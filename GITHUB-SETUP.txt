@@ -1,0 +1,45 @@
+================================================================================
+  WHY "REPOSITORY NOT FOUND"
+================================================================================
+
+Your remote URL must use your REAL GitHub username — NOT the words YOUR_USERNAME.
+
+BAD (placeholder — will always fail):
+  https://github.com/YOUR_USERNAME/YOUR_REPO.git
+
+GOOD (example — use YOUR account):
+  https://github.com/janedoe/Breakaway.git
+
+================================================================================
+  STEP 1 — Find your GitHub username
+================================================================================
+
+1. Log in at https://github.com
+2. Click your avatar (top right) → Your profile
+3. Look at the URL in the browser. It looks like:
+     https://github.com/SomeName
+   The part after github.com/ is your USERNAME (e.g. SomeName).
+
+================================================================================
+  STEP 2 — Create the repo on GitHub (empty)
+================================================================================
+
+1. https://github.com/new
+2. Repository name: Breakaway  (or any name — must match what you put in the URL)
+3. Public, NO readme, NO .gitignore, NO license
+4. Create repository
+
+================================================================================
+  STEP 3 — PowerShell (replace USERNAME and REPO if different)
+================================================================================
+
+cd "c:\Users\abdul\Downloads\Code\Breakaway"
+
+git remote add origin https://github.com/USERNAME/Breakaway.git
+
+git push -u origin main
+
+Password: use a Personal Access Token (NOT your GitHub password)
+  GitHub → Settings → Developer settings → Personal access tokens → Generate
+
+================================================================================
