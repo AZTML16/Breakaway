@@ -1,0 +1,9 @@
+{
+  "name": "breakaway",
+  "private": true,
+  "description": "Hockey career sim — static single-page game",
+  "scripts": {
+    "start": "npx --yes serve . -l 3000",
+    "host": "npx --yes serve . -l 3000"
+  }
+}

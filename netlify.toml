@@ -1,0 +1,8 @@
+# Netlify: connect repo or drag-drop this folder. Site serves from repo root.
+[build]
+  publish = "."
+
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
