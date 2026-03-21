@@ -44,7 +44,20 @@ git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
 git push -u origin main
 ```
 
-Replace `YOUR_USERNAME` and `YOUR_REPO` with yours. If the repo already exists and has a remote, skip `git init` / `remote add` and only `add`, `commit`, `push`.
+Replace `YOUR_USERNAME` and `YOUR_REPO` with yours.
+
+**Starting over (clean local Git):** if you already had a messy repo, you can wipe local Git history and commit once:
+
+```powershell
+cd path\to\Breakaway
+Remove-Item -Recurse -Force .git   # Windows PowerShell
+git init
+git branch -M main
+git add .
+git commit -m "Initial commit: Breakaway"
+```
+
+Then add `origin` and `git push` as above. On GitHub you can delete the old repo and create a new empty one with the same name, or force-push (advanced).
 
 ### 3. Turn on GitHub Pages
 
