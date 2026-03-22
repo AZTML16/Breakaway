@@ -464,6 +464,7 @@ input[type=range]{width:100%;accent-color:var(--gold);margin:6px 0}
 .badge.green{border-color:rgba(0,184,148,.5);color:var(--green);background:rgba(0,184,148,.07)}
 .badge.red{border-color:rgba(214,48,49,.5);color:var(--red);background:rgba(214,48,49,.07)}
 .badge.mut{border-color:rgba(90,138,176,.3);color:var(--mut)}
+.badge.acc{border-color:rgba(122,184,224,.45);color:var(--acc);background:rgba(122,184,224,.08)}
 .divider{border:none;border-top:1px solid var(--rl);margin:10px 0}
 .career-load-track{height:14px;background:var(--rink);border:2px solid var(--rl);overflow:hidden;box-shadow:inset 0 2px 8px rgba(0,0,0,.45)}
 .career-load-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--acc),var(--gold));transition:width .1s linear;box-shadow:0 0 14px rgba(0,255,204,.35)}
@@ -629,6 +630,7 @@ input[type=range]{width:100%;accent-color:var(--gold);margin:6px 0}
 <div class="panel"><div class="ptitle">HOW TO PLAY</div>
 <div class="vt" style="font-size:15px;color:var(--mut);line-height:2">
 &gt; CREATE YOUR PLAYER -- NATIONALITY, GENDER, POSITION, ARCHETYPE<br>
+&gt; PICK AN X-FACTOR -- EACH HAS UPS &amp; DOWNS (CLUTCH: WEAKER REG, STRONGER PLAYOFFS / WORLD)<br>
 &gt; DISTRIBUTE ATTRIBUTE POINTS TO CUSTOMIZE YOUR STYLE<br>
 &gt; CHOOSE YOUR STARTING LEAGUE AT AGE 16<br>
 &gt; JUNIORS: GET DRAFTED -- COLLEGE: SCHOLARSHIP OFFERS -- EURO: CONTRACT OFFERS<br>
@@ -722,6 +724,27 @@ input[type=range]{width:100%;accent-color:var(--gold);margin:6px 0}
 <div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:12px">YOUR ARCHETYPE SHAPES ATTRIBUTES AND DEVELOPMENT PATH.</div>
 <div id="arch-list"></div>
 </div>
+<button class="btn bp bw" onclick="goToPotential()">POTENTIAL &gt;</button>
+</div>
+
+<!-- POTENTIAL -->
+<div class="screen" id="s-potential">
+<div class="hbar"><span>BREAKAWAY</span><span>POTENTIAL</span></div>
+<div class="panel"><div class="ptitle">SCOUT PROJECTION</div>
+<div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:12px">HOW SCOUTS SEE YOUR LONG-TERM UPSIDE — NOT A HARD LIMIT. YOU CAN STILL OUTPERFORM OR FALL SHORT.</div>
+<div id="potential-w-hint" class="vt" style="font-size:13px;color:var(--acc);margin-bottom:10px;line-height:1.45;display:none"></div>
+<div id="potential-list"></div>
+</div>
+<button class="btn bp bw" onclick="goToXFactor()">X-FACTOR &gt;</button>
+</div>
+
+<!-- X-FACTOR -->
+<div class="screen" id="s-xfactor">
+<div class="hbar"><span>BREAKAWAY</span><span>X-FACTOR</span></div>
+<div class="panel"><div class="ptitle">YOUR X-FACTOR</div>
+<div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:12px">ONE SIGNATURE TRAIT — SHAPES STYLE, MEDIA, AND TINY ON-ICE TENDENCIES.</div>
+<div id="xfactor-list"></div>
+</div>
 <button class="btn bp bw" onclick="goToAttributes()">SET ATTRIBUTES &gt;</button>
 </div>
 
@@ -802,6 +825,8 @@ input[type=range]{width:100%;accent-color:var(--gold);margin:6px 0}
 <span class="badge blue" id="hub-league-badge">OJL</span>
 <span class="badge green" id="hub-contract-badge">AMATEUR</span>
 <span class="badge mut" id="hub-morale-badge">MORALE 70</span>
+<span class="badge acc" id="hub-potential-badge" style="font-size:11px;max-width:100%;white-space:normal;text-align:center;line-height:1.25">POTENTIAL</span>
+<span class="badge gold" id="hub-xfactor-badge" style="font-size:11px;max-width:100%;white-space:normal;text-align:center;line-height:1.25" title="X-Factor">X-FACTOR</span>
 </div>
 <div class="xpbar"><div class="xpfill" id="hub-xp" style="width:10%"></div></div>
 <div class="vt" style="font-size:12px;color:var(--mut);margin-top:4px">XP <span id="hub-xp-lbl">100/1000</span></div>
@@ -1267,11 +1292,10 @@ var ARCHETYPES = {
     Enforcer:     {name:'Enforcer',    icon:'[X]', desc:'Protector. Fights, hits, intimidates.',               boosts:{physical:20,stamina:8,shooting:-16,passing:-12,stickhandling:-8}}
   },
   D: {
-    OffensiveD:   {name:'Offensive D', icon:'[+]', desc:'QB on the blueline. Generates offense from the point.', boosts:{passing:16,skating:8,defense:-10,shotBlocking:-6}},
+    OffensiveD:   {name:'Offensive D', icon:'[+]', desc:'Offensive defenseman — joins the attack, shoots and passes from the blue line.', boosts:{passing:18,skating:10,defense:-12,shotBlocking:-6}},
     StayAtHome:   {name:'Stay-at-Home',icon:'[S]', desc:'No offense, all defense. Hard to play against.',      boosts:{defense:16,physical:12,shotBlocking:10,skating:-6,passing:-8}},
     TwoWayD:      {name:'Two-Way D',   icon:'[=]', desc:'Balanced blueliner. Competent in both zones.',        boosts:{defense:8,passing:8,skating:5,physical:3}},
-    ShutdownD:    {name:'Shutdown D',  icon:'[L]', desc:'Assignment: stop the other teams best player.',       boosts:{defense:18,positioning:12,skating:4,shotBlocking:8,passing:-10}},
-    OQD:          {name:'QB D',        icon:'[Q]', desc:'Elite point passer. Runs the power play unit.',       boosts:{passing:18,skating:10,defense:-14,shotBlocking:-6}}
+    ShutdownD:    {name:'Shutdown D',  icon:'[L]', desc:'Assignment: stop the other teams best player.',       boosts:{defense:18,positioning:12,skating:4,shotBlocking:8,passing:-10}}
   },
   G: {
     Butterfly:    {name:'Butterfly',   icon:'[B]', desc:'Positioning and post-sealing. Classic modern style.', boosts:{positioning:16,reboundControl:10,glove:-4,stamina:4}},
@@ -1707,6 +1731,22 @@ var curFAOffers = [];
 var pendingTrade = null;
 var ptsLeft = 20;
 var selPos = 'F', selSubPos = 'C', selArch = 'Sniper', selLeague = 'OJL';
+var selXFactor = 'hard_worker';
+var selPotential = 'support';
+/** Personality / identity tag — tradeoffs + sim / playoff / world hooks */
+var X_FACTORS = {
+  clutch:          {name:'CLUTCH',          icon:'[*]', desc:'− REG SEASON (flat nights) · + PLAYOFFS & WORLD STAGE (raises ceiling when it matters).'},
+  careless:        {name:'CARELESS',        icon:'[!]', desc:'Streaky: checks out when the team is losing / results pile up — but morale stays oddly steady. Playoffs & worlds: rises with the spotlight when things are going well (wins, confidence); soft D & extra GA mostly show up when the slump is on.'},
+  hard_worker:     {name:'HARD WORKER',     icon:'[+]', desc:'+ consistency & XP · no flash — rarely steals the highlight reel.'},
+  brat:            {name:'BRAT',            icon:'[B]', desc:'REG: fewer points & messy nights · PLAYOFFS/WORLD: thrives on noise — agitates, draws calls, rises when it counts.'},
+  smart_iq:        {name:'SMART IQ',        icon:'[IQ]',desc:'+ reads & decisions · − sometimes overthinks / passes up risk.'},
+  regular_season:  {name:'REG-SEASON STAR', icon:'[RS]',desc:'+ counting stats in the grind · − playoffs & best-on-best can shrink you.'},
+  heavy_hitter:    {name:'HEAVY HITTER',    icon:'[H]', desc:'+ physical edge & wear-down · − extra PIM risk / fatigue in long runs.'},
+  elite_vision:    {name:'ELITE VISION',    icon:'[EV]',desc:'+ playmaking & assist tilt · − shot-first selfish looks suffer.'},
+  quick_release:   {name:'QUICK RELEASE',   icon:'[QR]', desc:'+ gets pucks off before lanes close (forward goal tilt) · − less time to scan — playmaking / setup suffers.'},
+  good_stick:      {name:'GOOD STICK',      icon:'[⌇]',desc:'+ takeaways & stick checks (defense) · − can reach & take penalties.'},
+  none:            {name:'NO X-FACTOR',     icon:'[--]',desc:'No special label — straight-line development.'}
+};
 var socialSubFilter = 'all';
 var _pendingWeekSummaryCallback=null;
 var _lastPlayoffRecapHTML='';
@@ -1719,7 +1759,49 @@ function ri(a,b){return Math.floor(Math.random()*(b-a+1))+a;}
 function rd(a,b){return Math.random()*(b-a)+a;}
 function shuf(arr){var a=arr.slice();for(var i=a.length-1;i>0;i--){var j=ri(0,i);var t=a[i];a[i]=a[j];a[j]=t;}return a;}
 function fmt(n){if(n>=1000000)return'$'+(Math.round(n/100000)/10)+'M';if(n>=1000)return'$'+Math.round(n/1000)+'K';return'$'+n;}
+/** Save % for UI from ratio 0..1 (e.g. 0.905 -> "90.5%"). */
+function formatSvPctFromRatio(ratio){
+  if(!(ratio>0)||!isFinite(ratio)) return '--';
+  return (Math.round(ratio*1000)/10)+'%';
+}
+/** Season log rows may store svpct as percent (90.2) or legacy ratio (0.902). */
+function formatSeasonLogSvPct(val){
+  if(val==='--'||val==null||val==='') return '--';
+  var n=typeof val==='number'?val:parseFloat(String(val),10);
+  if(!isFinite(n)) return String(val);
+  if(n>0 && n<=1) return (Math.round(n*1000)/10)+'%';
+  return (Math.round(n*10)/10)+'%';
+}
 function ovr(attrs){var vals=Object.values(attrs);return Math.round(vals.reduce(function(a,b){return a+b;},0)/vals.length);}
+
+/** Scout projection — dev rate nudges growth; ovrMin/Max kept for internal balance only. Attr caps are age-only. */
+var POTENTIALS={
+  mvp:{name:'MVP',label:'MVP',ovrMin:97,ovrMax:99,devRate:1.15,desc:'Rare Hart-level peak — scouts see you as a league MVP candidate. You can still miss or exceed it.'},
+  franchise:{name:'FRANCHISE',label:'FRANCHISE',ovrMin:93,ovrMax:97,devRate:1.12,desc:'Face-of-the-franchise tier — the player a city builds around. Not a hard ceiling.'},
+  elite:{name:'ELITE',label:'ELITE',ovrMin:88,ovrMax:93,devRate:1.08,desc:'Top-line / elite tools — drives offense and plays in every big situation.'},
+  support:{name:'SUPPORT',label:'SUPPORT',ovrMin:83,ovrMax:88,devRate:1.0,desc:'Everyday middle-six support — reliable minutes, trusted role.'},
+  depth:{name:'DEPTH',label:'DEPTH',ovrMin:78,ovrMax:85,devRate:0.94,desc:'Bottom-six / PK / depth minutes — limited offensive flash, high compete.'},
+  fringe:{name:'FRINGE',label:'FRINGE',ovrMin:72,ovrMax:82,devRate:0.88,desc:'Bubble roster / AHL shuttle — fights for a jersey every season.'},
+  minor:{name:'MINOR',label:'MINOR',ovrMin:40,ovrMax:75,minorUnder:true,devRate:0.82,desc:'Minor-league / spot call — toughest path to stick; scouts have doubts.'}
+};
+function getBaseAgeAttrCap(age){
+  age=age||16;
+  if(age<=20) return 99;
+  if(age<=24) return 97;
+  if(age<=28) return 96;
+  return 92;
+}
+/** Max rating per attribute for this age (potential does not hard-cap attrs). */
+function getAttrCapForAge(age){
+  return cl(getBaseAgeAttrCap(age),65,99);
+}
+function escapeAttrTitle(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+function getPotentialDevMult(potentialKey){
+  var pk=(potentialKey&&POTENTIALS[potentialKey])?potentialKey:'support';
+  return POTENTIALS[pk].devRate||1;
+}
 
 function isGlitchEffectsEnabled(){
   try{return localStorage.getItem('breakawayGlitch')!=='0';}catch(e){return true;}
@@ -1808,6 +1890,9 @@ function buildGameSnapshot(){
 function applyGameSnapshot(snap){
   if(!snap||snap.v<1||!snap.G) return false;
   G=snap.G;
+  if(G.xFactor==='sniper_xf') G.xFactor='quick_release';
+  if(G.arch==='OQD') G.arch='OffensiveD';
+  if(!G.potential||!POTENTIALS[G.potential]) G.potential='support';
   var x=snap.x||{};
   timerSec=(typeof x.timerSec==='number'&&x.timerSec>=0)?x.timerSec:10;
   curMoment=x.curMoment|0;
@@ -1823,6 +1908,7 @@ function applyGameSnapshot(snap){
   pendingTrade=x.pendingTrade!=null?x.pendingTrade:null;
   ptsLeft=+x.ptsLeft||0;
   selPos=x.selPos||'F';selSubPos=x.selSubPos||'C';selArch=x.selArch||'Sniper';selLeague=x.selLeague||'OJL';
+  if(selArch==='OQD') selArch='OffensiveD';
   socialSubFilter=x.socialSubFilter||'all';
   _lastPlayoffRecapHTML=String(x._lastPlayoffRecapHTML!=null?x._lastPlayoffRecapHTML:'');
   _lastWorldStageHTML=String(x._lastWorldStageHTML!=null?x._lastWorldStageHTML:'');
@@ -1863,7 +1949,7 @@ function refreshUIRAfterLoad(screenId){
     if(id==='s-postgame'){
       renderHub(); show('s-hub'); notify('POSTGAME SCREEN RESET — HUB','gold'); return;
     }
-    if(id==='s-create'||id==='s-arch'||id==='s-attrs'||id==='s-league'||id==='s-team'){
+    if(id==='s-create'||id==='s-arch'||id==='s-potential'||id==='s-xfactor'||id==='s-attrs'||id==='s-league'||id==='s-team'){
       renderHub(); show('s-hub'); notify('CREATE FLOW — OPENED HUB','gold'); return;
     }
     if(id==='s-contract'||id==='s-retire'||id==='s-howto'||id==='s-title'){
@@ -1957,7 +2043,7 @@ function show(id){
   /* Full CRT cut: game beats + intro/load/story (more common than before) */
   var fullGlitchIds={'s-pregame':1,'s-ingame':1,'s-postgame':1,'s-game-intro':1,'s-story-opening':1,'s-game-loading':1};
   /* Softer snap: hub, career UI, create flow — always micro-glitch */
-  var softMicroIds={'s-hub':1,'s-offseason':1,'s-contract':1,'s-create':1,'s-arch':1,'s-attrs':1,'s-league':1,'s-team':1,'s-howto':1,'s-retire':1};
+  var softMicroIds={'s-hub':1,'s-offseason':1,'s-contract':1,'s-create':1,'s-arch':1,'s-potential':1,'s-xfactor':1,'s-attrs':1,'s-league':1,'s-team':1,'s-howto':1,'s-retire':1};
   var isBigGameTransition=!!fullGlitchIds[id];
   var isSoftMicro=!isBigGameTransition&&!!softMicroIds[id];
   var randomMicro=!isBigGameTransition&&!isSoftMicro&&Math.random()<0.26;
@@ -2492,7 +2578,7 @@ var RetroSound=(function(){
     if(!bgmEnabled){stopMusicInternal();return;}
     var id=screenId||'';
     if(id==='s-title'||id==='s-howto'||id==='s-game-intro') startMusic('title');
-    else if(id==='s-create'||id==='s-arch'||id==='s-attrs'||id==='s-league'||id==='s-team'||id==='s-game-loading') startMusic('menu');
+    else if(id==='s-create'||id==='s-arch'||id==='s-potential'||id==='s-xfactor'||id==='s-attrs'||id==='s-league'||id==='s-team'||id==='s-game-loading') startMusic('menu');
     else if(id==='s-ingame') startMusic('arena');
     else startMusic('hub');
   }
@@ -3055,6 +3141,11 @@ function populateFavoriteTeamSelect(){
 function onGenderChange(){
   selLeague = safeEl('c-gender').value === 'M' ? 'OJL' : 'CWHL';
   populateFavoriteTeamSelect();
+  try{
+    var cur=document.querySelector('.screen.on');
+    if(cur&&cur.id==='s-potential') goToPotential();
+    else if(cur&&cur.id==='s-xfactor') goToXFactor();
+  }catch(e){}
 }
 
 // ============================================================
@@ -3114,6 +3205,63 @@ function pickArch(k){
   var cards=document.querySelectorAll('.arch-card');
   for(var i=0;i<cards.length;i++) cards[i].classList.remove('sel');
   var el=safeEl('arch-'+k);
+  if(el) el.classList.add('sel');
+}
+
+function goToPotential(){
+  var gSel=(safeEl('c-gender')&&safeEl('c-gender').value)||'M';
+  var wh=safeEl('potential-w-hint');
+  if(wh){
+    if(gSel==='F'){
+      wh.style.display='block';
+      wh.textContent="WOMEN'S PATH: PROJECTION USES THE SAME TIERS IN THE WOMEN'S OVR CONTEXT (NOT THE MEN'S NUMBER LINE).";
+    } else {
+      wh.style.display='none';
+      wh.textContent='';
+    }
+  }
+  var plist=safeEl('potential-list');
+  var phtml='';
+  var pOrder=['mvp','franchise','elite','support','depth','fringe','minor'];
+  for(var pi=0;pi<pOrder.length;pi++){
+    var pid=pOrder[pi];
+    var pr=POTENTIALS[pid];
+    if(!pr) continue;
+    phtml+='<div class="arch-card'+(selPotential===pid?' sel':'')+'" id="pot-'+pid+'" onclick="pickPotential(\''+pid+'\')">';
+    phtml+='<div class="arch-name">'+pr.label+'</div>';
+    phtml+='<div class="arch-desc">'+pr.desc+'</div></div>';
+  }
+  plist.innerHTML=phtml;
+  show('s-potential');
+}
+function goToXFactor(){
+  var list=safeEl('xfactor-list');
+  var html='';
+  var keys=Object.keys(X_FACTORS);
+  for(var i=0;i<keys.length;i++){
+    var id=keys[i];
+    var xf=X_FACTORS[id];
+    html+='<div class="arch-card'+(selXFactor===id?' sel':'')+'" id="xf-'+id+'" onclick="pickXFactor(\''+id+'\')">';
+    html+='<div class="arch-name">'+xf.icon+' '+xf.name+'</div>';
+    html+='<div class="arch-desc">'+xf.desc+'</div></div>';
+  }
+  list.innerHTML=html;
+  show('s-xfactor');
+}
+function pickPotential(id){
+  if(!POTENTIALS[id]) return;
+  selPotential=id;
+  var cards=document.querySelectorAll('#potential-list .arch-card');
+  for(var i=0;i<cards.length;i++) cards[i].classList.remove('sel');
+  var el=safeEl('pot-'+id);
+  if(el) el.classList.add('sel');
+}
+function pickXFactor(id){
+  if(!X_FACTORS[id]) return;
+  selXFactor=id;
+  var cards=document.querySelectorAll('#xfactor-list .arch-card');
+  for(var i=0;i<cards.length;i++) cards[i].classList.remove('sel');
+  var el=safeEl('xf-'+id);
   if(el) el.classList.add('sel');
 }
 
@@ -3368,7 +3516,7 @@ function composeOriginStory(G){
     else if(archKey==='Grinder'||archKey==='Enforcer') posSoul='You learned the game in board battles and bruises — respect earned in inches, not highlights.';
     else posSoul='You wanted the puck when the clock got honest — when pretty breaks down and someone still has to score.';
   } else if(G.pos==='D'){
-    if(archKey==='OffensiveD'||archKey==='OQD') posSoul='You grew up wanting the blue line to be a weapon — not a parking spot.';
+    if(archKey==='OffensiveD') posSoul='You grew up wanting the blue line to be a weapon — not a parking spot.';
     else if(archKey==='StayAtHome'||archKey==='ShutdownD') posSoul='You fall in love with taking away time — the boring magic of being impossible to beat.';
     else posSoul='You see the rush before it forms — angles first, panic never.';
   } else {
@@ -3553,7 +3701,8 @@ function startCareer(){
     first:first,last:last,nat:nat,gender:gender,year:year,
     jersey:jersey,hand:hand,height:height,weight:weight,hometown:hometown,
     favoriteTeam:favoriteTeam,favoriteTeamLeague:favoriteTeamLeague,
-    pos:selPos,subPos:selSubPos,arch:selArch,
+    pos:selPos,subPos:selSubPos,arch:selArch,xFactor:(selXFactor&&X_FACTORS[selXFactor]?selXFactor:'none'),
+    potential:(selPotential&&POTENTIALS[selPotential]?selPotential:'support'),
     age:16,season:1,
     leagueKey:lk,league:l,team:team,
     attrs:attrs,health:100,stamina:80,morale:70,
@@ -3902,6 +4051,22 @@ function renderHub(){
   var me=G.morale;
   var mei=me>=80?':)':me>=60?':|':me>=40?':S':':(';
   safeEl('hub-morale-badge').textContent=mei+' '+me;
+  if(G.xFactor==='sniper_xf') G.xFactor='quick_release';
+  if(G.arch==='OQD') G.arch='OffensiveD';
+  var xfId=G.xFactor&&X_FACTORS[G.xFactor]?G.xFactor:'none';
+  var xf=X_FACTORS[xfId]||X_FACTORS.none;
+  var xfb=safeEl('hub-xfactor-badge');
+  if(xfb){
+    xfb.textContent=xf.icon+' '+xf.name;
+    xfb.title=xf.desc;
+  }
+  var potId=G.potential&&POTENTIALS[G.potential]?G.potential:'support';
+  var pot=POTENTIALS[potId];
+  var potB=safeEl('hub-potential-badge');
+  if(potB){
+    potB.textContent=pot.label+' POTENTIAL';
+    potB.title=pot.desc;
+  }
   var xpNxt=G.season*1200;
   safeEl('hub-xp').style.width=Math.min(100,G.xp/xpNxt*100)+'%';
   safeEl('hub-xp-lbl').textContent=G.xp+'/'+xpNxt;
@@ -3925,7 +4090,7 @@ function renderHub(){
       '<div class="stbox"><div class="stlbl">GP</div><div class="stval">'+G.gp+'</div></div>'+
       '<div class="stbox"><div class="stlbl">GA</div><div class="stval" style="color:var(--red)">'+(G.goalsAgainst||0)+'</div></div>'+
       '<div class="stbox"><div class="stlbl">SV</div><div class="stval" style="color:var(--green)">'+G.saves+'</div></div>'+
-      '<div class="stbox"><div class="stlbl">SV%</div><div class="stval" style="color:var(--gold)">'+svpctSzn+'</div></div>'+
+      '<div class="stbox"><div class="stlbl">SV%</div><div class="stval" style="color:var(--gold)">'+(svpctSzn==='--'?svpctSzn:svpctSzn+'%')+'</div></div>'+
       '<div class="stbox"><div class="stlbl">GAA</div><div class="stval">'+gaaSzn+'</div></div>'+
       '<div class="stbox"><div class="stlbl">W/L</div><div class="stval" style="color:'+(pm>=0?'var(--green)':'var(--red)')+'">'+(pm>=0?'+':'')+pm+'</div></div>';
   } else {
@@ -4040,6 +4205,9 @@ function hubTab(tab){
 function renderAttrTab(){
   var html='';
   var keys=Object.keys(G.attrs);
+  var potK=G.potential&&POTENTIALS[G.potential]?G.potential:'support';
+  html+='<div class="vt" style="font-size:13px;color:var(--mut);margin-bottom:10px;line-height:1.45">'+
+    '<span style="color:var(--acc)">PROJECTION:</span> '+POTENTIALS[potK].label+' — '+POTENTIALS[potK].desc+'</div>';
   for(var i=0;i<keys.length;i++){
     var k=keys[i]; var v=G.attrs[k];
     var color=ATTR_COLORS[k]||'var(--mut)';
@@ -4186,7 +4354,7 @@ function renderCareerTab(){
     if(s.season!=null) html+='<span style="color:var(--acc);font-size:12px"> SZN '+s.season+'</span> ';
     html+='<span style="color:var(--mut)">'+s.league+' '+s.team+'</span> ';
     if(s.isGoalie){
-      html+=s.gp+'GP '+s.sv+'SV '+s.ga+'GA SV%'+s.svpct+' GAA'+s.gaa;
+      html+=s.gp+'GP '+s.sv+'SV '+s.ga+'GA SV%'+formatSeasonLogSvPct(s.svpct)+' GAA'+s.gaa;
     } else {
       html+=s.gp+'GP '+s.g+'G '+s.a+'A '+(s.g+s.a)+'PTS';
     }
@@ -4584,6 +4752,9 @@ function renderSocialTab(){
   } else {
     statBadge='<span class="badge blue">'+G.goals+'G '+G.assists+'A</span>';
   }
+  var xfP=(G.xFactor&&X_FACTORS[G.xFactor])?('<span class="badge mut" title="'+(X_FACTORS[G.xFactor].desc||'')+'">'+X_FACTORS[G.xFactor].icon+' '+X_FACTORS[G.xFactor].name+'</span>'):'';
+  var potS=G.potential&&POTENTIALS[G.potential]?G.potential:'support';
+  var potP='<span class="badge acc" title="'+escapeAttrTitle(POTENTIALS[potS].desc)+'">'+POTENTIALS[potS].label+' POTENTIAL</span>';
   safeEl('social-profile').innerHTML=
     '<div class="player-card-full">'+
     '<div style="display:flex;align-items:center;gap:14px">'+
@@ -4602,6 +4773,8 @@ function renderSocialTab(){
     '<div style="margin-top:6px">'+
     '<span class="badge gold">OVR '+ovrVal+'</span>'+
     statBadge+
+    potP+
+    xfP+
     (G.careerCups>0?'<span class="badge green">'+G.careerCups+'x CHAMP</span>':'')+
     '</div>'+
     '</div></div></div>';
@@ -4758,6 +4931,17 @@ function sendResponse(idx,txt,moraleGain){
 // ============================================================
 // PRE-GAME
 // ============================================================
+function setPregamePlayButton(backupNight,gameIdx){
+  var btn=safeEl('btn-play-game');
+  if(!btn) return;
+  if(backupNight){
+    btn.textContent='[ SIM (BACKUP) ]';
+    btn.onclick=function(){ simBackupGoalieGame(gameIdx); };
+  } else {
+    btn.textContent='[ PLAY GAME ]';
+    btn.onclick=function(){ startGame(); };
+  }
+}
 function preGame(idx){
   if(G._worldStageCtx){
     var wctx=G._worldStageCtx;
@@ -4786,6 +4970,7 @@ function preGame(idx){
       shtml+='<button class="btn '+(curStrategy===ws.id?'bp':'bs')+'" onclick="setStrategy(\''+ws.id+'\',this)">'+ws.name+'<br><span class="vt" style="font-size:12px;color:var(--mut)">'+ws.desc+'</span></button>';
     }
     safeEl('strategy-btns').innerHTML=shtml;
+    setPregamePlayButton(false,0);
     show('s-pregame');
     return;
   }
@@ -4811,9 +4996,11 @@ function preGame(idx){
       pshtml+='<button class="btn '+(curStrategy===ps.id?'bp':'bs')+'" onclick="setStrategy(\''+ps.id+'\',this)">'+ps.name+'<br><span class="vt" style="font-size:12px;color:var(--mut)">'+ps.desc+'</span></button>';
     }
     safeEl('strategy-btns').innerHTML=pshtml;
+    setPregamePlayButton(false,0);
     show('s-pregame');
     return;
   }
+  G._pregameBackupNight=false;
   if(idx>=0){
     if(idx!==G.weekGames){
       notify('FINISH GAME '+(G.weekGames+1)+' ON THE SCHEDULE FIRST','gold');
@@ -4821,10 +5008,7 @@ function preGame(idx){
     }
     if(G.pos==='G'&&!G.isInjured){
       var _gm=ensureGoalieStartMask();
-      if(_gm&&!_gm[idx]){
-        notify('BACKUP STARTS -- TAP SIM (BACKUP) ON THE HUB','gold');
-        return;
-      }
+      if(_gm&&!_gm[idx]) G._pregameBackupNight=true;
     }
   }
   var perWeek=getGamesPerWeek(G.leagueKey);
@@ -4851,6 +5035,7 @@ function preGame(idx){
     shtml+='<button class="btn '+(curStrategy===s.id?'bp':'bs')+'" onclick="setStrategy(\''+s.id+'\',this)">'+s.name+'<br><span class="vt" style="font-size:12px;color:var(--mut)">'+s.desc+'</span></button>';
   }
   safeEl('strategy-btns').innerHTML=shtml;
+  setPregamePlayButton(!!G._pregameBackupNight,idx);
   show('s-pregame');
 }
 
@@ -5206,8 +5391,11 @@ function endGame(){
   var gRnd=Math.round(gameStats.g);
   var aRnd=Math.round(gameStats.a);
   var pm=Math.round(gameStats.pm||0);
+  if(G.xFactor==='careless' && (G._playoffCtx&&G._isPlayoffGame||G._worldStageCtx) && G.pos!=='G' && !won && !tied){
+    pm=cl(pm-1-(Math.random()<0.45?1:0),-6,6);
+  }
   var svpctRaw=gameStats.sv+gameStats.ga>0?gameStats.sv/(gameStats.sv+gameStats.ga):0;
-  var svpctStr=gameStats.sv+gameStats.ga>0?Math.round(svpctRaw*100)+'%':'---';
+  var svpctStr=gameStats.sv+gameStats.ga>0?formatSvPctFromRatio(svpctRaw):'---';
   var mAvg=getMomentScoresAverage();
 
   if(G._worldStageCtx){
@@ -5218,8 +5406,8 @@ function endGame(){
     if(G.pos==='G'){wctx.stats.sv+=gameStats.sv;wctx.stats.ga+=gameStats.ga;}
     else {wctx.stats.g+=gRnd;wctx.stats.a+=aRnd;}
     G.stamina=cl(G.stamina-ri(5,12),0,100);
-    G.morale=cl(G.morale+(won?8:tied?3:-6),0,100);
-    G.xp+=ri(30,55);
+    G.morale=cl(G.morale+(G.xFactor==='careless'?(won?8:tied?3:-4):(won?8:tied?3:-6)),0,100);
+    G.xp+=G.pos==='G'?Math.round(ri(22,42)*getXFactorGoalieXpMult(getXFactorGameContext())):ri(30,55);
     var scW=gameHomeScore+'-'+gameAwayScore;
     addNews(ev.nt+' '+scW+' vs '+curOpponent.n+' ('+ev.tName+') -- '+(won?'WIN':'LOSS'),(won?'good':'bad'));
     if(gRnd>=2) addNews(G.first+' '+G.last+' scores '+gRnd+' -- multi-goal game!','big');
@@ -5269,8 +5457,8 @@ function endGame(){
     if(G.pos==='G'){pctx.myStats.sv+=gameStats.sv;pctx.myStats.ga+=gameStats.ga;}
     else {pctx.myStats.g+=gRnd;pctx.myStats.a+=aRnd;}
     G.stamina=cl(G.stamina-ri(5,12),0,100);
-    G.morale=cl(G.morale+(won?7:tied?2:-5),0,100);
-    G.xp+=ri(25,50);
+    G.morale=cl(G.morale+(G.xFactor==='careless'?(won?7:tied?2:-3):(won?7:tied?2:-5)),0,100);
+    G.xp+=G.pos==='G'?Math.round(ri(18,38)*getXFactorGoalieXpMult(getXFactorGameContext())):ri(25,50);
     var scP=gameHomeScore+'-'+gameAwayScore;
     addNews('PLAYOFFS: '+G.team.n+' '+scP+' vs '+curOpponent.n+' -- '+(won?'WIN':'LOSS'),(won?'good':'bad'));
     if(gRnd>=2) addNews(G.first+' '+G.last+' scores '+gRnd+' -- multi-goal game!','big');
@@ -5339,9 +5527,9 @@ function endGame(){
     G.plusminus+=cl(defTick,-1,1);
   }
   G.stamina=cl(G.stamina-ri(6,14),0,100);
-  G.morale=cl(G.morale+(won?5:tied?1:-4),0,100);
+  G.morale=cl(G.morale+(G.xFactor==='careless'?(won?5:tied?1:-2):(won?5:tied?1:-4)),0,100);
   if(!G.isInjured&&Math.random()<0.018) triggerInjury();
-  G.xp+=ri(20,45);
+  G.xp+=G.pos==='G'?Math.round(ri(14,38)*getXFactorGoalieXpMult(getXFactorGameContext())):ri(20,45);
   var sc=gameHomeScore+'-'+gameAwayScore;
   addNews(G.team.n+' '+sc+' vs '+curOpponent.n+' -- '+(won?'WIN':'LOSS'),(won?'good':'bad'));
   if(gRnd>=2) addNews(G.first+' '+G.last+' scores '+gRnd+' -- multi-goal game!','big');
@@ -5410,11 +5598,13 @@ function nextWeek(){
   // Natural attribute development stops at age 26. Younger = much faster weekly gains, then tapers hard toward 25-26.
   if((G.age||16)<26){
     var youthW=G.age<=17?1.55:(G.age<=19?1.28:(G.age<=22?1.0:(G.age<=24?0.68:0.42)));
+    var pDev=getPotentialDevMult(G.potential||'support');
+    var amin=typeof G._attrClampMin==='number'?G._attrClampMin:40;
+    var capAge=getAttrCapForAge(G.age||16);
     var attrList=ATTRS[G.pos];
     for(var i=0;i<attrList.length;i++){
       var a=attrList[i];
-      var cap=G.age<=20?99:G.age<=24?97:G.age<=28?96:92;
-      if(G.attrs[a]<cap) G.attrs[a]=cl(G.attrs[a]+rd(0,0.4)*dev*(G.morale/100)*youthW,40,99);
+      if(G.attrs[a]<capAge) G.attrs[a]=cl(G.attrs[a]+rd(0,0.4)*dev*pDev*(G.morale/100)*youthW,amin,capAge);
     }
   }
   // tougher leagues introduce more media pressure and fatigue on bad weeks
@@ -5440,6 +5630,7 @@ function simulatePlayoffs(){
   var sorted=G.standings.slice().sort(function(a,b){return b.pts-a.pts;});
   var bracket=buildPlayoffBracketFromStandings(sorted);
   if(!bracket||bracket.length<2)return {wonCup:false,roundReached:'',summary:null};
+  var pk=getXFactorPlayoffPowerMult();
   addNews('PLAYOFFS BEGIN in '+G.league.short+' with '+bracket.length+' teams.','big');
   var roundReached='';
   var current=bracket;
@@ -5456,8 +5647,8 @@ function simulatePlayoffs(){
     var roundRows=[];
     for(var i=0;i<current.length/2;i++){
       var home=current[i], away=current[current.length-1-i];
-      var homePower=(home.pts/(home.gp||1))+ (home.isMe?(ovr(G.attrs)/5):0);
-      var awayPower=(away.pts/(away.gp||1))+ (away.isMe?(ovr(G.attrs)/5):0);
+      var homePower=(home.pts/(home.gp||1))+ (home.isMe?(ovr(G.attrs)/5)*pk:0);
+      var awayPower=(away.pts/(away.gp||1))+ (away.isMe?(ovr(G.attrs)/5)*pk:0);
       var prob=cl(0.5 + (homePower-awayPower)/30,0.1,0.9);
       var winner=Math.random()<prob?home:away;
       var loser=winner===home?away:home;
@@ -5468,10 +5659,20 @@ function simulatePlayoffs(){
         if(G.pos==='G'){
           var psv=ri(24,40);
           var pga=ri(1,5);
+          if(G.xFactor==='careless'&&isCarelessSlumping()) pga+=Math.random()<0.42?ri(1,2):0;
           myStats.sv+=psv;
           myStats.ga+=pga;
         } else {
           var pg=ri(0,2), pa=ri(0,2);
+          var sp=getXFactorSkaterPtsMult('playoff');
+          if(sp>1){
+            if(Math.random()<(sp-1)*0.52) pg++;
+            if(Math.random()<(sp-1)*0.44) pa++;
+          } else if(sp<1){
+            if(Math.random()<(1-sp)*0.48 && pg>0) pg--;
+            if(Math.random()<(1-sp)*0.4 && pa>0) pa--;
+          }
+          pg=cl(pg,0,4); pa=cl(pa,0,4);
           myStats.g+=pg; myStats.a+=pa;
         }
         if(winner.isMe){
@@ -5505,8 +5706,9 @@ function simulatePlayoffs(){
 }
 
 function simPlayoffPairWinner(home,away){
-  var homePower=(home.pts/(home.gp||1))+ (home.isMe?(ovr(G.attrs)/5):0);
-  var awayPower=(away.pts/(away.gp||1))+ (away.isMe?(ovr(G.attrs)/5):0);
+  var pk=getXFactorPlayoffPowerMult();
+  var homePower=(home.pts/(home.gp||1))+ (home.isMe?(ovr(G.attrs)/5)*pk:0);
+  var awayPower=(away.pts/(away.gp||1))+ (away.isMe?(ovr(G.attrs)/5)*pk:0);
   var prob=cl(0.5 + (homePower-awayPower)/30,0.1,0.9);
   return Math.random()<prob?home:away;
 }
@@ -5936,7 +6138,8 @@ function runInternationalTournament(kind){
 
 function runInternationalTournamentFromEval(ev){
   var isJunior=ev.isJunior;
-  var tName=ev.tName, nt=ev.nt, teamPower=ev.teamPower, pOvr=ev.pOvr;
+  var tName=ev.tName, nt=ev.nt, pOvr=ev.pOvr;
+  var teamPower=cl(ev.teamPower*getXFactorWorldTeamPowerMult(),0.05,1.35);
   _lastWorldStageHTML+='<div style="margin-bottom:8px;color:var(--gold);font-size:15px">'+tName+': SELECTED FOR '+nt.toUpperCase()+'</div>';
   addNews('WORLD STAGE: '+G.first+' '+G.last+' selected for '+nt+' at '+tName+'.','big');
   var rrW=0, rrL=0;
@@ -5973,12 +6176,15 @@ function runInternationalTournamentFromEval(ev){
   if(G.pos==='G'){
     var shots=ri(70,130);
     var svRate=cl(0.89 + (pOvr-70)*0.001 + rd(-0.01,0.01),0.84,0.95);
+    if(G.xFactor==='clutch') svRate=cl(svRate+0.009,0.84,0.956);
+    if(G.xFactor==='regular_season') svRate=cl(svRate-0.007,0.84,0.95);
+    if(G.xFactor==='careless'&&isCarelessSlumping()) svRate=cl(svRate-0.006,0.84,0.95);
     var sv=Math.round(shots*svRate);
     var ga=shots-sv;
     addNews((medal?medal+' MEDAL! ':'')+nt+' '+tName+' run -- '+G.first+' '+G.last+' posts '+sv+' SV and '+ga+' GA in '+gp+' games.','big');
     _lastWorldStageStats={team:nt,tournament:tName,gp:gp,sv:sv,ga:ga,g:0,a:0};
   } else {
-    var pts=Math.max(0,Math.round(gp*(0.2 + (pOvr-60)*0.018 + rd(0,0.3))));
+    var pts=Math.max(0,Math.round(gp*(0.2 + (pOvr-60)*0.018 + rd(0,0.3))*getXFactorSkaterPtsMult('world')));
     var g=Math.round(pts*rd(0.35,0.6));
     var a=Math.max(0,pts-g);
     addNews((medal?medal+' MEDAL! ':'')+nt+' '+tName+' run -- '+G.first+' '+G.last+' records '+g+'G '+a+'A in '+gp+' games.','big');
@@ -6721,8 +6927,10 @@ function runDraftEventIfEligible(){
     if(pre>=72 && Math.random()<boomChance){
       var alBoom=ATTRS[G.pos]||[];
       var nBoost=track==='generational'?5:(track==='elite'?4:3);
+      var boomCap=getAttrCapForAge(G.age||18);
+      var bmin=typeof G._attrClampMin==='number'?G._attrClampMin:40;
       shuf(alBoom.slice()).slice(0,nBoost).forEach(function(a){
-        G.attrs[a]=cl(G.attrs[a]+rd(0.9,2.2),40,99);
+        G.attrs[a]=cl(G.attrs[a]+rd(0.9,2.2),bmin,boomCap);
       });
       addNews('DRAFT-YEAR LEAP: Scouts note a major jump from '+G.first+' '+G.last+' entering draft season.','good');
     }
@@ -6798,7 +7006,7 @@ function goToOffseason(){
   runDraftEventIfEligible();
   var actions=[
     {id:'surgery',   icon:'[H]', name:'SURGERY & REHAB',   desc:'Restore health -- lose dev time.',      fn:function(){G.health=cl(G.health+35,0,100);addNews('Surgery complete -- health restored.','good');}},
-    {id:'elite',     icon:'[T]', name:'ELITE SKILLS CAMP', desc:'Private coaching -- attr gains.',        fn:function(){if((G.age||16)>=26){G.morale=cl(G.morale+8,0,100);addNews('Skills camp -- mental reps and video work (physical ceiling reached at 26+).','neutral');return;}var al=ATTRS[G.pos];var picks=shuf(al.slice()).slice(0,3);picks.forEach(function(a){G.attrs[a]=cl(G.attrs[a]+rd(1,2.5),40,99);});addNews('Skills camp -- significant improvement.','good');}},
+    {id:'elite',     icon:'[T]', name:'ELITE SKILLS CAMP', desc:'Private coaching -- attr gains.',        fn:function(){if((G.age||16)>=26){G.morale=cl(G.morale+8,0,100);addNews('Skills camp -- mental reps and video work (physical ceiling reached at 26+).','neutral');return;}var al=ATTRS[G.pos];var picks=shuf(al.slice()).slice(0,3);var cc=getAttrCapForAge(G.age||16);var cmin=typeof G._attrClampMin==='number'?G._attrClampMin:40;picks.forEach(function(a){G.attrs[a]=cl(G.attrs[a]+rd(1,2.5),cmin,cc);});addNews('Skills camp -- significant improvement.','good');}},
     {id:'vacation',  icon:'[V]', name:'FULL VACATION',     desc:'Total rest -- morale and stamina.',      fn:function(){G.morale=cl(G.morale+30,0,100);G.stamina=cl(G.stamina+25,0,100);addNews('Vacation -- recharged.','good');}},
     {id:'media',     icon:'[M]', name:'MEDIA TOUR',        desc:'Commercials -- PR and brand boost.',     fn:function(){addNews('Media tour -- brand building done.','neutral');}},
     {id:'charity',   icon:'[C]', name:'CHARITY WORK',      desc:'Community impact -- morale boost.',      fn:function(){G.morale=cl(G.morale+18,0,100);addNews('Charity work -- huge goodwill.','good');}},
@@ -7244,9 +7452,11 @@ function nextSeason(){
   }
   if(G.age<=25){
     var al2=ATTRS[G.pos];
-    var gm=G.growthMult||1;
+    var gm=(G.growthMult||1)*getPotentialDevMult(G.potential||'support');
     var yb=G.age<=17?1.6:(G.age<=19?1.38:(G.age<=22?1.05:(G.age<=24?0.7:0.45)));
-    for(var i=0;i<al2.length;i++) G.attrs[al2[i]]=cl(G.attrs[al2[i]]+rd(0,1.5*gm*yb),40,99);
+    var oc=getAttrCapForAge(G.age||16);
+    var omin=typeof G._attrClampMin==='number'?G._attrClampMin:40;
+    for(var i=0;i<al2.length;i++) G.attrs[al2[i]]=cl(G.attrs[al2[i]]+rd(0,1.5*gm*yb),omin,oc);
   }
   G.gp=0;G.w=0;G.l=0;G.otl=0;G.goals=0;G.assists=0;G.plusminus=0;G.sog=0;G.saves=0;G.goalsAgainst=0;
   G.week=1;G.weekGames=0;G.isInjured=false;G.wonCup=false;G.milestones=[];
@@ -7381,8 +7591,10 @@ function openStaffChat(title, lines, replies){
 
 function staffChatReply(idx){
   var r=window._staffChatReplies[idx];
-  if(r&&r.fn) r.fn();
+  // Close first so callbacks can open a follow-up staff chat (e.g. playoffs -> world stage)
+  // without this close firing immediately after and dismissing the new modal.
   closeM('m-staffchat');
+  if(r&&r.fn) r.fn();
 }
 
 function applyLifeScenarioChoice(s,choiceIdx){
@@ -7579,27 +7791,165 @@ function addSimMediaMoment(won, gameStats, opp){
   if(Math.random()>chance) return;
   if(hasGoalieLine){
     var svTxt=Math.round(svPct*1000)/10;
-    addNews('MEDIA AVAILABILITY: "'+(won?'We stayed composed in our zone.':'I need one or two of those back.')+'" -- '+G.first+' '+G.last+' after a '+gameStats.sv+'SV, '+gameStats.ga+'GA night (SV% '+svTxt+') vs '+opp.n+'.','neutral');
+    addNews('MEDIA AVAILABILITY: "'+(won?'We stayed composed in our zone.':'I need one or two of those back.')+'" -- '+G.first+' '+G.last+' after a '+gameStats.sv+'SV, '+gameStats.ga+'GA night (SV% '+svTxt+'%) vs '+opp.n+'.','neutral');
     return;
   }
   var quote = hotNight ? 'I just trusted my reads and attacked space.' :
-    (pressure ? 'No excuses. I have to be better and lead the response.' : 'We stuck to details and managed the game the right way.');
+    (pressure ? (G.xFactor==='careless' ? 'Everyone\'s loud — I\'m fine with that.' : 'No excuses. I have to be better and lead the response.') : 'We stuck to details and managed the game the right way.');
   addNews('MEDIA AVAILABILITY: "'+quote+'" -- '+G.first+' '+G.last+' after '+totalPts+' point(s) vs '+opp.n+'.','neutral');
 }
 
-// Sim week: no hard weekly cap -- "good" weeks cluster ~6-9 PTS (F), ~4-6 (offensive D), less for shutdown D.
+// Sim week: no hard weekly cap -- "good" weeks cluster ~6-9 PTS (F); D scoring is lower, esp. shutdown/stay-at-home.
 function getSimDefenseScoringTier(){
   if(G.pos!=='D') return 'F';
   var da=G.arch||'';
-  if(da==='OffensiveD'||da==='OQD') return 'Doff';
+  if(da==='OffensiveD') return 'Doff';
   if(da==='TwoWayD') return 'Dtwo';
+  if(da==='StayAtHome'||da==='ShutdownD') return 'Dmin';
   return 'Dlow';
 }
 function getSimMaxPointsPerGame(perWeek,tier){
   if(tier==='F') return perWeek<=3 ? 5 : 4;
-  if(tier==='Doff') return perWeek<=3 ? 4 : 3;
-  if(tier==='Dtwo') return perWeek<=3 ? 3 : 3;
-  return perWeek<=3 ? 2 : 2;
+  if(tier==='Doff') return perWeek<=3 ? 3 : 2;
+  if(tier==='Dtwo') return perWeek<=3 ? 2 : 2;
+  if(tier==='Dmin') return 1;
+  return perWeek<=3 ? 2 : 1;
+}
+/** reg | playoff | world — used for XP and PTS multipliers */
+function getXFactorGameContext(){
+  if(G._worldStageCtx) return 'world';
+  if(G._playoffCtx&&G._isPlayoffGame) return 'playoff';
+  return 'reg';
+}
+/** Careless: streaky — performance drops when the team is in a real slump (not just “bad stats”). */
+function isCarelessSlumping(){
+  if(G.xFactor!=='careless') return false;
+  if(G.streakType==='L' && (G.streakCount||0)>=2) return true;
+  if((G.gp||0)>=8){
+    var gpv=G.gp||1;
+    if((G.w||0)/gpv<0.36) return true;
+  }
+  return false;
+}
+/** Careless: “up” — confidence / hot streak (playoff spotlight bonus). */
+function isCarelessRidingHigh(){
+  if(G.xFactor!=='careless') return false;
+  if(G.streakType==='W' && (G.streakCount||0)>=2) return true;
+  if((G.morale||0)>=62) return true;
+  return false;
+}
+/** Skater-only: PTS expectation by season phase (goalies: use goalie XP mult). */
+function getXFactorSkaterPtsMult(region){
+  if(G.pos==='G') return 1;
+  region=region||'reg';
+  var xf=G.xFactor||'none';
+  if(xf==='clutch'){
+    if(region==='reg') return 0.9;
+    if(region==='playoff'||region==='world') return 1.1;
+    return 1;
+  }
+  if(xf==='regular_season'){
+    if(region==='reg') return 1.05;
+    if(region==='playoff') return 0.88;
+    if(region==='world') return 0.92;
+    return 1;
+  }
+  if(xf==='careless'){
+    if(region==='reg'){
+      if(isCarelessSlumping()) return 0.78;
+      return 0.94;
+    }
+    if(region==='playoff'||region==='world'){
+      if(isCarelessSlumping()) return 0.93;
+      if(isCarelessRidingHigh()) return 1.12;
+      return 1.03;
+    }
+    return 1;
+  }
+  if(xf==='brat'){
+    if(region==='reg') return 0.82;
+    if(region==='playoff'||region==='world') return 1.09;
+    return 1;
+  }
+  if(xf==='hard_worker') return region==='reg'?1.03:1.01;
+  if(xf==='smart_iq') return 1.025;
+  if(xf==='elite_vision' && (G.pos==='F'||G.pos==='D')) return 1.045;
+  if(xf==='quick_release' && G.pos==='F') return 1.065;
+  if(xf==='good_stick' && G.pos==='D') return 1.04;
+  if(xf==='heavy_hitter' && (G.pos==='D'||G.pos==='F')) return 1.02;
+  return 1;
+}
+/** OVR contribution in playoff bracket sim (win odds + stat feel). */
+function getXFactorPlayoffPowerMult(){
+  var xf=G.xFactor||'none';
+  if(xf==='clutch') return 1.08;
+  if(xf==='regular_season') return 0.9;
+  if(xf==='brat') return 1.06;
+  if(xf==='careless'){
+    if(isCarelessSlumping()) return 0.94;
+    if(isCarelessRidingHigh()) return 1.08;
+    return 1;
+  }
+  if(xf==='hard_worker') return 1.03;
+  if(xf==='smart_iq'||xf==='elite_vision') return 1.02;
+  if(xf==='quick_release') return G.pos==='F'?1.05:1;
+  if(xf==='good_stick') return G.pos==='D'?1.05:1;
+  if(xf==='heavy_hitter') return 1.03;
+  return 1;
+}
+/** National team tournament win odds (sim path). */
+function getXFactorWorldTeamPowerMult(){
+  var xf=G.xFactor||'none';
+  if(xf==='clutch') return 1.08;
+  if(xf==='regular_season') return 0.92;
+  if(xf==='hard_worker') return 1.03;
+  if(xf==='careless'){
+    if(isCarelessSlumping()) return 0.94;
+    if(isCarelessRidingHigh()) return 1.08;
+    return 1;
+  }
+  if(xf==='brat') return 1.04;
+  if(xf==='smart_iq'||xf==='elite_vision') return 1.03;
+  if(xf==='quick_release'&&G.pos==='F') return 1.04;
+  if(xf==='good_stick'&&G.pos==='D') return 1.04;
+  if(xf==='heavy_hitter') return 1.02;
+  return 1;
+}
+/** Goalie XP from games — context-aware (clutch shines playoffs/world). */
+function getXFactorGoalieXpMult(ctx){
+  ctx=ctx||'reg';
+  var xf=G.xFactor||'none';
+  if(xf==='clutch'){
+    if(ctx==='reg') return 0.93;
+    if(ctx==='playoff'||ctx==='world') return 1.1;
+    return 1;
+  }
+  if(xf==='regular_season'){
+    if(ctx==='reg') return 1.05;
+    if(ctx==='playoff'||ctx==='world') return 0.9;
+    return 1;
+  }
+  if(xf==='hard_worker') return ctx==='reg'?1.06:1.03;
+  if(xf==='smart_iq') return 1.03;
+  if(xf==='careless'){
+    if(ctx==='reg'){
+      if(isCarelessSlumping()) return 0.82;
+      return 0.94;
+    }
+    if(ctx==='playoff'||ctx==='world'){
+      if(isCarelessSlumping()) return 0.93;
+      if(isCarelessRidingHigh()) return 1.08;
+      return 1.02;
+    }
+    return 1;
+  }
+  if(xf==='brat'){
+    if(ctx==='reg') return 0.92;
+    if(ctx==='playoff'||ctx==='world') return 1.05;
+    return 1;
+  }
+  if(xf==='elite_vision'||xf==='quick_release'||xf==='good_stick') return 1;
+  return 1;
 }
 /** Extra dampening on simmed PTS/G for women's circuits (PWL strongest). */
 function getSimWomenLeagueScoringFactor(leagueKey, league){
@@ -7626,9 +7976,9 @@ function simSkaterGoalAssistSplit(totalPts, perfBias, won){
   if(G.pos==='D'){
     pGoal=0.19;
     var da=G.arch||'';
-    if(da==='OffensiveD'||da==='OQD') pGoal=0.26;
+    if(da==='OffensiveD') pGoal=0.26;
     else if(da==='TwoWayD') pGoal=0.18;
-    else if(da==='StayAtHome'||da==='ShutdownD') pGoal=0.13;
+    else if(da==='StayAtHome'||da==='ShutdownD') pGoal=0.1;
   } else {
     // All forward positions use the same goal vs assist mix; centres earn more total points in simWeek().
     pGoal=0.32;
@@ -7638,6 +7988,9 @@ function simSkaterGoalAssistSplit(totalPts, perfBias, won){
     if(fa==='TwoWay') pGoal-=0.04;
     if(fa==='Grinder'||fa==='Enforcer') pGoal-=0.09;
   }
+  if((G.xFactor==='elite_vision'||G.xFactor==='smart_iq') && (G.pos==='F'||G.pos==='D')) pGoal-=0.07;
+  if(G.xFactor==='quick_release' && G.pos==='F') pGoal+=0.09;
+  if(G.xFactor==='good_stick' && G.pos==='D') pGoal-=0.05;
   pGoal=cl(pGoal+perfBias*0.035+(won?0.025:-0.02),0.11,0.46);
   for(var p=0;p<totalPts;p++){
     if(Math.random()<pGoal) out.g++;
@@ -7733,22 +8086,28 @@ function simWeek(){
           expGamePts=cl(expGamePts+ri(1,2),0,maxThisGame);
         }
       } else if(dTier==='Doff'){
-        var offDCore=0.92+ptSkill*0.48+domBoost*0.42+rd(0,0.62);
+        var offDCore=0.66+ptSkill*0.36+domBoost*0.3+rd(0,0.48);
         expGamePts=cl(offDCore,0,maxThisGame);
-        if(ptSkill>=0.95 && Math.random()<0.22) expGamePts=cl(expGamePts+1,0,maxThisGame);
+        if(ptSkill>=0.95 && Math.random()<0.16) expGamePts=cl(expGamePts+1,0,maxThisGame);
       } else if(dTier==='Dtwo'){
-        expGamePts=cl(0.58+ptSkill*0.36+domBoost*0.28+rd(0,0.5),0,maxThisGame);
+        expGamePts=cl(0.4+ptSkill*0.26+domBoost*0.18+rd(0,0.36),0,maxThisGame);
+      } else if(dTier==='Dmin'){
+        expGamePts=cl(0.12+ptSkill*0.12+domBoost*0.07+rd(0,0.22),0,maxThisGame);
       } else {
-        expGamePts=cl(0.32+ptSkill*0.28+domBoost*0.18+rd(0,0.42),0,maxThisGame);
+        expGamePts=cl(0.22+ptSkill*0.2+domBoost*0.12+rd(0,0.28),0,maxThisGame);
       }
       var wSimFac=getSimWomenLeagueScoringFactor(G.leagueKey,G.league);
-      expGamePts=cl(expGamePts*wSimFac,0,maxThisGame);
+      expGamePts=cl(expGamePts*wSimFac*getXFactorSkaterPtsMult('reg'),0,maxThisGame);
       var gamePts=Math.min(maxThisGame,Math.max(0,Math.round(expGamePts+rd(-0.35,0.55))));
       var gaSplit=simSkaterGoalAssistSplit(gamePts,perfBias,gameHomeScore>gameAwayScore);
       gameStats.g=gaSplit.g;
       gameStats.a=gaSplit.a;
       gameStats.sog=Math.max(1,Math.round(ri(2,5)+gamePts+perfBias*0.9));
-      gameStats.block=G.pos==='D'?ri(0,3):ri(0,2);
+      var blk=G.pos==='D'?ri(0,3):ri(0,2);
+      if(G.xFactor==='good_stick'&&G.pos==='D') blk+=Math.random()<0.48?1:0;
+      if(G.xFactor==='heavy_hitter'&&(G.pos==='D'||G.pos==='F')) blk+=Math.random()<0.24?1:0;
+      if(G.xFactor==='careless'&&isCarelessSlumping()&&(G.pos==='D'||G.pos==='F')&&Math.random()<0.38) blk=Math.max(0,blk-1);
+      gameStats.block=blk;
       // Smoother +/- so it tracks outcome and contribution without wild swings.
       var defSkill=((G.attrs.mental||60)+(G.attrs.physical||60)-120)/30;
       var defBias=(G.pos==='D'?0.55:0) + cl(defSkill,-0.6,0.9)*0.35 + (gameStats.block>=2?0.3:0);
@@ -7785,14 +8144,31 @@ function simWeek(){
     var staminaLoss=ri(5,15);
     G.stamina=cl(G.stamina-staminaLoss,0,100);
     weeklyStats.staminaLoss+=staminaLoss;
-    G.morale=cl(G.morale+(won?3:tied?1:-3),0,100);
-    G.xp+=ri(14,30);
-    if(!G.isInjured&&Math.random()<0.012) triggerInjury();
+    var md=won?3:tied?1:-3;
+    if(G.xFactor==='careless'){
+      if(won) md=2;
+      else if(tied) md=1;
+      else md=0;
+    }
+    G.morale=cl(G.morale+md,0,100);
+    if(G.pos==='G'){
+      G.xp+=Math.round(ri(9,22)*getXFactorGoalieXpMult('reg'));
+    } else {
+      G.xp+=ri(14,30);
+    }
+    if(!G.isInjured&&Math.random()<(G.xFactor==='careless'?0.022:0.012)) triggerInjury();
     var sc=gameHomeScore+'-'+gameAwayScore;
     addNews(G.team.n+' '+sc+' vs '+opp.n+' -- '+(won?'WIN':tied?'OTL':'LOSS')+' [SIMULATED]',(won?'good':tied?'neutral':'bad'));
     if(gRnd>=2) addNews(G.first+' '+G.last+' scores '+gRnd+' -- multi-goal game!','big');
     if(aRnd>=2) addNews(G.first+' '+G.last+' picks up '+aRnd+' assists -- playmaking night!','big');
     addSimMediaMoment(won, gameStats, opp);
+    if(G.xFactor==='brat'&&G.pos!=='G'&&won&&Math.random()<0.14){
+      addNews('AFTER THE WHISTLE: '+G.last+' gets under the other bench -- they take a frustration penalty.','neutral');
+    }
+    if(G.xFactor==='heavy_hitter'&&(G.pos==='D'||G.pos==='F')&&Math.random()<0.07){
+      addNews('ROUGHING AFTER THE PLAY -- '+G.last+' finishes the hit, sits two minutes.','bad');
+      G.morale=cl(G.morale-1,0,100);
+    }
     if(Math.random()<0.2) weeklyStats.pressHits++;
     if(G.standings){
       for(var s=0;s<G.standings.length;s++){
