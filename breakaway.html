@@ -634,6 +634,7 @@ input[type=range]{width:100%;accent-color:var(--gold);margin:6px 0}
 &gt; JUNIORS: GET DRAFTED -- COLLEGE: SCHOLARSHIP OFFERS -- EURO: CONTRACT OFFERS<br>
 &gt; EACH WEEK: 3 GAMES WITH LIVE TIMED DECISIONS PER GAME<br>
 &gt; 10 SECONDS PER MOMENT -- HESITATE AND AUTO-PICK KICKS IN<br>
+&gt; HOTKEYS: PRESS <b>1 &ndash; 4</b> TO INSTANT-PICK MOMENT OPTIONS (WHEN IN GAME)<br>
 &gt; PASSING PLAYS CREATE ASSISTS -- SHOOTING PLAYS CREATE GOALS<br>
 &gt; NEGOTIATE CONTRACTS -- SALARY SLIDER, YEARS, NTC, BONUSES<br>
 &gt; GET TRADED, REQUEST TRADES, OR HIT FREE AGENCY<br>
@@ -917,6 +918,7 @@ input[type=range]{width:100%;accent-color:var(--gold);margin:6px 0}
 <div class="moment-ctx" id="moment-ctx"></div>
 <div class="moment-text" id="moment-text"></div>
 <div id="moment-opts"></div>
+<div class="vt" style="font-size:12px;color:var(--mut);margin-top:8px;opacity:.88">TIP: KEYS <b>1&ndash;4</b> = OPTIONS (FAST)</div>
 <div id="moment-result" style="display:none"></div>
 </div>
 </div>
@@ -2024,6 +2026,24 @@ function show(id){
     RetroSound.syncMusicForScreen(id);
   });
 }
+
+/** In-game: number keys pick moment options (1 = first button, etc.) */
+(function initMomentHotkeys(){
+  if(window._bkMomentKeysBound) return;
+  window._bkMomentKeysBound=true;
+  document.addEventListener('keydown',function(e){
+    var ing=document.getElementById('s-ingame');
+    if(!ing||!ing.classList.contains('on')) return;
+    var t=e.target;
+    if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||(t.isContentEditable))) return;
+    var k=e.key;
+    if(k<'1'||k>'9') return;
+    var btns=document.querySelectorAll('#moment-opts .opt-btn');
+    var idx=parseInt(k,10)-1;
+    if(idx>=0&&idx<btns.length&&!btns[idx].disabled) btns[idx].click();
+  },false);
+})();
+
 function closeM(id){var el=document.getElementById(id); if(el){el.style.display='none';el.classList.remove('open');}}
 function openM(id){
   RetroSound.runWhenReady(function(){
@@ -3102,10 +3122,14 @@ function goToAttributes(){
   var attrList=ATTRS[selPos];
   var base={};
   var arch=ARCHETYPES[selPos][selArch];
-  attrList.forEach(function(a){base[a]=selPos==='G'?58:55;});
+  var gAttr=(safeEl('c-gender')&&safeEl('c-gender').value)||'M';
+  var baseStart=gAttr==='F'?30:(selPos==='G'?58:55);
+  // Men: floor 40 on attrs (matches 55/58 base). Women: floor 22 so archetype minuses stay low — OVR stays low 30s, not low 40s.
+  G._attrClampMin=gAttr==='F'?22:40;
+  attrList.forEach(function(a){base[a]=baseStart;});
   if(arch && arch.boosts){
     Object.keys(arch.boosts).forEach(function(k){
-      if(base[k]!==undefined) base[k]=cl(base[k]+arch.boosts[k],40,92);
+      if(base[k]!==undefined) base[k]=cl(base[k]+arch.boosts[k],G._attrClampMin,92);
     });
   }
   G._baseAttrs=base;
@@ -3118,11 +3142,12 @@ function goToAttributes(){
 function renderAttrDist(){
   var attrList=ATTRS[selPos];
   var html='';
+  var cmin=(typeof G._attrClampMin==='number')?G._attrClampMin:40;
   for(var i=0;i<attrList.length;i++){
     var a=attrList[i];
     var base=G._baseAttrs[a]||55;
     var extra=G._extraAttrs[a]||0;
-    var total=cl(base+extra,40,99);
+    var total=cl(base+extra,cmin,99);
     var color=ATTR_COLORS[a]||'var(--mut)';
     var lbl=ATTR_LABELS[a]||a;
     html+='<div class="attr-row-d">';
@@ -3150,7 +3175,8 @@ function chgAttr(a,d){
 function renderAttrPreview(){
   var attrList=ATTRS[selPos];
   var finals={};
-  attrList.forEach(function(a){finals[a]=cl((G._baseAttrs[a]||55)+(G._extraAttrs[a]||0),40,99);});
+  var cmin=(typeof G._attrClampMin==='number')?G._attrClampMin:40;
+  attrList.forEach(function(a){finals[a]=cl((G._baseAttrs[a]||55)+(G._extraAttrs[a]||0),cmin,99);});
   var html='';
   attrList.forEach(function(a){
     var color=ATTR_COLORS[a]||'var(--mut)';
@@ -3503,11 +3529,13 @@ function startCareer(){
   var attrList=ATTRS[selPos];
   var arch=ARCHETYPES[selPos][selArch];
   var attrs={};
-  attrList.forEach(function(a){attrs[a]=selPos==='G'?58:55;});
+  var baseStartF=gender==='F'?30:(selPos==='G'?58:55);
+  var attrClampMin=gender==='F'?22:40;
+  attrList.forEach(function(a){attrs[a]=baseStartF;});
   if(arch && arch.boosts){
-    Object.keys(arch.boosts).forEach(function(k){if(attrs[k]!==undefined)attrs[k]=cl(attrs[k]+arch.boosts[k],40,92);});
+    Object.keys(arch.boosts).forEach(function(k){if(attrs[k]!==undefined)attrs[k]=cl(attrs[k]+arch.boosts[k],attrClampMin,92);});
   }
-  attrList.forEach(function(a){attrs[a]=cl((G._baseAttrs&&G._baseAttrs[a]||attrs[a])+(G._extraAttrs&&G._extraAttrs[a]||0),40,99);});
+  attrList.forEach(function(a){attrs[a]=cl((G._baseAttrs&&G._baseAttrs[a]||attrs[a])+(G._extraAttrs&&G._extraAttrs[a]||0),attrClampMin,99);});
   var pOvrInit=ovr(attrs);
   // Rare high-ceiling tracks so a few prospects can be 80+ by draft age.
   var devRoll=Math.random();
@@ -3518,7 +3546,7 @@ function startCareer(){
     if(l.tier==='college') return {sal:0,yrs:(pOvrInit>=78?4:pOvrInit>=68?3:2),type:'SCHOLARSHIP',ntc:false,bonus:false};
     var base=l.salBase||0;
     var sal=Math.round((base*cl(0.85+(pOvrInit-60)*0.015,0.7,1.5))/1000)*1000;
-    if(lk==='PHL') return {sal:sal,yrs:3,type:'ENTRY LEVEL',ntc:false,bonus:false};
+    if(lk===getProLeagueKeyByGender(gender)) return {sal:sal,yrs:3,type:'ENTRY LEVEL',ntc:false,bonus:false};
     return {sal:sal,yrs:2,type:'PRO CONTRACT',ntc:false,bonus:false};
   })();
   G={
@@ -3536,6 +3564,7 @@ function startCareer(){
     contract:initContract,
     contractYrsLeft:initContract.yrs,
     xp:100,news:[],seasonLog:[],awards:[],milestones:[],
+    _seasonEndLoggedForSeason:0,
     playoffLog:[],worldStageLog:[],
     socialMessages:[],socialReactions:{},
     standings:[],wonCup:false,careerCups:0,
@@ -3566,7 +3595,8 @@ function startCareer(){
     _lifeScenarioLastCgp:-999,
     _lifeScenarioGuaranteeCgp:ri(120,280),
     _lifeScenarioRolledThisWeek:false,
-    _originPlaceRaw:hometownRaw
+    _originPlaceRaw:hometownRaw,
+    _attrClampMin:attrClampMin
   };
   G.standings=buildStandings(lk);
   G.allOpponents=genSeason(lk,team);
@@ -3617,6 +3647,80 @@ function getGamesPerWeek(lk){
   return (LEAGUES[lk] && LEAGUES[lk].gamesPerWeek) ? LEAGUES[lk].gamesPerWeek : 3;
 }
 
+/** OVR at which you're considered "PPG-caliber" for this league (women's leagues: -30 vs men's bar — e.g. PWL 60 vs PHL 90). */
+function getPpgCaliberOvrThreshold(leagueKey){
+  var L=LEAGUES[leagueKey]||{};
+  var isF=L.gender==='F';
+  var base=72;
+  if(leagueKey==='PHL'||leagueKey==='PWL') base=90;
+  else if(L.tier==='college') base=70;
+  else if(L.tier==='junior'){
+    base=65;
+  } else if(L.tier==='euro'||L.tier==='asia'){
+    var harder=['NEHL','CEHL','ARHL','SDHL','FWHL','AWHL'];
+    base= harder.indexOf(leagueKey)!==-1 ? 75 : 70;
+  }
+  if(isF) base-=30;
+  return Math.max(28, base);
+}
+
+/** Men's ELC-ready bar; women's path is 30 OVR lower (e.g. 80 → 50). */
+var DRAFT_CLUB_ELC_MIN_OVR_MEN=80;
+function getDraftClubElcMinOvr(){
+  if(typeof G==='undefined'||!G) return DRAFT_CLUB_ELC_MIN_OVR_MEN;
+  return G.gender==='F'?Math.max(25, DRAFT_CLUB_ELC_MIN_OVR_MEN-30):DRAFT_CLUB_ELC_MIN_OVR_MEN;
+}
+function getEliteReadyOvrBar(){
+  if(typeof G==='undefined'||!G) return 83;
+  return G.gender==='F'?Math.max(40, 83-30):83;
+}
+function getProAffiliateDemotionMaxOvr(){
+  if(typeof G==='undefined'||!G) return 80;
+  return G.gender==='F'?50:80;
+}
+/** Men 75 / women 45 (-30): (1) main-pro hard floor before reassignment, (2) min OVR to join NAML/PWDL from junior/college/semi-pro — below = stay dev path. */
+function getProHardDevelopmentFloorOvr(){
+  if(typeof G==='undefined'||!G) return 75;
+  return G.gender==='F'?45:75;
+}
+
+/** Playoff field: top half qualify; sim uses up to 8 teams, even count; always includes you if you qualified. */
+function buildPlayoffBracketFromStandings(sorted){
+  var n=sorted.length;
+  if(n<2) return null;
+  var qualifyN=Math.ceil(n/2);
+  var maxTeams=Math.min(8,qualifyN);
+  var bracket=sorted.slice(0,maxTeams);
+  var meRow=null,myIdx=-1;
+  for(var i=0;i<sorted.length;i++){
+    if(sorted[i].isMe){ meRow=sorted[i]; myIdx=i; break; }
+  }
+  if(meRow && myIdx>=0 && myIdx<qualifyN && bracket.indexOf(meRow)===-1){
+    bracket[bracket.length-1]=meRow;
+  }
+  if(bracket.length%2===1) bracket=bracket.slice(0,bracket.length-1);
+  if(bracket.length<2) return null;
+  return bracket;
+}
+
+function recordPlayoffLogFromResult(playoff){
+  if(!playoff||playoff.roundReached==null||playoff.roundReached==='') return;
+  G.playoffLog=G.playoffLog||[];
+  G.playoffLog.push({
+    year:G.year,
+    league:G.league.short,
+    team:G.team.n,
+    round:playoff.roundReached,
+    wonCup:!!playoff.wonCup,
+    isGoalie:G.pos==='G',
+    gp:_lastPlayoffStats?_lastPlayoffStats.gp:0,
+    g:_lastPlayoffStats?_lastPlayoffStats.g:0,
+    a:_lastPlayoffStats?_lastPlayoffStats.a:0,
+    sv:_lastPlayoffStats?_lastPlayoffStats.sv:0,
+    ga:_lastPlayoffStats?_lastPlayoffStats.ga:0
+  });
+}
+
 function evaluateLeadershipAtSeasonEnd(){
   var completedTenure=(G.teamTenure||0)+1;
   var elite=false, decent=false, severe=false;
@@ -3625,7 +3729,11 @@ function evaluateLeadershipAtSeasonEnd(){
     elite=sv>=0.925; decent=sv>=0.905; severe=sv<0.885;
   } else {
     var ppg=G.gp>0?(G.goals+G.assists)/G.gp:0;
-    elite=ppg>=1.0; decent=ppg>=0.65; severe=ppg<0.35;
+    var ppgBar=getPpgCaliberOvrThreshold(G.leagueKey);
+    var oLead=ovr(G.attrs);
+    elite=ppg>=1.0&&oLead>=ppgBar;
+    decent=ppg>=0.65&&oLead>=Math.max(48,ppgBar-12);
+    severe=ppg<0.35||oLead<Math.max(42,ppgBar-22);
   }
   if(G.leadershipRole==='C'){
     // Captains are rarely stripped out of respect.
@@ -3835,11 +3943,19 @@ function renderHub(){
     msgs.push(fullName.toUpperCase()+' -- '+G.gp+'GP '+G.saves+'SV SV%'+svDisp+' THIS SEASON');
   } else {
     msgs.push(fullName.toUpperCase()+' -- '+(G.goals+G.assists)+' PTS ('+G.goals+'G '+G.assists+'A) THIS SEASON');
+    if(G.gp>0){
+      var ppgH=(G.goals+G.assists)/G.gp, bar=getPpgCaliberOvrThreshold(G.leagueKey);
+      if(ppgH>=1&&o>=bar) msgs.push('PPG CALIBER FOR '+G.league.short+' (OVR '+Math.round(o)+' / TYPICAL BAR ~'+bar+')');
+    }
   }
   msgs.push(G.team.n.toUpperCase()+' GAME DAY');
   msgs.push('LEAGUE SCORING RACE HEATING UP');
   msgs.push('SCOUTS IN THE HOUSE TONIGHT');
   if(G.streakType && G.streakType!=='none' && G.streakCount>=2) msgs.push('TREND: '+G.streakType+G.streakCount+' STREAK');
+  if(G.streakType && G.streakType!=='none' && G.streakCount>=4) msgs.push('ARENA ENERGY: '+G.streakType+G.streakCount+' -- EVERY SHIFT MATTERS');
+  if(typeof draftClubWillingToSignElc==='function' && hasActiveDraftRights() && !draftClubWillingToSignElc())
+    msgs.push('DRAFT: '+G.draftRights.team+' HOLDS RIGHTS -- DEV TRACK (TARGET '+getDraftClubElcMinOvr()+'+ OVR)');
+  if(G.morale>=88) msgs.push(G.first.toUpperCase()+' -- LOCKER ROOM VIBES: MORALE THROUGH THE ROOF');
   if(G.league.tier==='pro' && G.gp>0 && (G.w/G.gp)<0.45) msgs.push('MEDIA: Press conference demand spikes after poor form.');
   if(G.news.length) msgs.push(G.news[0].txt);
   safeEl('hub-tick').textContent=shuf(msgs).join('  --  ');
@@ -3950,7 +4066,26 @@ function renderStandingsTab(){
   el.innerHTML=html;
 }
 
+/** Remove duplicate season-log rows (same year/league/team/stats) from older saves or rare double-calls */
+function dedupeSeasonLogEntries(log){
+  if(!log||!log.length) return [];
+  var seen={}, out=[];
+  for(var i=0;i<log.length;i++){
+    var e=log[i];
+    var k=(e.year|0)+'|'+(e.league||'')+'|'+(e.team||'')+'|'+(e.gp|0)+'|'+(e.ovrVal|0)+'|'+(e.isGoalie?1:0)+'|'+(e.g|0)+'|'+(e.a|0)+'|'+(e.sv|0)+'|'+(e.ga|0);
+    if(seen[k]) continue;
+    seen[k]=true;
+    out.push(e);
+  }
+  return out;
+}
+
 function renderCareerTab(){
+  if(G.seasonLog&&G.seasonLog.length){
+    var fixed=dedupeSeasonLogEntries(G.seasonLog);
+    if(fixed.length<G.seasonLog.length) G.seasonLog=fixed;
+  }
+  if(typeof G._seasonEndLoggedForSeason!=='number') G._seasonEndLoggedForSeason=0;
   var cp=G.cGoals+G.cAssists;
   var cGrid=
     '<div class="stbox"><div class="stlbl">SEASONS</div><div class="stval">'+(G.season-1)+'</div></div>'+
@@ -4048,6 +4183,7 @@ function renderCareerTab(){
     var s=log[i];
     html+='<div style="padding:7px;border-bottom:1px solid rgba(122,184,224,.07);font-family:VT323,monospace;font-size:14px">';
     html+='<span style="color:var(--gold)">'+s.year+'</span> ';
+    if(s.season!=null) html+='<span style="color:var(--acc);font-size:12px"> SZN '+s.season+'</span> ';
     html+='<span style="color:var(--mut)">'+s.league+' '+s.team+'</span> ';
     if(s.isGoalie){
       html+=s.gp+'GP '+s.sv+'SV '+s.ga+'GA SV%'+s.svpct+' GAA'+s.gaa;
@@ -4140,6 +4276,7 @@ function calcHOF(){
 // ============================================================
 function generateSocialMessages(){
   var msgs=[];
+  var isWomens=G.gender==='F';
   var pts=G.goals+G.assists;
   var svPctNow=G.saves+(G.goalsAgainst||0)>0?(G.saves/(G.saves+(G.goalsAgainst||0))):0;
   var o=ovr(G.attrs);
@@ -4200,34 +4337,93 @@ function generateSocialMessages(){
       text:'Kept your name in our reports since you came up. '+G.first+' '+G.last+' -- #'+G.jersey+' -- is a player. National teams are going to come calling.',mood:'good',idx:msgs.length});
   }
 
-  // Pro media pressure when struggling
+  // Pro media pressure when struggling (rarer in women's game — newer league, less legacy toxicity)
   if(G.league.tier==='pro' && G.gp>0 && (G.w/G.gp) < 0.43){
-    msgs.push({type:'staff',sender:'Hockey Analyst -- TSN',handle:'@MediaMaven',
-      text:'Tough stretch in '+G.league.short+' for #'+G.jersey+'. Is confidence cracking? Fans want answers now.',mood:'bad',idx:msgs.length});
-    msgs.push({type:'fan',sender:'@IceTimeInsider',handle:'@IceTimeInsider',
-      text:'Every loss has us screaming for a lineup shake. #'+G.jersey+' is in the hot seat.',mood:'bad',idx:msgs.length});
+    if(!isWomens || Math.random()<0.32){
+      msgs.push({type:'staff',sender:'Hockey Analyst -- TSN',handle:'@MediaMaven',
+        text:'Tough stretch in '+G.league.short+' for #'+G.jersey+'. Is confidence cracking? Fans want answers now.',mood:'bad',idx:msgs.length});
+      msgs.push({type:'fan',sender:'@IceTimeInsider',handle:'@IceTimeInsider',
+        text:'Every loss has us screaming for a lineup shake. #'+G.jersey+' is in the hot seat.',mood:'bad',idx:msgs.length});
+      var phlFishbowl=!isWomens&&G.leagueKey==='PHL'&&isPhlBigMarketTeamName(G.team&&G.team.n);
+      if(!isWomens && (phlFishbowl?Math.random()<0.88:Math.random()<0.62)){
+        msgs.push({type:'fan',sender:'SportsRadio '+ri(1,9)+'AM',handle:'@DriveTimeHotTake',
+          text:'Caller pile-on: "'+G.last+' is why we can\'t close." Lines jammed — hosts say the market is "done making excuses" for #'+G.jersey+'.',mood:'bad',idx:msgs.length});
+      }
+    } else {
+      msgs.push({type:'fan',sender:fansUsed[0],handle:'@'+fansUsed[0],
+        text:'Rough patch for the team but #'+G.jersey+' is still driving play — fans who watch every shift see it. Stay with them.',mood:'good',idx:msgs.length});
+    }
   }
 
-  // === FANS ===
-  msgs.push({type:'fan',sender:fansUsed[0],handle:'@'+fansUsed[0],
-    text:'#'+G.jersey+' '+G.last+' is my favourite player on this roster rn. Every game something happens with that kid.',mood:'good',idx:msgs.length});
-  if(o>=75){
-    msgs.push({type:'fan',sender:fansUsed[1],handle:'@'+fansUsed[1],
-      text:'People genuinely sleep on '+G.first+' '+G.last+' but if you watch every shift they are doing something elite. Top player in this league fr.',mood:'good',idx:msgs.length});
-  }
-  msgs.push({type:'fan',sender:fansUsed[2],handle:'@'+fansUsed[2],
-    text:(G.hometown?'Kid from '+G.hometown+' making it in the '+G.league.short+'. ':'')+g_fanStat()+' Love watching this player.',mood:'good',idx:msgs.length});
-  if(G.wonCup||G.careerCups>0){
-    msgs.push({type:'fan',sender:fansUsed[3],handle:'@'+fansUsed[3],
-      text:'CHAMPION. '+G.last.toUpperCase()+' has that winner DNA. Straight up.',mood:'good',idx:msgs.length});
+  // === FANS === (men: more skepticism / pressure; women: warmer default mix)
+  if(isWomens){
+    msgs.push({type:'fan',sender:fansUsed[0],handle:'@'+fansUsed[0],
+      text:'#'+G.jersey+' '+G.last+' is my favourite player on this roster rn. Every game something happens with that kid.',mood:'good',idx:msgs.length});
+    if(o>=75){
+      msgs.push({type:'fan',sender:fansUsed[1],handle:'@'+fansUsed[1],
+        text:'People genuinely sleep on '+G.first+' '+G.last+' but if you watch every shift they are doing something elite. Top player in this league fr.',mood:'good',idx:msgs.length});
+    }
+    msgs.push({type:'fan',sender:fansUsed[2],handle:'@'+fansUsed[2],
+      text:(G.hometown?'Kid from '+G.hometown+' making it in the '+G.league.short+'. ':'')+g_fanStat()+' Love watching this player.',mood:'good',idx:msgs.length});
+    if(G.wonCup||G.careerCups>0){
+      msgs.push({type:'fan',sender:fansUsed[3],handle:'@'+fansUsed[3],
+        text:'CHAMPION. '+G.last.toUpperCase()+' has that winner DNA. Straight up.',mood:'good',idx:msgs.length});
+    } else {
+      msgs.push({type:'fan',sender:fansUsed[3],handle:'@'+fansUsed[3],
+        text:'Hope this team gets '+G.last+' some hardware. Deserves to be on a winner. Do something management.',mood:'neutral',idx:msgs.length});
+    }
+    msgs.push({type:'fan',sender:fansUsed[4],handle:'@'+fansUsed[4],
+      text:'Caught the game last night. That play in the '+(ri(0,1)?'second':'third')+' period by #'+G.jersey+' -- standing ovation from our section. What a sequence.',mood:'good',idx:msgs.length});
   } else {
-    msgs.push({type:'fan',sender:fansUsed[3],handle:'@'+fansUsed[3],
-      text:'Hope this team gets '+G.last+' some hardware. Deserves to be on a winner. Do something management.',mood:'neutral',idx:msgs.length});
+    var mFan1=Math.random()<0.42;
+    msgs.push({type:'fan',sender:fansUsed[0],handle:'@'+fansUsed[0],
+      text:mFan1?('#'+G.jersey+' '+G.last+' — fine player. But this market wants playoff proof, not "good process" quotes.'):
+        ('#'+G.jersey+' '+G.last+' is my favourite player on this roster rn. Every game something happens with that kid.'),mood:mFan1?'neutral':'good',idx:msgs.length});
+    if(o>=75&&Math.random()<0.52){
+      msgs.push({type:'fan',sender:fansUsed[1],handle:'@'+fansUsed[1],
+        text:'People genuinely sleep on '+G.first+' '+G.last+' but if you watch every shift they are doing something elite. Top player in this league fr.',mood:'good',idx:msgs.length});
+    } else if(o>=75){
+      msgs.push({type:'fan',sender:fansUsed[1],handle:'@'+fansUsed[1],
+        text:'High OVR, big hype — where are the signature wins? The league is watching the next "empty numbers" story.',mood:'bad',idx:msgs.length});
+    }
+    var mFan3=Math.random()<0.48;
+    msgs.push({type:'fan',sender:fansUsed[2],handle:'@'+fansUsed[2],
+      text:mFan3?((G.hometown?'Kid from '+G.hometown+' — ':'')+'I\'m not seeing consistent impact shift-to-shift. '+G.league.short+' is unforgiving.'):
+        ((G.hometown?'Kid from '+G.hometown+' making it in the '+G.league.short+'. ':'')+g_fanStat()+' Love watching this player.'),mood:mFan3?'neutral':'good',idx:msgs.length});
+    if(G.wonCup||G.careerCups>0){
+      msgs.push({type:'fan',sender:fansUsed[3],handle:'@'+fansUsed[3],
+        text:'CHAMPION. '+G.last.toUpperCase()+' has that winner DNA. Straight up.',mood:'good',idx:msgs.length});
+    } else {
+      var cynicalHope=Math.random()<0.45;
+      msgs.push({type:'fan',sender:fansUsed[3],handle:'@'+fansUsed[3],
+        text:cynicalHope?('Another year, same story for '+G.last+'. '+G.team.n+' pays for stars — fans pay for wins.'):
+          ('Hope this team gets '+G.last+' some hardware. Deserves to be on a winner. Do something management.'),mood:cynicalHope?'bad':'neutral',idx:msgs.length});
+    }
+    var mFan5=Math.random()<0.5;
+    msgs.push({type:'fan',sender:fansUsed[4],handle:'@'+fansUsed[4],
+      text:mFan5?('Last night: one good shift, three quiet ones. That\'s the book on #'+G.jersey+' until it isn\'t.'):
+        ('Caught the game last night. That play in the '+(ri(0,1)?'second':'third')+' period by #'+G.jersey+' -- standing ovation from our section. What a sequence.'),mood:mFan5?'neutral':'good',idx:msgs.length});
+    var menLoveNeutral=shuf([
+      {t:'Not always pretty but #'+G.jersey+' competes. That\'s my guy.',m:'good'},
+      {t:'Quietly putting up useful minutes — '+G.last+' does the dirty work.',m:'good'},
+      {t:'Weather forecast: hate in the mentions. I still think '+G.first+' brings it.',m:'good'},
+      {t:'Neutral take: '+G.last+' is fine. Not a superstar, not a liability — just a pro.',m:'neutral'},
+      {t:'Split fanbase on '+G.last+' but I\'m watching the same shifts as the haters — calmer than the noise.',m:'neutral'},
+      {t:'Box score watchers vs eye-test crowd fighting again. I\'m just here for the hockey.',m:'neutral'},
+      {t:'Love the way #'+G.jersey+' draws penalties. Smart hockey.',m:'good'},
+      {t:'Road trip grind — '+G.first+' still showing up. Respect.',m:'good'}
+    ].slice());
+    for(var mi=0;mi<4;mi++){
+      var row=menLoveNeutral[mi]; if(!row) break;
+      msgs.push({type:'fan',sender:FAN_HANDLES[ri(0,FAN_HANDLES.length-1)],handle:'@'+FAN_HANDLES[ri(0,FAN_HANDLES.length-1)],
+        text:row.t,mood:row.m==='good'?'good':'neutral',idx:msgs.length});
+    }
+    msgs.push({type:'fan',sender:'HockeyBiz Podcast',handle:'@HockeyBizPod',
+      text:Math.random()<0.55?('Rant segment: "'+G.last+' is the problem" — co-host pushes back: "You\'re being ridiculous." Debate gets heated.'):
+        ('Segment idea: fair or foul to call '+G.first+' "polarizing"? Chat is split 60/40.'),mood:'neutral',idx:msgs.length});
   }
-  msgs.push({type:'fan',sender:fansUsed[4],handle:'@'+fansUsed[4],
-    text:'Caught the game last night. That play in the '+(ri(0,1)?'second':'third')+' period by #'+G.jersey+' -- standing ovation from our section. What a sequence.',mood:'good',idx:msgs.length});
 
-  // === CRITICS, RIVALS & HATERS (mix of troll, professional, rival) ===
+  // === CRITICS, RIVALS & HATERS (men's side: heavier; women's: newer scene — more growth/support, fewer pile-ons) ===
   var critic=CRITIC_NAMES[ri(0,CRITIC_NAMES.length-1)];
   var rivalName=getRandomTalentName();
   var haterHandles2=['AnonymousPuck','BenchCritic99','OverratedWatchers','HockeyHaters_','RealTalkArena','IceTrollDaily','TradeHimNow_','BardownTrolls','ShiftWatcher404','NoClutchZone','BenchHimTonight','TapeRoomBurner','xGPolice','PuckWatcherLive'];
@@ -4267,21 +4463,93 @@ function generateSocialMessages(){
     'Every analytics account says the same thing: empty calories production.',
     'If this is a "future star", the bar is on the floor.'
   ];
+  var menExtraTrolls=[
+    'Your contract is a cap crime. '+G.last+' should donate half the AAV to charity and ride the bus.',
+    'Soft. No jam. '+G.team.n+' fans deserve a real competitor — not a highlight-reel coward.',
+    'National TV every time you touch the puck for the wrong reasons. Embarrassing brand for the logo.',
+    'Dressing room source (allegedly): players tired of the act. Media circling. Tick tock.',
+    'PP1 minutes and you still ghost when the building gets loud. Spare us the "process" quotes.',
+    'Hope '+G.last+' enjoys cashing cheques — because nobody\'s cashing wins on his account.',
+    'I\'d rather ice a bag of pucks than watch another coast-to-coast turnover from #'+G.jersey+'.',
+    'Tell your agent to stop begging for All-Star votes. The tape is ugly.',
+    'You get outworked by AHL call-ups. '+G.team.n+' should be embarrassed to dress you.',
+    'Zero killer instinct. '+G.first+' plays like the game owes him something.',
+    'Your own mother would boo that defensive effort. Brutal.',
+    'Trade him for futures. I mean it. '+G.last+' is a luxury this team can\'t afford to lose with.',
+    'Keyboard warriors? Nah — real fans in the building are DONE with this act.',
+    'Injury-prone, drama-prone, scoreboard-absent. Triple threat.',
+    'If "almost" paid rent, '+G.last+' would own the city. But it doesn\'t.'
+  ];
+  var menTabloid=[
+    'TABLOID: "'+G.last+'\'s inner circle \'split\' on whether the star is committed" — anonymous quotes everywhere.',
+    'THREAD: 4K quote-tweets dragging '+G.first+' for last night\'s interview. Comms already drafting a statement.',
+    'Podcast clip going viral: "Is '+G.last+' actually a winning player or just marketing?" Debate is ugly.'
+  ];
 
-  var numNeg=ri(3,5);
-  // Always include at least one pro critic, one troll, maybe a rival
-  msgs.push({type:'fan',sender:critic.n,handle:critic.role,
-    text:shuf(proComments)[0],mood:'bad',idx:msgs.length});
-  msgs.push({type:'fan',sender:haterHandles2[ri(0,haterHandles2.length-1)],handle:'@'+haterHandles2[ri(0,haterHandles2.length-1)]+' -- Online',
-    text:shuf(trollComments)[0],mood:'bad',idx:msgs.length});
-  if(numNeg>=3){
+  if(isWomens){
+    var growSupport=shuf([
+      'Women\'s hockey keeps climbing and '+G.first+' '+G.last+' is a huge reason people tune in — pace, skill, compete every night.',
+      'So proud our city gets to watch '+G.last+' in the '+G.league.short+'. Kids in the stands are wearing #'+G.jersey+'.',
+      'The league is still young and '+G.first+' is helping define what pro women\'s hockey looks like. Love this energy.',
+      'Crowd was loud for #'+G.jersey+' last game — this is what growing the game looks like. More of this.',
+      'Representation matters. '+G.first+' taking big minutes and leading by example matters. Full stop.',
+      'Unsung stuff in '+G.last+'\'s game — board battles, backcheck, PK. Real fans notice.',
+      'My daughter wants to play because players like '+G.first+' are on the screen. Bigger than any stat line.',
+      'Solid take: '+G.first+' has been a bright spot. Room and city are lucky to have that compete.'
+    ].slice());
+    msgs.push({type:'fan',sender:fansUsed[5]||fansUsed[0],handle:'@'+(fansUsed[5]||fansUsed[0]),
+      text:growSupport[0],mood:'good',idx:msgs.length});
+    msgs.push({type:'fan',sender:fansUsed[6]||fansUsed[1],handle:'@'+(fansUsed[6]||fansUsed[1]),
+      text:growSupport[1]||growSupport[0],mood:'good',idx:msgs.length});
+    msgs.push({type:'fan',sender:'Youth Hockey Parent',handle:'@GrowTheGame_'+ri(100,999),
+      text:'My kid watches '+G.first+' every week. Seeing a real pro path means everything — thank you for repping.',mood:'good',idx:msgs.length});
+    if(Math.random()<0.34){
+      msgs.push({type:'fan',sender:critic.n,handle:critic.role,
+        text:shuf(proComments)[0],mood:'bad',idx:msgs.length});
+    }
+    if(Math.random()<0.26){
+      msgs.push({type:'fan',sender:haterHandles2[ri(0,haterHandles2.length-1)],handle:'@'+haterHandles2[ri(0,haterHandles2.length-1)]+' -- Online',
+        text:shuf(trollComments)[0],mood:'bad',idx:msgs.length});
+    }
+    if(Math.random()<0.18){
+      msgs.push({type:'fan',sender:rivalName,handle:'Rival Player -- '+G.league.short,
+        text:shuf(rivalComments)[0],mood:'bad',idx:msgs.length});
+    }
+  } else {
+    // Men's game: bigger media machine — more pile-ons, talk radio, tabloid energy
+    var numNeg=ri(4,6);
+    msgs.push({type:'fan',sender:critic.n,handle:critic.role,
+      text:shuf(proComments)[0],mood:'bad',idx:msgs.length});
+    msgs.push({type:'fan',sender:haterHandles2[ri(0,haterHandles2.length-1)],handle:'@'+haterHandles2[ri(0,haterHandles2.length-1)]+' -- Online',
+      text:shuf(trollComments)[0],mood:'bad',idx:msgs.length});
+    msgs.push({type:'fan',sender:haterHandles2[ri(0,haterHandles2.length-1)]+'_2',handle:'@'+haterHandles2[ri(0,haterHandles2.length-1)]+' -- Online',
+      text:shuf(menExtraTrolls)[0],mood:'bad',idx:msgs.length});
     msgs.push({type:'fan',sender:rivalName,handle:'Rival Player -- '+G.league.short,
       text:shuf(rivalComments)[0],mood:'bad',idx:msgs.length});
-  }
-  if(numNeg>=4){
-    var crit2=CRITIC_NAMES[ri(0,CRITIC_NAMES.length-1)];
-    msgs.push({type:'fan',sender:crit2.n,handle:crit2.role,
-      text:shuf(proComments)[ri(1,proComments.length-1)],mood:'bad',idx:msgs.length});
+    if(numNeg>=5){
+      var crit2=CRITIC_NAMES[ri(0,CRITIC_NAMES.length-1)];
+      msgs.push({type:'fan',sender:crit2.n,handle:crit2.role,
+        text:shuf(proComments)[ri(1,proComments.length-1)],mood:'bad',idx:msgs.length});
+    }
+    if(numNeg>=6){
+      msgs.push({type:'fan',sender:'RumorWire Hockey',handle:'@RumorWire',
+        text:shuf(menTabloid)[0],mood:'bad',idx:msgs.length});
+    }
+    var mTrollExtra=shuf(menExtraTrolls.slice());
+    msgs.push({type:'fan',sender:'Burner_'+ri(100,999),handle:'@IceBurnerFeed',
+      text:mTrollExtra[0],mood:'bad',idx:msgs.length});
+    msgs.push({type:'fan',sender:'ArenaBooBirds',handle:'@RealFanVoice',
+      text:(mTrollExtra[1]||mTrollExtra[0]),mood:'bad',idx:msgs.length});
+    if(G.leagueKey==='PHL' && isPhlBigMarketTeamName(G.team&&G.team.n)){
+      msgs.push({type:'fan',sender:'Market Desk',handle:'@PHL_Fishbowl',
+        text:G.team.n.toUpperCase()+' is a content economy: every shift is a headline. '+G.last+' is learning what "big market" means — fair or not.',mood:'bad',idx:msgs.length});
+      msgs.push({type:'fan',sender:'BoardsNation',handle:'@BoardsNation',
+        text:'Toronto/Montreal/NY-tier pressure: fans aren\'t patient. '+G.first+' either delivers in April or the narrative writes itself.',mood:'bad',idx:msgs.length});
+    }
+    if(G.nat==='Canadian' && lastWorldStageWasTeamCanadaNoMedal()){
+      msgs.push({type:'fan',sender:'Hockey Canada Heat',handle:'@CanadaHockeyDesk',
+        text:'Whole country still rewinding that tournament. Men\'s Team Canada expectations aren\'t "try hard" — it\'s gold-or-scrutiny. '+G.last+' knows.',mood:'bad',idx:msgs.length});
+    }
   }
 
   return msgs;
@@ -4984,9 +5252,7 @@ function endGame(){
         '</div>';
     }
     var ratingW=getGameRating(G.pos,gRnd,aRnd,svpctRaw,won,mAvg);
-    statsHtmlW+='<div style="display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px;border:1px solid var(--rl);background:var(--rink)">';
-    statsHtmlW+='<div style="font-family:\'Press Start 2P\',monospace;font-size:18px;color:'+ratingW.color+'">'+ratingW.grade+'</div>';
-    statsHtmlW+='<div class="vt" style="font-size:15px;color:var(--mut)">'+ratingW.txt+'</div></div>';
+    statsHtmlW+=buildPostgameRatingBlock(ratingW,mAvg);
     safeEl('pg2-stats').innerHTML=statsHtmlW;
     safeEl('pg2-news').innerHTML=G.news.slice(0,3).map(function(n){return n.txt;}).join('<br>');
     safeEl('pg2-next-btn').textContent='CONTINUE >';
@@ -5037,9 +5303,7 @@ function endGame(){
         '</div>';
     }
     var ratingP=getGameRating(G.pos,gRnd,aRnd,svpctRaw,won,mAvg);
-    statsHtmlP+='<div style="display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px;border:1px solid var(--rl);background:var(--rink)">';
-    statsHtmlP+='<div style="font-family:\'Press Start 2P\',monospace;font-size:18px;color:'+ratingP.color+'">'+ratingP.grade+'</div>';
-    statsHtmlP+='<div class="vt" style="font-size:15px;color:var(--mut)">'+ratingP.txt+'</div></div>';
+    statsHtmlP+=buildPostgameRatingBlock(ratingP,mAvg);
     safeEl('pg2-stats').innerHTML=statsHtmlP;
     safeEl('pg2-news').innerHTML=G.news.slice(0,3).map(function(n){return n.txt;}).join('<br>');
     safeEl('pg2-next-btn').textContent=won?'CONTINUE PLAYOFFS >':'PLAYOFFS OVER >';
@@ -5114,9 +5378,7 @@ function endGame(){
   }
   // Game rating badge (blended: key-moment execution + box score)
   var rating=getGameRating(G.pos,gRnd,aRnd,svpctRaw,won,mAvg);
-  statsHtml+='<div style="display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px;border:1px solid var(--rl);background:var(--rink)">';
-  statsHtml+='<div style="font-family:\'Press Start 2P\',monospace;font-size:18px;color:'+rating.color+'">'+rating.grade+'</div>';
-  statsHtml+='<div class="vt" style="font-size:15px;color:var(--mut)">'+rating.txt+'</div></div>';
+  statsHtml+=buildPostgameRatingBlock(rating,mAvg);
   safeEl('pg2-stats').innerHTML=statsHtml;
   safeEl('pg2-news').innerHTML=G.news.slice(0,3).map(function(n){return n.txt;}).join('<br>');
   G.weekGames++;
@@ -5176,13 +5438,9 @@ function nextWeek(){
 
 function simulatePlayoffs(){
   var sorted=G.standings.slice().sort(function(a,b){return b.pts-a.pts;});
-  var total=sorted.length;
-  var spots=Math.min(8,Math.max(4,Math.floor(total/2)));
-  if(spots%2!==0) spots--;
-  spots=Math.max(4,spots);
-  var bracket=sorted.slice(0,spots);
-  if(bracket.length<2)return {wonCup:false,roundReached:'',summary:null};
-  addNews('PLAYOFFS BEGIN in '+G.league.short+' with top '+spots+' teams.','big');
+  var bracket=buildPlayoffBracketFromStandings(sorted);
+  if(!bracket||bracket.length<2)return {wonCup:false,roundReached:'',summary:null};
+  addNews('PLAYOFFS BEGIN in '+G.league.short+' with '+bracket.length+' teams.','big');
   var roundReached='';
   var current=bracket;
   var roundNames={8:'Quarterfinals',4:'Semifinals',2:'Finals'};
@@ -5256,17 +5514,13 @@ function simPlayoffPairWinner(home,away){
 function initPlayablePlayoffs(){
   G.standings=buildStandings(G.leagueKey);
   var sorted=G.standings.slice().sort(function(a,b){return b.pts-a.pts;});
-  var total=sorted.length;
-  var spots=Math.min(8,Math.max(4,Math.floor(total/2)));
-  if(spots%2!==0) spots--;
-  spots=Math.max(4,spots);
-  var bracket=sorted.slice(0,spots);
-  if(bracket.length<2){
+  var bracket=buildPlayoffBracketFromStandings(sorted);
+  if(!bracket||bracket.length<2){
     addNews('Not enough playoff teams -- skipping playable bracket.','neutral');
     finishSeasonToOffseason();
     return;
   }
-  addNews('PLAYOFFS BEGIN (PLAYABLE) in '+G.league.short+' with top '+spots+' teams.','big');
+  addNews('PLAYOFFS BEGIN (PLAYABLE) in '+G.league.short+' -- '+bracket.length+' teams.','big');
   G._playoffCtx={
     active:true,
     current:bracket,
@@ -5370,7 +5624,7 @@ function afterPlayoffPlayableGame(won){
 function finishPlayablePlayoffs(){
   var ctx=G._playoffCtx;
   if(!ctx){
-    finishSeasonToOffseason();
+    // Context already cleared after a normal finish — do not run season-end again (duplicate season log)
     return;
   }
   var champion=ctx.current[0];
@@ -5379,6 +5633,7 @@ function finishPlayablePlayoffs(){
   G.wonCup=ctx.wonCup;
   _lastPlayoffStats=ctx.myStats;
   var playoffObj={wonCup:ctx.wonCup,roundReached:ctx.roundReached||'Finals',summary:ctx.summary};
+  recordPlayoffLogFromResult(playoffObj);
   _lastPlayoffRecapHTML=buildPlayoffRecapHTML(playoffObj);
   G._playoffCtx=null;
   G._isPlayoffGame=false;
@@ -5422,22 +5677,6 @@ function buildPlayoffRecapHTML(playoff){
       html+='<div style="margin-top:8px">YOUR PLAYOFF STATS: '+_lastPlayoffStats.gp+'GP '+_lastPlayoffStats.g+'G '+_lastPlayoffStats.a+'A '+(_lastPlayoffStats.g+_lastPlayoffStats.a)+'PTS</div>';
     }
   }
-  if(playoff && playoff.roundReached){
-    G.playoffLog=G.playoffLog||[];
-    G.playoffLog.push({
-      year:G.year,
-      league:G.league.short,
-      team:G.team.n,
-      round:playoff.roundReached,
-      wonCup:!!playoff.wonCup,
-      isGoalie:G.pos==='G',
-      gp:_lastPlayoffStats?_lastPlayoffStats.gp:0,
-      g:_lastPlayoffStats?_lastPlayoffStats.g:0,
-      a:_lastPlayoffStats?_lastPlayoffStats.a:0,
-      sv:_lastPlayoffStats?_lastPlayoffStats.sv:0,
-      ga:_lastPlayoffStats?_lastPlayoffStats.ga:0
-    });
-  }
   return html;
 }
 
@@ -5448,6 +5687,18 @@ var TOP_HOCKEY_COUNTRIES = [
 
 function isTopHockeyCountry(nat){
   return TOP_HOCKEY_COUNTRIES.indexOf(nat)!==-1;
+}
+
+/** PHL clubs in major media markets — extra scrutiny / social heat (fishbowl). */
+function isPhlBigMarketTeamName(teamName){
+  if(!teamName) return false;
+  return /Toronto|Montreal|New York|Boston|Philadelphia|Los Angeles|Chicago/i.test(String(teamName));
+}
+/** Recent world stage: played for Canada, no medal (men's national scrutiny). */
+function lastWorldStageWasTeamCanadaNoMedal(){
+  if(!G.worldStageLog||!G.worldStageLog.length) return false;
+  var e=G.worldStageLog[G.worldStageLog.length-1];
+  return e.team==='Team Canada' && (e.medal==='NONE'||!e.medal);
 }
 
 function getNationalTeamName(nat){
@@ -5515,7 +5766,12 @@ function finalizeWorldStagePlayable(ctx){
     _lastWorldStageHTML+='<div style="margin-top:8px;padding:8px;border:1px solid rgba(46,204,113,.35);color:var(--green)">RESULT: '+medal+' MEDAL</div>';
     addNews('WORLD STAGE RESULT: '+nt+' win '+medal+' at '+tName+'!','big');
   } else {
-    G.morale=cl(G.morale+2,0,100);
+    if(nt==='Team Canada' && G.gender==='M'){
+      G.morale=cl(G.morale-6,0,100);
+      addNews('NATIONAL PRESSURE: Canada men finish without a medal — media and fans turn up the heat.','bad');
+    } else {
+      G.morale=cl(G.morale+2,0,100);
+    }
     G.xp+=40;
     _lastWorldStageHTML+='<div style="margin-top:8px;padding:8px;border:1px solid rgba(122,184,224,.25)">RESULT: NO MEDAL</div>';
     addNews('WORLD STAGE RESULT: '+nt+' finish without a medal at '+tName+'.','neutral');
@@ -5554,6 +5810,11 @@ function afterWorldStagePlayableGame(won){
   if(!ctx)return;
   var ev=ctx.ev;
   var tName=ev.tName, nt=ev.nt, teamPower=ev.teamPower;
+  if(!won){
+    var lossMorale=-1;
+    if(nt==='Team Canada' && G.gender==='M') lossMorale=-3;
+    G.morale=cl(G.morale+lossMorale,0,100);
+  }
   if(ctx.phase==='group'){
     if(won) ctx.rrW++; else ctx.rrL++;
     ctx.htmlLines.push('<div style="padding:5px;border-left:3px solid var(--acc);margin-bottom:4px">GROUP GAME '+(ctx.rrW+ctx.rrL)+': '+(won?'W':'L')+'</div>');
@@ -5658,7 +5919,7 @@ function evaluateWorldTournament(kind){
   if(!isTopHockeyCountry(G.nat))
     return {ok:false,msg:'<div>'+tName+': '+nt+' did not qualify.</div>'};
   if(isJunior && G.age>20) return {ok:false,msg:'<div>'+tName+': Age ineligible (over 20).</div>'};
-  if(isJunior && G.leagueKey==='PHL') return {ok:false,msg:'<div>'+tName+': Ineligible as full-time PHL player.</div>'};
+  if(isJunior && G.leagueKey===getProLeagueKeyByGender(G.gender)) return {ok:false,msg:'<div>'+tName+': Ineligible as full-time '+getProLeagueKeyByGender(G.gender)+' player.</div>'};
   if(!isJunior && (G.year%4)!==0) return {ok:false,msg:'<div>'+tName+': Not held this year.</div>'};
   var pOvr=ovr(G.attrs);
   if(pOvr<reqOvr)
@@ -5731,7 +5992,12 @@ function runInternationalTournamentFromEval(ev){
     _lastWorldStageHTML+='<div style="margin-top:8px;padding:8px;border:1px solid rgba(46,204,113,.35);color:var(--green)">RESULT: '+medal+' MEDAL</div>';
     addNews('WORLD STAGE RESULT: '+nt+' win '+medal+' at '+tName+'!','big');
   } else {
-    G.morale=cl(G.morale+2,0,100);
+    if(nt==='Team Canada' && G.gender==='M'){
+      G.morale=cl(G.morale-6,0,100);
+      addNews('NATIONAL PRESSURE: Canada men finish without a medal — media and fans turn up the heat.','bad');
+    } else {
+      G.morale=cl(G.morale+2,0,100);
+    }
     G.xp+=40;
     _lastWorldStageHTML+='<div style="margin-top:8px;padding:8px;border:1px solid rgba(122,184,224,.25)">RESULT: NO MEDAL</div>';
     addNews('WORLD STAGE RESULT: '+nt+' finish without a medal at '+tName+'.','neutral');
@@ -5769,30 +6035,18 @@ function endRegSeason(){
   var madePlayoffs=myIdx<Math.ceil(sorted.length/2);
   if(madePlayoffs){
     openStaffChat('PLAYOFFS START -- CHOOSE PATH',
-      [{sender:'League Office', color:'var(--gold)', text:'You qualified for the playoffs. Simulate, quick-play, or play real elimination games (one 3-moment game per round -- does not change regular-season stats).'}],
+      [{sender:'League Office', color:'var(--gold)', text:'You qualified for the playoffs. Sim the full bracket (fast) or play elimination games (one 3-moment game per round you play).'}],
       [
         {label:'SIM PLAYOFFS', fn:function(){
           var playoff=simulatePlayoffs();
           G.wonCup=playoff.wonCup;
+          recordPlayoffLogFromResult(playoff);
           _lastPlayoffRecapHTML=buildPlayoffRecapHTML(playoff);
           if(G.wonCup){
             G.careerCups++;
             G.awards.push({name:'League Champion',icon:'[C]',desc:'Won the '+G.league.short+' championship',season:G.season});
           } else {
             addNews('Made the playoffs -- eliminated in the '+playoff.roundReached+'.','neutral');
-          }
-          finishSeasonToOffseason();
-        }},
-        {label:'PLAYOFF QUICKPLAY (3 GAMES)', fn:function(){
-          var p=simulatePlayoffs();
-          G.wonCup=p.wonCup;
-          _lastPlayoffRecapHTML=buildPlayoffRecapHTML(p);
-          addNews('PLAYOFF QUICKPLAY completed (3-game managed route).','neutral');
-          if(G.wonCup){
-            G.careerCups++;
-            G.awards.push({name:'League Champion',icon:'[C]',desc:'Won the '+G.league.short+' championship',season:G.season});
-          } else {
-            addNews('Playoff run ended in the '+p.roundReached+'.','neutral');
           }
           finishSeasonToOffseason();
         }},
@@ -5811,8 +6065,14 @@ function endRegSeason(){
 }
 
 function finishSeasonToOffseason(){
+  // One log row per season end (playoff paths could otherwise fire this multiple times)
+  if(G._seasonEndLoggedForSeason===G.season){
+    goToOffseason();
+    return;
+  }
+  G._seasonEndLoggedForSeason=G.season;
   // Store season stats in log
-  var logEntry={year:G.year,league:G.league.short,team:G.team.n.split(' ').slice(-1)[0],gp:G.gp,ovrVal:ovr(G.attrs),wonCup:G.wonCup,isGoalie:G.pos==='G'};
+  var logEntry={year:G.year,season:G.season,league:G.league.short,leagueKey:G.leagueKey,team:G.team.n.split(' ').slice(-1)[0],gp:G.gp,ovrVal:ovr(G.attrs),wonCup:G.wonCup,isGoalie:G.pos==='G'};
   if(G.pos==='G'){
     var sSvPct=G.saves+(G.goalsAgainst||0)>0?(Math.round(G.saves/(G.saves+(G.goalsAgainst||0))*1000)/10):'--';
     var sGAA=G.gp>0?Math.round(((G.goalsAgainst||0)/G.gp)*100)/100:'--';
@@ -5942,14 +6202,45 @@ function maybeTriggerPostGamePressOnce(won, gRnd, aRnd){
 function maybeTriggerPressConference(won, gRnd, aRnd){
   var pts=(gRnd||0)+(aRnd||0);
   var isG=G.pos==='G';
+  var isF=G.gender==='F';
   if(!isG && pts<2 && !G.wonCup) return;
   if(isG && pts<1 && !won && !G.wonCup) return;
-  if(Math.random()>0.48) return;
+  // Men: press conferences fire more often; women: same base rate as before
+  if(isF){ if(Math.random()>0.48) return; }
+  else { if(Math.random()>0.85) return; }
   var peer=pressRandomPeer();
   var critic=pressRandomCritic();
   var hdl=pressRandomHandle();
   var coach=pressRandomCoach();
-  var questions=isG?[
+  var questions;
+  if(isF){
+    questions=isG?[
+      {q:'Strong game in net — what was working for you?',
+       opts:[{t:'Tracking the puck through traffic.',m:3},{t:'Rebound control was a focus.',m:2},{t:'The guys cleared the crease.',m:3},{t:'Just happy to help the team.',m:2}]},
+      {q:'How do you stay ready when the score is tight?',
+       opts:[{t:'Stick to routine — breathe between whistles.',m:2},{t:'Trust the process we practiced.',m:3},{t:'Lean on the leadership group.',m:2},{t:'One save at a time.',m:2}]},
+      {q:'Fans are excited about your season. What does that mean to you?',
+       opts:[{t:'It means a lot — I play for them too.',m:3},{t:'I try to let my play speak.',m:2},{t:'Grateful for the support.',m:3},{t:'We are building something special.',m:2}]},
+      {q:'What did you see from the defense in front of you tonight?',
+       opts:[{t:'They battled hard — cleared bodies.',m:2},{t:'Communication was good.',m:2},{t:'We can always tighten gaps.',m:1},{t:'Proud of how they competed.',m:3}]},
+      {q:'Any message for young goalies watching?',
+       opts:[{t:'Work on skating and patience.',m:2},{t:'Have fun — the game should be joy first.',m:3},{t:'Find a mentor you trust.',m:2},{t:'Keep showing up.',m:2}]}
+    ]:[
+      {q:'Walk us through your night — what stood out?',
+       opts:[{t:'The team played fast and connected.',m:2},{t:'I tried to keep my game simple.',m:2},{t:'We earned two points together.',m:3},{t:'Proud of the group effort.',m:2}]},
+      {q:'What does this win mean for the room?',
+       opts:[{t:'Momentum — we believe in each other.',m:3},{t:'We are taking it step by step.',m:2},{t:'Everyone contributed.',m:3},{t:'Long season — we stay humble.',m:2}]},
+      {q:'You have been a bright spot. What are you working on?',
+       opts:[{t:'Details at both ends — always.',m:2},{t:'Strength and conditioning.',m:2},{t:'Video with coaches.',m:2},{t:'Being a good teammate.',m:3}]},
+      {q:'How do you handle expectations?',
+       opts:[{t:'I focus on what I can control.',m:2},{t:'My teammates support me.',m:3},{t:'I lean on family and staff.',m:2},{t:'One day at a time.',m:2}]},
+      {q:'What did '+coach+' emphasize this week?',
+       opts:[{t:'Compete and communication.',m:2},{t:'Structure and pace.',m:2},{t:'Playing for each other.',m:3},{t:'Sticking to our identity.',m:2}]},
+      {q:'Any advice for girls and boys who look up to you?',
+       opts:[{t:'Dream big, work hard, be kind.',m:3},{t:'Stay in school and love the game.',m:2},{t:'Find joy in practice.',m:2},{t:'Believe in yourself.',m:2}]}
+    ];
+  } else {
+  questions=isG?[
     {q:'Your reads looked composed. What were you tracking on late chances?',
      opts:[{t:'Puck first -- then hands. I did not chase ghosts.',m:3},{t:'Rebounds. We talked about second chances all week.',m:2},{t:'I stayed patient -- let them move first.',m:2},{t:'I was unbeatable tonight. Next question.',m:-3}]},
     {q:'Any nerves with the score tight late?',
@@ -5986,6 +6277,7 @@ function maybeTriggerPressConference(won, gRnd, aRnd){
     {q:'Locker-room distraction narrative -- response?',
      opts:[{t:'My focus is on winning.',m:2},{t:'I let my play do the talking.',m:1},{t:'This room knows I give 100%.',m:2},{t:'That story is nonsense.',m:-2}]}
   ];
+  }
   var q=shuf(questions.slice())[0];
   openStaffChat('PRESS -- POST-GAME',
     [{sender:'Reporter @ '+G.league.short,color:'var(--mut)',text:q.q}],
@@ -6003,15 +6295,42 @@ function maybeTriggerBadPressConference(won, gRnd, aRnd){
   if(G.gp<2) return;
   var pts=(gRnd||0)+(aRnd||0);
   var isG=G.pos==='G';
+  var isF=G.gender==='F';
   var struggling=isG
     ? ((!won && pts<1) || G.morale<42 || (G.gp>0 && G.w/G.gp<0.42))
     : (G.w/G.gp<0.45 ||G.morale<45 ||G.plusminus<=-4 || (!won && pts===0));
   if(!struggling) return;
-  if(Math.random()>0.52) return;
+  // Men: tough press fires often. Women: rarely — and questions stay constructive, not cruel.
+  if(isF){ if(Math.random()>0.88) return; }
+  else { if(Math.random()>0.18) return; }
   var peer=pressRandomPeer();
   var critic=pressRandomCritic();
   var hdl=pressRandomHandle();
-  var questions=isG?[
+  var questions;
+  if(isF){
+    questions=isG?[
+      {q:'A tough result — what is your focus heading into the next one?',
+       opts:[{t:'Short memory — review and reset.',m:2},{t:'Supporting the team any way I can.',m:3},{t:'Extra work with the goalie coach.',m:2},{t:'We will bounce back together.',m:3}]},
+      {q:'How are you taking care of yourself through a heavy schedule?',
+       opts:[{t:'Sleep, nutrition, honest with trainers.',m:2},{t:'Leaning on teammates.',m:2},{t:'Keeping perspective.',m:3},{t:'Grateful for the opportunity to play.',m:2}]},
+      {q:'What positives can you take from tonight?',
+       opts:[{t:'We never quit.',m:2},{t:'Some good saves to build on.',m:2},{t:'Lessons for the next game.',m:2},{t:'The room stays connected.',m:3}]},
+      {q:'Message to fans who are with you in the hard stretches?',
+       opts:[{t:'Thank you — we hear you.',m:3},{t:'We are working every day.',m:2},{t:'Your support means everything.',m:3},{t:'Stick with us.',m:2}]}
+    ]:[
+      {q:'Rough patch — how do you keep the room together?',
+       opts:[{t:'Communication and honesty.',m:3},{t:'Small goals each period.',m:2},{t:'Leaders stepping up.',m:2},{t:'We trust the process.',m:2}]},
+      {q:'What are you personally working on this week?',
+       opts:[{t:'Details at both ends.',m:2},{t:'Skating and puck support.',m:2},{t:'Video with coaches.',m:2},{t:'Staying positive for teammates.',m:3}]},
+      {q:'How do you block out outside noise?',
+       opts:[{t:'Focus on the locker room.',m:2},{t:'Family and close circle.',m:2},{t:'One day at a time.',m:2},{t:'I control my effort.',m:2}]},
+      {q:'Anything you want fans to know after tonight?',
+       opts:[{t:'We will keep fighting.',m:2},{t:'Appreciate everyone who supports us.',m:3},{t:'Long season ahead.',m:2},{t:'Proud to wear this jersey.',m:3}]},
+      {q:'Coach challenged the group — how did you receive that?',
+       opts:[{t:'Constructive — we all want to win.',m:2},{t:'Accountability is healthy.',m:2},{t:'We are in this together.',m:3},{t:'Turn the page tomorrow.',m:2}]}
+    ];
+  } else {
+  questions=isG?[
     {q:'Tough night -- want any goal back?',
      opts:[{t:'A couple. I will clean it up on video.',m:2},{t:'They earned their looks.',m:1},{t:'I need to be sharper early.',m:2},{t:'The team hung me out.',m:-4}]},
     {q:'Fans on '+hdl+' are roasting rebound control. Response?',
@@ -6019,7 +6338,9 @@ function maybeTriggerBadPressConference(won, gRnd, aRnd){
     {q:critic+' called you "shaky in big moments." Fair?',
      opts:[{t:'I will use it as fuel.',m:1},{t:'I disagree with the premise.',m:0},{t:'I need one more save.',m:2},{t:'He never played.',m:-3}]},
     {q:'Is fatigue a factor with workload?',
-     opts:[{t:'No excuses -- pros figure it out.',m:2},{t:'I am honest with trainers.',m:2},{t:'Everyone is tired in March.',m:1},{t:'Load management is a joke.',m:-3}]}
+     opts:[{t:'No excuses -- pros figure it out.',m:2},{t:'I am honest with trainers.',m:2},{t:'Everyone is tired in March.',m:1},{t:'Load management is a joke.',m:-3}]},
+    {q:'Media says you are the story tonight — for the wrong reasons. Reply?',
+     opts:[{t:'I own it. Bad night.',m:1},{t:'Ask me after I watch tape.',m:0},{t:'Save percentage lies sometimes.',m:-1},{t:'Ratings game — I stop pucks.',m:-2}]}
   ]:[
     {q:'You are in a tough stretch. How do you stay confident?',
      opts:[{t:'I trust my process.',m:2},{t:'I am watching film and learning.',m:2},{t:'Season is long.',m:1},{t:'People are overreacting.',m:-3}]},
@@ -6034,11 +6355,16 @@ function maybeTriggerBadPressConference(won, gRnd, aRnd){
     {q:'Coach called the effort "inconsistent." Do you agree?',
      opts:[{t:'We can all be better.',m:2},{t:'I own my shifts.',m:2},{t:'That is a fair challenge.',m:2},{t:'Call out who you mean.',m:-4}]},
     {q:'A thread on '+hdl+' compares you to a minor-league call-up. Motivated?',
-     opts:[{t:'I stay off the apps.',m:2},{t:'Motivation is internal.',m:2},{t:'Let them talk.',m:1},{t:'I am still here -- they are not.',m:-2}]}
+     opts:[{t:'I stay off the apps.',m:2},{t:'Motivation is internal.',m:2},{t:'Let them talk.',m:1},{t:'I am still here -- they are not.',m:-2}]},
+    {q:'Radio says you are "untradeable" — because nobody wants the contract. Fair?',
+     opts:[{t:'Disrespectful. Next question.',m:-2},{t:'I am still here producing.',m:1},{t:'My game will talk.',m:0},{t:'They can say whatever.',m:-1}]}
   ];
+  }
   var q=shuf(questions.slice())[0];
-  openStaffChat('PRESS -- TOUGH QUESTIONS',
-    [{sender:critic+' (press room)',color:'var(--mut)',text:q.q}],
+  var pTitle=isF?'PRESS -- CONVERSATION':'PRESS -- TOUGH QUESTIONS';
+  var pSender=isF?('Reporter @ '+G.league.short):(critic+' (press room)');
+  openStaffChat(pTitle,
+    [{sender:pSender,color:'var(--mut)',text:q.q}],
     q.opts.map(function(opt){
       return {label:trimPressLabel(opt.t),fn:function(){
         G.morale=cl(G.morale+opt.m,0,100);
@@ -6062,6 +6388,17 @@ function maybeTriggerTrade(gRnd,aRnd,won){
   if(Math.random() > chance) return;
   addNews('TRADE RUMORS: management exploring options after recent struggles.','neutral');
   triggerTrade();
+}
+
+// ============================================================
+// POST-GAME RATING BLOCK (letter + key-moment average)
+// ============================================================
+function buildPostgameRatingBlock(rating,mAvg){
+  var h='<div style="display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px;border:1px solid var(--rl);background:var(--rink)">';
+  h+='<div style="font-family:\'Press Start 2P\',monospace;font-size:18px;color:'+rating.color+'">'+rating.grade+'</div>';
+  h+='<div class="vt" style="font-size:15px;color:var(--mut);line-height:1.45">'+rating.txt+'</div></div>';
+  h+='<div class="vt" style="font-size:12px;color:var(--mut);margin-top:6px;opacity:.88">KEY MOMENTS AVG: '+Math.round(mAvg)+'/100</div>';
+  return h;
 }
 
 // ============================================================
@@ -6121,8 +6458,9 @@ function declineTrade(){
 // ============================================================
 function offerContract(forcedTeamName){
   if(hasActiveDraftRights() && !draftClubWillingToSignElc() && (G.contractYrsLeft||0)<=0){
-    notify('RIGHTS CLUB: NO ELC UNTIL '+DRAFT_CLUB_ELC_MIN_OVR+'+ OVR','gold');
-    addNews(G.draftRights.team+' holds your rights -- no entry-level offer until you are pro-ready ('+DRAFT_CLUB_ELC_MIN_OVR+'+ OVR). Keep developing.','neutral');
+    var elcNeed=getDraftClubElcMinOvr();
+    notify('RIGHTS CLUB: NO ELC UNTIL '+elcNeed+'+ OVR','gold');
+    addNews(G.draftRights.team+' holds your rights -- no entry-level offer until you are pro-ready ('+elcNeed+'+ OVR). Keep developing.','neutral');
     return;
   }
   // Staff chat before going to negotiation screen
@@ -6223,8 +6561,9 @@ function walkAway(){
 
 function getProContractType(){
   if(G.league.tier!=='pro') return 'PRO CONTRACT';
-  if(G.leagueKey!=='PHL') return 'UFA';
-  // ELC is pro-only and always the first 3-year starter contract.
+  var topPro=getProLeagueKeyByGender(G.gender);
+  if(G.leagueKey!==topPro) return 'UFA';
+  // ELC is top-pro-only (PHL / PWL) and always the first 3-year starter contract.
   if(!G.hadELC) return 'ENTRY LEVEL';
   if(G.age<25 && G.draftRights && G.draftRights.team===G.team.n && G.draftRights.leagueKey===G.leagueKey) return 'RFA';
   if(G.age<25) return 'UFA';
@@ -6234,10 +6573,9 @@ function getProContractType(){
 function hasActiveDraftRights(){
   return !!(G.draftRights && G.age<25);
 }
-/** Drafting club keeps your rights but will not table an ELC / pro offer below this (develop in junior, college, semi-pro, etc.). */
-var DRAFT_CLUB_ELC_MIN_OVR=80;
+/** Drafting club keeps your rights but will not table an ELC / pro offer below gendered bar (see getDraftClubElcMinOvr). */
 function draftClubWillingToSignElc(){
-  return ovr(G.attrs)>=DRAFT_CLUB_ELC_MIN_OVR;
+  return ovr(G.attrs)>=getDraftClubElcMinOvr();
 }
 
 function finalizeContract(sal,yrs,ntc,bonus){
@@ -6273,8 +6611,14 @@ function getSemiProLeagueKeysByGender(gender){return gender==='F'?['SDHL','FWHL'
 
 function getTransitionLeagueOptions(){
   // Default pathway is lower levels; pro only via draft-rights signing.
-  var opts=[getMinorLeagueKeyByGender(G.gender)].concat(getSemiProLeagueKeysByGender(G.gender));
-  return opts.filter(function(k){return LEAGUES[k];});
+  // Affiliate minors (NAML/PWDL) only if 75+ / 45+ OVR; otherwise semi-pro + dev only.
+  var minorK=getMinorLeagueKeyByGender(G.gender);
+  var opts=[minorK].concat(getSemiProLeagueKeysByGender(G.gender));
+  opts=opts.filter(function(k){return LEAGUES[k];});
+  if(ovr(G.attrs)<getProHardDevelopmentFloorOvr()){
+    opts=opts.filter(function(k){return LEAGUES[k].tier!=='minor';});
+  }
+  return opts;
 }
 
 function getDemotionDestinationFromPHL(){
@@ -6299,14 +6643,14 @@ function hadBadProSeason(){
   return (ppg<0.46 && (G.plusminus||0)<=-12) || ((G.plusminus||0)<=-22);
 }
 
-/** NAML/PWDL send-down from main pro (PHL/PWL): sub-80 OVR, short tenure, age 21–29. Bad year = very likely; otherwise still rolls often. */
+/** NAML/PWDL send-down from main pro (PHL/PWL): below gendered OVR bar, short tenure, age 18–29. Bad year = very likely; otherwise still rolls often. */
 function qualifiesYoungProAffiliateDemotion(wasBadSeason, ageSeasonJustEnded){
   if(!G.league||G.league.tier!=='pro') return false;
   var proKey=getProLeagueKeyByGender(G.gender);
   if(G.leagueKey!==proKey) return false;
   var endedAge=ageSeasonJustEnded!=null?ageSeasonJustEnded:(G.age||16);
-  if(endedAge<21||endedAge>=30) return false;
-  if(ovr(G.attrs)>=80) return false;
+  if(endedAge<18||endedAge>=30) return false;
+  if(ovr(G.attrs)>=getProAffiliateDemotionMaxOvr()) return false;
   if((G.teamTenure||0)>2) return false;
   if(wasBadSeason) return Math.random()<0.86;
   return Math.random()<0.44;
@@ -6343,10 +6687,12 @@ function canMoveToProLeague(targetKey){
     return !!(G.draftRights && G.draftRights.leagueKey===targetKey);
   }
   if(tTier==='minor'){
-    if((G.age||16)<21) return false; // cannot play affiliate minors before 21
-    // Affiliate minors require draft rights (or already being in pro/minor system).
+    if((G.age||16)<18) return false; // affiliate minors (NAML/PWDL): 18+
+    // Already in pro/minor: free movement within system.
     if(G.league && (G.league.tier==='minor'||G.league.tier==='pro')) return true;
-    return !!G.draftRights;
+    // From junior/college/semi-pro: draft rights + men 75+ / women 45+ to join affiliate minors.
+    if(!G.draftRights) return false;
+    return ovr(G.attrs)>=getProHardDevelopmentFloorOvr();
   }
   return true;
 }
@@ -6423,8 +6769,8 @@ function runDraftEventIfEligible(){
     addNews('DRAFT RIGHTS ONLY: '+G.first+' has not signed yet and will continue developing unless a contract is offered.','neutral');
     if(pOvr<76){
       addNews('Development path: '+G.first+' remains in '+G.league.short+' for now despite being drafted.','neutral');
-    } else if(pOvr<DRAFT_CLUB_ELC_MIN_OVR){
-      addNews('CLUB STANCE: '+draftedTeam.n+' holds your rights but will not offer an ELC until you are pro-ready ('+DRAFT_CLUB_ELC_MIN_OVR+'+ OVR) -- keep developing.','neutral');
+    } else if(pOvr<getDraftClubElcMinOvr()){
+      addNews('CLUB STANCE: '+draftedTeam.n+' holds your rights but will not offer an ELC until you are pro-ready ('+getDraftClubElcMinOvr()+'+ OVR) -- keep developing.','neutral');
     } else {
       addNews('ELC TRACK: '+G.first+' projected for ENTRY-LEVEL CONTRACT talks with '+draftedTeam.n+' (no auto-signing).','good');
     }
@@ -6481,7 +6827,7 @@ function goToOffseason(){
   var tier=G.league.tier;
   var advPanel=safeEl('league-advance-panel');
   var shouldAdv=['junior','college'].indexOf(tier)!==-1&&G.season>=3||['euro','asia'].indexOf(tier)!==-1&&G.season>=2;
-  var shouldAdvMinor=tier==='minor'&&G.season>=2&&ovr(G.attrs)>=75;
+  var shouldAdvMinor=tier==='minor'&&G.season>=2&&ovr(G.attrs)>=getProHardDevelopmentFloorOvr();
   if(shouldAdv||shouldAdvMinor){
     advPanel.style.display='block';
     var nextKeys=(NEXT_TIER[tier]&&NEXT_TIER[tier][G.gender])||[];
@@ -6491,7 +6837,7 @@ function goToOffseason(){
       ahtml+='<div class="vt" style="font-size:14px;color:var(--gold);margin-bottom:8px">'+
         (draftClubWillingToSignElc()
           ? 'YOU HAVE BEEN DRAFTED BY '+G.draftRights.team.toUpperCase()+' ('+G.draftRights.leagueKey+'). PRO SIGNING USES YOUR DRAFT RIGHTS WHEN YOU ACCEPT AN OFFER.'
-          : 'DRAFT RIGHTS: '+G.draftRights.team.toUpperCase()+' ('+G.draftRights.leagueKey+') -- NO ELC FROM CLUB UNTIL '+DRAFT_CLUB_ELC_MIN_OVR+'+ OVR. KEEP DEVELOPING (JUNIOR / COLLEGE / SEMI-PRO) VIA LEAGUE SWITCH.')+
+          : 'DRAFT RIGHTS: '+G.draftRights.team.toUpperCase()+' ('+G.draftRights.leagueKey+') -- NO ELC FROM CLUB UNTIL '+getDraftClubElcMinOvr()+'+ OVR. KEEP DEVELOPING (JUNIOR / COLLEGE / SEMI-PRO) VIA LEAGUE SWITCH.')+
         '</div>';
     } else if(tier==='minor'){
       ahtml+='<div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:8px">'+G.league.short+' IS AFFILIATED TO '+getProLeagueKeyByGender(G.gender)+'. YOU CANNOT JUMP TO PRO UNLESS DRAFTED.</div>';
@@ -6515,36 +6861,40 @@ function goToOffseason(){
   var proKeyTop=getProLeagueKeyByGender(G.gender);
   if(mustLeaveJunior || (tier==='junior' && G.season>=1 && ovr(G.attrs)>=62) || G.isDraftFreeAgent || G.draftRights || tier==='pro'){
     switchPanel.style.display='block';
-    var offerPool=mustLeaveJunior?getTransitionLeagueOptions():(tier==='pro'?[proKeyTop]:(G.gender==='M'?['OJL','QMJL','WJL','NCHA','USJL','NEHL','CEHL','ARHL']:['CWHL','NWCHA','USWDL','SDHL','FWHL','AWHL']));
+    var offerPool=mustLeaveJunior?getTransitionLeagueOptions():(tier==='pro'?getTransitionLeagueOptions():(G.gender==='M'?['OJL','QMJL','WJL','NCHA','USJL','NEHL','CEHL','ARHL']:['CWHL','NWCHA','USWDL','SDHL','FWHL','AWHL']));
     // Common pathway: strong juniors can jump to college scholarship after year 1.
     if(tier==='junior' && G.season>=1){
       var collegeKey=G.gender==='M'?'NCHA':'NWCHA';
       if(offerPool.indexOf(collegeKey)===-1) offerPool.unshift(collegeKey);
     }
-    // Drafted players: pro destination in the switcher only once the club would offer (80+ OVR).
+    // Drafted players: pro destination in the switcher only once the club would offer (ELC-ready OVR).
     var draftedFastTrack=G.draftRights && draftClubWillingToSignElc();
-    if(draftedFastTrack && offerPool.indexOf(G.draftRights.leagueKey)===-1) offerPool.unshift(G.draftRights.leagueKey);
+    if(draftedFastTrack && G.draftRights.leagueKey!==G.leagueKey && offerPool.indexOf(G.draftRights.leagueKey)===-1) offerPool.unshift(G.draftRights.leagueKey);
     var otherLeagues=offerPool.filter(function(k){
       if(!LEAGUES[k]||!canMoveToProLeague(k)) return false;
-      if(tier==='pro'&&k===G.leagueKey&&LEAGUES[k].tier==='pro') return true;
       return k!==G.leagueKey;
     });
-    var numOffers=tier==='pro'?1:Math.min(3, Math.max(1, Math.floor((ovr(G.attrs)-58)/10)));
-    var offers=tier==='pro'?otherLeagues.slice(0,1):shuf(otherLeagues).slice(0,numOffers);
-    if(draftedFastTrack && G.draftRights && offers.indexOf(G.draftRights.leagueKey)===-1) offers.unshift(G.draftRights.leagueKey);
+    var numOffers=tier==='pro'?Math.min(3, Math.max(1, otherLeagues.length)):Math.min(3, Math.max(1, Math.floor((ovr(G.attrs)-58)/10)));
+    var offers=tier==='pro'?otherLeagues.slice(0,numOffers):shuf(otherLeagues).slice(0,numOffers);
+    if(draftedFastTrack && G.draftRights && G.draftRights.leagueKey!==G.leagueKey && offers.indexOf(G.draftRights.leagueKey)===-1) offers.unshift(G.draftRights.leagueKey);
+    if(!offers.length){
+      var shtmlEmpty='<div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:10px">NO OTHER LEAGUES TO SWITCH TO RIGHT NOW. USE <b>STAY</b> OR HANDLE MOVES IN-SEASON.</div>';
+      safeEl('switch-content').innerHTML=shtmlEmpty+'<div class="vt" style="margin-top:8px"><button class="btn bs" onclick="pickSwitchLeague(null)">STAY IN '+G.league.short+'</button></div>';
+      G._switchLeague=null;
+    } else {
     var shtml='<div class="vt" style="font-size:15px;color:var(--mut);margin-bottom:10px">'+
       (mustLeaveJunior?'AGE RULE: MUST MOVE TO MINOR/SEMI-PRO OR HIGHER THIS OFFSEASON.':
-      (tier==='pro'?'PRO ROSTER: TAP '+proKeyTop+' TO CHANGE TEAMS (SAME LEAGUE) -- E.G. BACK TO A FORMER CLUB.':
+      (tier==='pro'?'LEAGUE SWITCH: OTHER LEAGUES ONLY (YOU ARE ALREADY IN '+G.league.short+').':
       (G.isDraftFreeAgent?'FREE AGENT OFFERS AVAILABLE:':'OFFERS AVAILABLE:')))+'</div>';
     if(tier==='pro'){
-      shtml+='<div class="vt" style="font-size:14px;color:var(--gold);margin-bottom:8px">Already in '+G.league.short+'. Selecting '+proKeyTop+' again assigns you to another club (draft rights only apply until you leave the team that drafted you).</div>';
+      shtml+='<div class="vt" style="font-size:14px;color:var(--gold);margin-bottom:8px">Same-league team changes are handled in-season via trades/requests -- offseason here is for moving to a different league.</div>';
     } else if(!G.draftRights){
-      shtml+='<div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:8px">'+getMinorLeagueKeyByGender(G.gender)+' FEEDS INTO '+proKeyTop+'. FIRST-TIME PRO ENTRY NEEDS DRAFT RIGHTS TO THAT LEAGUE.</div>';
+      shtml+='<div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:8px">'+getMinorLeagueKeyByGender(G.gender)+' FEEDS INTO '+proKeyTop+'. FIRST-TIME PRO ENTRY NEEDS DRAFT RIGHTS. AFFILIATE MINORS FROM DEV LEAGUES REQUIRE <b>'+getProHardDevelopmentFloorOvr()+'+ OVR</b> (MEN 75 / WOMEN 45), AGE 18+.</div>';
     } else {
       shtml+='<div class="vt" style="font-size:14px;color:var(--gold);margin-bottom:8px">DRAFTED BY '+G.draftRights.team.toUpperCase()+' ('+G.draftRights.leagueKey+'). '+
         (draftClubWillingToSignElc()
           ? 'ELC OFFERS APPEAR WHEN YOUR CONTRACT EXPIRES.'
-          : 'BELOW '+DRAFT_CLUB_ELC_MIN_OVR+' OVR: NO ELC YET -- PICK A DEVELOPMENT LEAGUE BELOW. AT '+DRAFT_CLUB_ELC_MIN_OVR+'+: PRO MAY APPEAR HERE.')+
+          : 'BELOW '+getDraftClubElcMinOvr()+' OVR: NO ELC YET -- PICK A DEVELOPMENT LEAGUE BELOW. AT '+getDraftClubElcMinOvr()+'+: PRO MAY APPEAR HERE.')+
         '</div>';
     }
     for(var j=0;j<offers.length;j++){
@@ -6557,6 +6907,7 @@ function goToOffseason(){
     if(!mustLeaveJunior) shtml+='<div class="vt" style="font-size:14px;color:var(--mut);margin-top:8px">-- OR -- <button class="btn bs" onclick="pickSwitchLeague(null)">STAY IN '+G.league.short+'</button></div>';
     safeEl('switch-content').innerHTML=shtml;
     G._switchLeague=offers[0]||null;
+    }
   } else {
     switchPanel.style.display='none';
     G._switchLeague=null;
@@ -6652,7 +7003,11 @@ function generateFAOffers(){
   potentialLeagues=potentialLeagues.filter(function(k){
     var lk=LEAGUES[k];
     if(!lk) return false;
-    if(lk.tier==='minor' && (G.age||16)<21) return false;
+    if(lk.tier==='minor'){
+      if((G.age||16)<18) return false;
+      if(G.league && (G.league.tier==='minor'||G.league.tier==='pro')) return true;
+      return ovr(G.attrs)>=getProHardDevelopmentFloorOvr();
+    }
     if(lk.tier==='pro'){
       if(G.league && G.league.tier==='pro') return true;
       return !!(G.draftRights && G.draftRights.leagueKey===k);
@@ -6671,7 +7026,7 @@ function generateFAOffers(){
     rteam=getValidTeamForLeague(rk,G.draftRights.team);
     // Rights-holding club waits until you are pro-ready -- no phantom ELC while still developing.
     if(rl&&rteam&&draftClubWillingToSignElc()){
-      var eliteReady=ovr(G.attrs)>=83;
+      var eliteReady=ovr(G.attrs)>=getEliteReadyOvrBar();
       var rsal=Math.round(rl.salBase*rd(eliteReady?1.0:0.9,eliteReady?1.25:1.15)/1000)*1000;
       curFAOffers.push({lk:rk,l:rl,team:rteam,sal:rsal,yrs:eliteReady?3:ri(2,4),rights:true,eliteReady:eliteReady});
     }
@@ -6703,7 +7058,7 @@ function generateFAOffers(){
   var rightsDevHold=rightsActive && !draftClubWillingToSignElc();
   if(rightsDevHold){
     html+='<div class="vt" style="font-size:15px;color:var(--gold);margin-bottom:8px">DRAFT RIGHTS &mdash; '+G.draftRights.team.toUpperCase()+' ('+G.draftRights.leagueKey+')</div>';
-    html+='<div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:12px;line-height:1.65">No contract offer from your drafting club until <b>'+DRAFT_CLUB_ELC_MIN_OVR+'+ OVR</b>. They still hold your rights. Use <b>LEAGUE SWITCH</b> above to stay in or move to <b>junior, college, semi-pro,</b> or overseas and keep developing.</div>';
+    html+='<div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:12px;line-height:1.65">No contract offer from your drafting club until <b>'+getDraftClubElcMinOvr()+'+ OVR</b>. They still hold your rights. Use <b>LEAGUE SWITCH</b> above to stay in or move to <b>junior, college, semi-pro,</b> or overseas and keep developing.</div>';
   } else {
     html+='<div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:10px">YOU ARE A FREE AGENT. OFFERS:</div>';
   }
@@ -6717,7 +7072,7 @@ function generateFAOffers(){
     html+='<div class="cval-big">'+fmt(o.sal)+'/YR</div>';
     html+='<div class="vt" style="font-size:14px;color:var(--mut)">'+o.yrs+'-YEAR DEAL -- TOTAL '+fmt(o.sal*o.yrs)+'</div>';
     if(o.rights) html+='<div class="vt" style="font-size:13px;color:var(--gold)">YOUR RIGHTS-HOLDING TEAM</div>';
-    if(o.eliteReady) html+='<div class="vt" style="font-size:13px;color:var(--good)">HIGH-END READY (83+ OVR)</div>';
+    if(o.eliteReady) html+='<div class="vt" style="font-size:13px;color:var(--good)">HIGH-END READY ('+getEliteReadyOvrBar()+'+ OVR)</div>';
     if(o.offerSheet) html+='<div class="vt" style="font-size:13px;color:var(--acc)">RARE OFFER SHEET</div>';
     html+='<button class="btn bp" style="margin-top:8px;font-size:14px;padding:6px 14px" onclick="signFAOffer('+i+')">SIGN HERE</button>';
     html+='</div>';
@@ -6831,12 +7186,12 @@ function nextSeason(){
       onTeamChangeLeadershipReset();
       G.standings=buildStandings(downKey);
       G.allOpponents=genSeason(downKey,G.team);
-      addNews('ROSTER MOVE: '+oldTeam2+' ('+oldLeague2+') assign '+G.first+' '+G.last+' to '+G.league.short+' -- under 80 OVR, short tenure; development stint (OVR '+ovr(G.attrs)+').','neutral');
+      addNews('ROSTER MOVE: '+oldTeam2+' ('+oldLeague2+') assign '+G.first+' '+G.last+' to '+G.league.short+' -- under '+getProAffiliateDemotionMaxOvr()+' OVR, short tenure; development stint (OVR '+ovr(G.attrs)+').','neutral');
       notify('ASSIGNED TO '+G.league.short.toUpperCase(),'red');
     }
   }
-  // Main pro (PHL/PWL) hard roster floor: sub-75 OVR reassigned to development leagues.
-  if(G.leagueKey===getProLeagueKeyByGender(G.gender) && ovr(G.attrs)<75){
+  // Main pro (PHL/PWL) hard roster floor: sub-floor OVR reassigned to development leagues (gendered).
+  if(G.leagueKey===getProLeagueKeyByGender(G.gender) && ovr(G.attrs)<getProHardDevelopmentFloorOvr()){
     var demoteKey=getDemotionDestinationFromPHL();
     if(demoteKey && LEAGUES[demoteKey]){
       var oldTeam=G.team.n, oldLeague=G.league.short;
@@ -6852,9 +7207,10 @@ function nextSeason(){
   }
   if((G.league.tier==='junior'||G.league.tier==='college') && G.age>20){
     var forced=getTransitionLeagueOptions();
-    // Undrafted players route to semi-pro path first (not affiliate minors).
+    // Undrafted players route to semi-pro path first (not affiliate minors without OVR).
     var validForced=(forced||[]).filter(function(k){return canMoveToProLeague(k);});
-    var fallbackSemi=getSemiProLeagueKeysByGender(G.gender).filter(function(k){return LEAGUES[k];})[0]||getMinorLeagueKeyByGender(G.gender);
+    var semiFirst=getSemiProLeagueKeysByGender(G.gender).filter(function(k){return LEAGUES[k];});
+    var fallbackSemi=semiFirst.length?semiFirst[0]:(ovr(G.attrs)>=getProHardDevelopmentFloorOvr()?getMinorLeagueKeyByGender(G.gender):(G.gender==='M'?'NEHL':'SDHL'));
     var forcedKey=(validForced&&validForced.length)?validForced[0]:fallbackSemi;
     if(LEAGUES[forcedKey]){
       var oldShort=G.league.short;
@@ -7493,6 +7849,13 @@ function simWeek(){
   var streakLabel=G.streakType==='none'?'--':(G.streakType+G.streakCount);
   html+='<div>Streak: '+streakLabel+' | Media Events: '+weeklyStats.pressHits+'</div>';
   html+='<div>Stamina Loss: -'+weeklyStats.staminaLoss+'</div>';
+  if(G.pos==='G'){
+    var ssnF=(G.saves||0)+(G.goalsAgainst||0);
+    var ssnPct=ssnF>0?(Math.round((G.saves/ssnF)*1000)/10)+'%':'--';
+    html+='<div style="font-size:13px;color:var(--gold);margin-top:8px;border-top:1px solid rgba(122,184,224,.12);padding-top:6px">SEASON: '+G.gp+' GP &mdash; '+G.saves+' SV &middot; '+ssnPct+'</div>';
+  } else {
+    html+='<div style="font-size:13px;color:var(--gold);margin-top:8px;border-top:1px solid rgba(122,184,224,.12);padding-top:6px">SEASON: '+G.gp+' GP &mdash; '+(G.goals+G.assists)+' PTS ('+G.goals+'G '+G.assists+'A)</div>';
+  }
   html+='<div>';
   html+='<div style="font-size:18px;color:'+(weeklyGrade==='A+'?'gold':weeklyGrade==='A'?'green':weeklyGrade==='B'?'orange':'gray')+'">'+weeklyGrade+'</div>';
   html+='<div>WEEKLY GRADE</div></div>';
