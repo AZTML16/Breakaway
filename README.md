@@ -1,6 +1,6 @@
 # Breakaway
 
-Single-file hockey career sim (`breakaway.html`). Open `index.html` or `breakaway.html` in a browser (use **http**, not `file://`, for reliable Web Audio).
+Hockey career sim: main game in `breakaway.html`. **CSS:** `css/app/breakaway.css` (main UI) and `css/logos/team-logos.css` (crest chrome). **JS:** game logic under `js/game/` (load order in `breakaway.html`); crest generation in `js/team-logos/` — `shells.js` (badge shapes), `gfx-0.js` / `gfx-procedural.js` / `gfx-dispatch.js` (320 centre marks: 0–79 hand-tuned, 80–319 procedural), and `composer.js` (pro + college SVG layouts). Optional maintainer script: `tools/organize_breakaway.py` (re-extracts inline CSS/JS if you ever collapse them back into the HTML). Crests use **Google Fonts** (Bebas Neue, Oswald, Russo One, script faces, etc.) plus retro pixel fonts where the hash picks them. Open `index.html` or `breakaway.html` over **http** (not `file://`) for reliable script loading and Web Audio.
 
 ## Run locally (recommended)
 
