@@ -19,7 +19,9 @@ function nextWeek(){
     for(var i=0;i<attrList.length;i++){
       var a=attrList[i];
       var leagueMult=getLeagueAttrDevMultiplier(lkDev, tnDev, a);
-      if(G.attrs[a]<capAge) G.attrs[a]=cl(G.attrs[a]+rd(0,0.4)*dev*pDev*(G.morale/100)*youthW*leagueMult,amin,capAge);
+      var inc=rd(0,0.4)*dev*pDev*(G.morale/100)*youthW*leagueMult;
+      if(typeof SKATER_BASE_ATTR_KEYS!=='undefined' && SKATER_BASE_ATTR_KEYS.indexOf(a)>=0) inc*=0.4;
+      if(G.attrs[a]<capAge) G.attrs[a]=cl(G.attrs[a]+inc,amin,capAge);
     }
   }
   // tougher leagues introduce more media pressure and fatigue on bad weeks
@@ -67,14 +69,17 @@ function getPlayoffSimGrindPowerBonus(){
   if(G.pos==='D'){
     bon+=((G.attrs.defense||60)+(G.attrs.shotBlocking||60)+(G.attrs.positioning||60)-180)/110;
   }
+  if(G.pos==='F'){
+    bon+=((G.attrs.stickChecks||60)+(G.attrs.defense||60)+(G.attrs.anticipation||60)-180)/130;
+  }
   if(G.xFactor==='brat') bon+=0.26;
   if(G.xFactor==='heavy_hitter') bon+=0.2;
   return cl(bon,-0.12,1.08);
 }
 function playoffSingleGameHomeWins(home,away){
   var pk=getXFactorPlayoffPowerMult();
-  var homePower=(home.pts/(home.gp||1))+ (home.isMe?(ovr(G.attrs)/5)*pk:0);
-  var awayPower=(away.pts/(away.gp||1))+ (away.isMe?(ovr(G.attrs)/5)*pk:0);
+  var homePower=(home.pts/(home.gp||1))+ (home.isMe?(ovr(G.attrs,G.pos)/5)*pk:0);
+  var awayPower=(away.pts/(away.gp||1))+ (away.isMe?(ovr(G.attrs,G.pos)/5)*pk:0);
   if(home.isMe) homePower+=getPlayoffSimGrindPowerBonus();
   if(away.isMe) awayPower+=getPlayoffSimGrindPowerBonus();
   var prob=cl(0.5 + (homePower-awayPower)/PLAYOFF_SIM_POWER_DIV,0.1,0.9);
@@ -214,7 +219,7 @@ function initPlayablePlayoffs(){
   }
   var divN2=getPlayoffDivisionTeamLists(G.leagueKey).length;
   var poN2=(divN2>=2?' division winners + wild cards, re-seeded':' seeded by points');
-  addNews('PLAYOFFS BEGIN (PLAYABLE) in '+G.league.short+' — '+bracket.length+' teams (best-of-7), '+poN2+'. Use the hub bracket to play or sim each round.','big');
+  addNews('PLAYOFFS BEGIN (PLAYABLE) in '+G.league.short+' — '+bracket.length+' teams (best-of-7), '+poN2+'. Hub: SIM ROUND (CPU), SIM MY SERIES, or PLAY GAME each win.','big');
   G._playoffCtx={
     active:true,
     hubScheduleMode:true,
@@ -303,7 +308,16 @@ function afterPlayoffPlayableGame(won){
   var ctx=G._playoffCtx;
   if(!ctx)return;
   var pr=ctx.pairs[ctx.pairIndex];
-  if(!pr){finishPlayablePlayoffs();return;}
+  if(!pr){
+    if(ctx.hubScheduleMode&&ctx.pairIndex>=ctx.pairs.length){
+      tryCompletePlayoffRoundFromHub();
+      if(G._playoffCtx&&G._playoffCtx.eliminated) simAllRemainingPlayoffRoundsCpu();
+      if(G._playoffCtx&&G._playoffCtx.active){ try{renderHub();}catch(ePc){} show('s-hub'); }
+      return;
+    }
+    finishPlayablePlayoffs();
+    return;
+  }
   var home=pr[0], away=pr[1];
   var userRow=home.isMe?home:away;
   var oppRow=home.isMe?away:home;
@@ -315,6 +329,7 @@ function afterPlayoffPlayableGame(won){
       G._isPlayoffGame=false;
       addNews('PLAYOFF SERIES: '+ctx.seriesHW+'-'+ctx.seriesAW+' vs '+oppRow.team.n+' — back to hub when ready.','neutral');
       try{renderHub();}catch(eH0){}
+      show('s-hub');
       return;
     }
     ctx.awaitingUserGame=true;
@@ -351,6 +366,7 @@ function afterPlayoffPlayableGame(won){
     }
     if(G._playoffCtx&&G._playoffCtx.active){
       try{renderHub();}catch(eH1){}
+      show('s-hub');
     }
     return;
   }
@@ -677,7 +693,7 @@ function evaluateWorldTournament(kind){
   if(!isJunior && (G.year%4)!==0) return {ok:false,msg:'<div>'+tName+': Not held this year.</div>'};
   var countryMult=getWorldStageCountryDifficultyMult(G.nat);
   var reqOvr=reqOvrBase*countryMult;
-  var pOvr=ovr(G.attrs);
+  var pOvr=ovr(G.attrs,G.pos);
   var reqShow=Math.round(reqOvr);
   if(pOvr<reqOvr)
     return {ok:false,msg:'<div>'+tName+': Not selected by '+nt+' (OVR '+pOvr+' / req '+reqShow+').</div>'};
@@ -816,7 +832,7 @@ function finishSeasonToOffseason(){
   }
   G._seasonEndLoggedForSeason=G.season;
   // Store season stats in log
-  var logEntry={year:G.year,season:G.season,league:G.league.short,leagueKey:G.leagueKey,team:G.team.n.split(' ').slice(-1)[0],gp:G.gp,ovrVal:ovr(G.attrs),wonCup:G.wonCup,isGoalie:G.pos==='G'};
+  var logEntry={year:G.year,season:G.season,league:G.league.short,leagueKey:G.leagueKey,team:G.team.n.split(' ').slice(-1)[0],gp:G.gp,ovrVal:ovr(G.attrs,G.pos),wonCup:G.wonCup,isGoalie:G.pos==='G'};
   if(G.pos==='G'){
     var sSvPct=G.saves+(G.goalsAgainst||0)>0?(Math.round(G.saves/(G.saves+(G.goalsAgainst||0))*1000)/10):'--';
     var sGAA=G.gp>0?Math.round(((G.goalsAgainst||0)/G.gp)*100)/100:'--';

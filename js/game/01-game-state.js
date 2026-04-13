@@ -104,12 +104,10 @@ function hexBlend(hexA,hexB,t){
   return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
 }
 function potentialTierWord(pk){
-  var p=POTENTIALS[pk]||POTENTIALS.support;
-  var map={MVP:'MVP',FRANCHISE:'Franchise',ELITE:'Elite',SUPPORT:'Support',DEPTH:'Depth',FRINGE:'Fringe',MINOR:'Minor'};
-  return map[p.label]||p.label.charAt(0)+p.label.slice(1).toLowerCase();
+  return (POTENTIALS[pk]||POTENTIALS.support).label;
 }
 function potentialUiShort(pk){
-  return potentialTierWord(pk)+' potential';
+  return potentialTierWord(pk)+' Potential';
 }
 function xFactorUiName(key){
   var xf=X_FACTORS[key]||X_FACTORS.none;
@@ -382,17 +380,41 @@ function formatSeasonLogSvPct(val){
   if(n>0 && n<=1) return (Math.round(n*1000)/10)+'%';
   return (Math.round(n*10)/10)+'%';
 }
-function ovr(attrs){var vals=Object.values(attrs);return Math.round(vals.reduce(function(a,b){return a+b;},0)/vals.length);}
+function ovr(attrs, pos){
+  if(!attrs) return 60;
+  pos=String(pos||'');
+  if(!pos||pos==='undefined'){
+    if(typeof attrs.reflexes==='number'&&typeof attrs.glove==='number') pos='G';
+    else pos='F';
+  }
+  if(pos==='G'){
+    var gk=['reflexes','positioning','glove','blocker','reboundControl','mental','stamina'];
+    var gs=0,gc=0;
+    for(var gi=0;gi<gk.length;gi++){
+      var gv=attrs[gk[gi]];
+      if(typeof gv==='number'&&!isNaN(gv)){ gs+=gv; gc++; }
+    }
+    return gc?Math.round(gs/gc):60;
+  }
+  var keys=typeof SKATER_RATING_ATTR_KEYS!=='undefined'?SKATER_RATING_ATTR_KEYS:['skating','shooting','stickhandling','passing','positioning','physical','stamina'];
+  var ss=0,cc=0;
+  for(var j=0;j<keys.length;j++){
+    var vv=attrs[keys[j]];
+    if(typeof vv==='number'&&!isNaN(vv)){ ss+=vv; cc++; }
+    else { ss+=57; cc++; }
+  }
+  return cc?Math.round(ss/cc):60;
+}
 
 /** Scout projection — dev rate nudges growth; ovrMin/Max kept for internal balance only. Attr caps are age-only. */
 var POTENTIALS={
   mvp:{name:'MVP',label:'MVP',ovrMin:97,ovrMax:99,devRate:1.14,desc:'Rare Hart-level peak — scouts see you as a league MVP candidate. You can still miss or exceed it.'},
-  franchise:{name:'FRANCHISE',label:'FRANCHISE',ovrMin:93,ovrMax:97,devRate:1.10,desc:'Face-of-the-franchise tier — the player a city builds around. Not a hard ceiling.'},
-  elite:{name:'ELITE',label:'ELITE',ovrMin:88,ovrMax:93,devRate:1.05,desc:'Top-line / elite tools — drives offense and plays in every big situation.'},
-  support:{name:'SUPPORT',label:'SUPPORT',ovrMin:83,ovrMax:88,devRate:1.0,desc:'Everyday middle-six support — reliable minutes, trusted role.'},
-  depth:{name:'DEPTH',label:'DEPTH',ovrMin:78,ovrMax:85,devRate:0.86,desc:'Bottom-six / PK / depth minutes — limited offensive flash, high compete.'},
-  fringe:{name:'FRINGE',label:'FRINGE',ovrMin:72,ovrMax:82,devRate:0.74,desc:'Bubble roster / AHL shuttle — fights for a jersey every season.'},
-  minor:{name:'MINOR',label:'MINOR',ovrMin:40,ovrMax:75,minorUnder:true,devRate:0.62,desc:'Minor-league / spot call — toughest path to stick; scouts have doubts.'}
+  franchise:{name:'Franchise',label:'Franchise',ovrMin:93,ovrMax:97,devRate:1.10,desc:'Face-of-the-franchise tier — the player a city builds around. Not a hard ceiling.'},
+  elite:{name:'Elite',label:'Elite',ovrMin:88,ovrMax:93,devRate:1.05,desc:'Top-line / elite tools — drives offense and plays in every big situation.'},
+  support:{name:'Support',label:'Support',ovrMin:83,ovrMax:88,devRate:1.0,desc:'Everyday middle-six support — reliable minutes, trusted role.'},
+  depth:{name:'Depth',label:'Depth',ovrMin:78,ovrMax:85,devRate:0.86,desc:'Bottom-six / PK / depth minutes — limited offensive flash, high compete.'},
+  fringe:{name:'Fringe',label:'Fringe',ovrMin:72,ovrMax:82,devRate:0.74,desc:'Bubble roster / AHL shuttle — fights for a jersey every season.'},
+  minor:{name:'Minor',label:'Minor',ovrMin:40,ovrMax:75,minorUnder:true,devRate:0.62,desc:'Minor-league / spot call — toughest path to stick; scouts have doubts.'}
 };
 function getBaseAgeAttrCap(age){
   age=age||16;
@@ -559,6 +581,7 @@ function applyGameSnapshot(snap){
   reconcileTeamToLeague();
   if(G.xFactor==='sniper_xf') G.xFactor='quick_release';
   if(G.arch==='OQD') G.arch='OffensiveD';
+  try{ if(typeof ensureUnifiedSkaterAttrs==='function') ensureUnifiedSkaterAttrs(G); }catch(eUsk){}
   if(!G.potential||!POTENTIALS[G.potential]) G.potential='support';
   if(typeof G._inOffseason!=='boolean') G._inOffseason=false;
   if(typeof G.heightInches!=='number'||G.heightInches<=0) G.heightInches=parseHeightToInches(G.height);
@@ -754,13 +777,13 @@ function show(id){
   if(!tgt){console.warn('show: missing screen',id);return;}
   if(id==='s-title'){
     try{applyTeamTheme(null);}catch(eTh0){}
-  } else if(typeof G!=='undefined'&&G&&G.team&&G.team.n&&(id==='s-hub'||id==='s-ingame'||id==='s-pregame'||id==='s-postgame'||id==='s-offseason')){
+  } else if(typeof G!=='undefined'&&G&&G.team&&G.team.n&&(id==='s-hub'||id==='s-ingame'||id==='s-shootout'||id==='s-pregame'||id==='s-postgame'||id==='s-offseason')){
     try{applyTeamTheme(G.team.n);}catch(eTh1){}
   }
   var reduceMotion=typeof window!=='undefined'&&window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var allowGlitchFX=!reduceMotion&&isGlitchEffectsEnabled();
   /* Full CRT cut: game beats + intro/load/story (more common than before) */
-  var fullGlitchIds={'s-pregame':1,'s-ingame':1,'s-postgame':1,'s-game-intro':1,'s-story-opening':1,'s-game-loading':1};
+  var fullGlitchIds={'s-pregame':1,'s-ingame':1,'s-shootout':1,'s-postgame':1,'s-game-intro':1,'s-story-opening':1,'s-game-loading':1};
   /* Softer snap: hub, career UI, create flow — always micro-glitch */
   var softMicroIds={'s-hub':1,'s-offseason':1,'s-contract':1,'s-create':1,'s-arch':1,'s-potential':1,'s-xfactor':1,'s-attrs':1,'s-league':1,'s-team':1,'s-howto':1,'s-retire':1};
   var isBigGameTransition=!!fullGlitchIds[id];
@@ -843,6 +866,7 @@ function syncDocumentTitle(screenId){
       return;
     }
     if(sid==='s-ingame'){ document.title='IN GAME — BREAKAWAY'; return; }
+    if(sid==='s-shootout'){ document.title='SHOOTOUT — BREAKAWAY'; return; }
     if(sid==='s-pregame'){ document.title='PREGAME — BREAKAWAY'; return; }
     if(sid==='s-postgame'){ document.title='POSTGAME — BREAKAWAY'; return; }
     if(sid==='s-offseason'){ document.title='OFFSEASON — BREAKAWAY'; return; }
@@ -856,12 +880,16 @@ function syncDocumentTitle(screenId){
   window._bkMomentKeysBound=true;
   document.addEventListener('keydown',function(e){
     var ing=document.getElementById('s-ingame');
-    if(!ing||!ing.classList.contains('on')) return;
+    var sho=document.getElementById('s-shootout');
+    var onIng=ing&&ing.classList.contains('on');
+    var onSho=sho&&sho.classList.contains('on');
+    if(!onIng&&!onSho) return;
     var t=e.target;
     if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||(t.isContentEditable))) return;
     var k=e.key;
     if(k<'1'||k>'9') return;
-    var btns=document.querySelectorAll('#moment-opts .opt-btn');
+    var sel=onIng?'#moment-opts':'#so-moment-opts';
+    var btns=document.querySelectorAll(sel+' .opt-btn');
     var idx=parseInt(k,10)-1;
     if(idx>=0&&idx<btns.length&&!btns[idx].disabled) btns[idx].click();
   },false);
@@ -1422,7 +1450,7 @@ var RetroSound=(function(){
     var id=screenId||'';
     if(id==='s-title'||id==='s-howto'||id==='s-game-intro') startMusic('title');
     else if(id==='s-create'||id==='s-arch'||id==='s-potential'||id==='s-xfactor'||id==='s-attrs'||id==='s-league'||id==='s-team'||id==='s-game-loading') startMusic('menu');
-    else if(id==='s-ingame') startMusic('arena');
+    else if(id==='s-ingame'||id==='s-shootout') startMusic('arena');
     else startMusic('hub');
   }
   /** Schedule one SFX tone — detuned, filtered, waveshaped, jittered (broken-cheap-arcade feel). */
@@ -1698,7 +1726,7 @@ var RetroSound=(function(){
       if(!enabled) return;
       var sid=screenId||'';
       var post=sid==='s-postgame';
-      var ing=sid==='s-ingame';
+      var ing=sid==='s-ingame'||sid==='s-shootout';
       withRunning(function(c){
         var t=c.currentTime;
         var i,j;

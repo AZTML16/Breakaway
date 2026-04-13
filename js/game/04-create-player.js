@@ -65,7 +65,7 @@ function goToPotential(){
   if(wh){
     if(gSel==='F'){
       wh.style.display='block';
-      wh.textContent="WOMEN'S PATH: PROJECTION USES THE SAME TIERS IN THE WOMEN'S OVR CONTEXT (NOT THE MEN'S NUMBER LINE).";
+      wh.textContent="Women's path: projection uses the same tiers in the women's OVR context (not the men's number line).";
     } else {
       wh.style.display='none';
       wh.textContent='';
@@ -182,7 +182,7 @@ function renderAttrPreview(){
     var lbl=ATTR_LABELS[a]||a;
     html+='<div class="srow"><div class="slbl">'+lbl+'</div><div class="sbar"><div class="sfill" style="background:'+color+';width:'+finals[a]+'%"></div></div><div class="sval">'+finals[a]+'</div></div>';
   });
-  html+='<div style="margin-top:8px"><span class="badge gold">OVR '+ovr(finals)+'</span></div>';
+  html+='<div style="margin-top:8px"><span class="badge gold">OVR '+ovr(finals, selPos)+'</span></div>';
   safeEl('attr-preview').innerHTML=html;
 }
 
@@ -198,7 +198,7 @@ function computeCreateAttrsPreviewOvr(){
     Object.keys(arch.boosts).forEach(function(k){if(attrs[k]!==undefined)attrs[k]=cl(attrs[k]+arch.boosts[k],attrClampMin,92);});
   }
   attrList.forEach(function(a){attrs[a]=cl((G._baseAttrs&&G._baseAttrs[a]||attrs[a])+(G._extraAttrs&&G._extraAttrs[a]||0),attrClampMin,99);});
-  return ovr(attrs);
+  return ovr(attrs, selPos);
 }
 
 function isPaidOverseasSemiProStartLeague(leagueKey){

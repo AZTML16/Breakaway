@@ -39,7 +39,7 @@ function _startContractNegotiation(forcedTeamName){
     return;
   }
   G.pendingContract=true;
-  var o=ovr(G.attrs);
+  var o=ovr(G.attrs,G.pos);
   var tier=G.league.tier;
   cnMinSal=G.league.salBase||0;
   cnMaxSal=tier==='pro'?o*200000:tier==='minor'?Math.min(350000,o*5000):tier==='euro'||tier==='asia'?o*5000:o*1000;
@@ -135,7 +135,7 @@ function hasActiveDraftRights(){
 }
 /** Drafting club keeps your rights but will not table an ELC / pro offer below gendered bar (see getDraftClubElcMinOvr). */
 function draftClubWillingToSignElc(){
-  return ovr(G.attrs)>=getDraftClubElcMinOvr();
+  return ovr(G.attrs,G.pos)>=getDraftClubElcMinOvr();
 }
 
 function finalizeContract(sal,yrs,ntc,bonus){

@@ -423,20 +423,26 @@ var START_LEAGUES_F = ['CWHL','NWCHA','USWDL','EWJC','AWJC'];
 var START_LEAGUE_BYPASS_OVR_M=72;
 var START_LEAGUE_BYPASS_OVR_F=50;
 
+/** All skaters (F/D) share this rating set for OVR + moments. */
+var SKATER_RATING_ATTR_KEYS=['skating','shooting','stickhandling','passing','positioning','physical','stamina','defense','shotBlocking','stickChecks','faceoffs','anticipation'];
+/** Tracked on sheet but excluded from OVR (injury/load style). */
+var SKATER_BASE_ATTR_KEYS=['durability','conditioning'];
+var SKATER_ATTRS_LIST=SKATER_RATING_ATTR_KEYS.concat(SKATER_BASE_ATTR_KEYS);
+
 var ARCHETYPES = {
   F: {
-    Sniper:       {name:'Sniper',      icon:'[*]', desc:'Pure goal scorer. Deadly accuracy, elite shot.',      boosts:{shooting:15,stickhandling:5,physical:-8,passing:-3}},
-    Playmaker:    {name:'Playmaker',   icon:'[~]', desc:'Elite vision and distribution. Creates for others.',  boosts:{passing:16,stickhandling:10,skating:5,physical:-8,shooting:-5}},
-    PowerForward: {name:'Power Fwd',   icon:'[!]', desc:'Big body scorer. Dominates corners and crease.',      boosts:{physical:14,shooting:8,stamina:5,skating:-5,stickhandling:-4}},
-    TwoWay:       {name:'Two-Way',     icon:'[=]', desc:'Responsible at both ends. Reliable production.',      boosts:{positioning:12,passing:6,physical:4,stamina:4}},
-    Grinder:      {name:'Grinder',     icon:'[G]', desc:'Outworks everyone. Low skill ceiling, high motor.',   boosts:{physical:16,stamina:14,shooting:-12,stickhandling:-10,passing:-4}},
-    Enforcer:     {name:'Enforcer',    icon:'[X]', desc:'Protector. Fights, hits, intimidates.',               boosts:{physical:20,stamina:8,shooting:-16,passing:-12,stickhandling:-8}}
+    Sniper:       {name:'Sniper',      icon:'[*]', desc:'Pure goal scorer. Deadly accuracy, elite shot.',      boosts:{shooting:15,stickhandling:5,physical:-8,passing:-3,defense:-3,shotBlocking:-2,stickChecks:-2,faceoffs:-4,anticipation:4}},
+    Playmaker:    {name:'Playmaker',   icon:'[~]', desc:'Elite vision and distribution. Creates for others.',  boosts:{passing:16,stickhandling:10,skating:5,physical:-8,shooting:-5,defense:-2,shotBlocking:-1,stickChecks:2,faceoffs:2,anticipation:6}},
+    PowerForward: {name:'Power Fwd',   icon:'[!]', desc:'Big body scorer. Dominates corners and crease.',      boosts:{physical:14,shooting:8,stamina:5,skating:-5,stickhandling:-4,defense:2,shotBlocking:4,stickChecks:2,faceoffs:0,anticipation:-2}},
+    TwoWay:       {name:'Two-Way',     icon:'[=]', desc:'Trust-first forward: details, sticks, and lane reads before flash.', boosts:{positioning:18,passing:6,physical:7,stamina:6,shooting:-4,stickhandling:-3,defense:6,shotBlocking:5,stickChecks:7,faceoffs:5,anticipation:5}},
+    Grinder:      {name:'Grinder',     icon:'[G]', desc:'Outworks everyone. Low skill ceiling, high motor.',   boosts:{physical:16,stamina:14,shooting:-12,stickhandling:-10,passing:-4,defense:4,shotBlocking:6,stickChecks:8,faceoffs:2,anticipation:0}},
+    Enforcer:     {name:'Enforcer',    icon:'[X]', desc:'Protector. Fights, hits, intimidates.',               boosts:{physical:20,stamina:8,shooting:-16,passing:-12,stickhandling:-8,defense:2,shotBlocking:3,stickChecks:4,faceoffs:-4,anticipation:-6}}
   },
   D: {
-    OffensiveD:   {name:'Offensive D', icon:'[+]', desc:'Offensive defenseman — joins the attack, shoots and passes from the blue line.', boosts:{passing:18,skating:10,defense:-12,shotBlocking:-6}},
-    StayAtHome:   {name:'Stay-at-Home',icon:'[S]', desc:'No offense, all defense. Hard to play against.',      boosts:{defense:16,physical:12,shotBlocking:10,skating:-6,passing:-8}},
-    TwoWayD:      {name:'Two-Way D',   icon:'[=]', desc:'Balanced blueliner. Competent in both zones.',        boosts:{defense:8,passing:8,skating:5,physical:3}},
-    ShutdownD:    {name:'Shutdown D',  icon:'[L]', desc:'Assignment: stop the other teams best player.',       boosts:{defense:18,positioning:12,skating:4,shotBlocking:8,passing:-10}}
+    OffensiveD:   {name:'Offensive D', icon:'[+]', desc:'Offensive defenseman — joins the attack, shoots and passes from the blue line.', boosts:{passing:18,skating:10,defense:-12,shotBlocking:-6,shooting:6,stickhandling:4,stickChecks:-2,faceoffs:-2,anticipation:3}},
+    StayAtHome:   {name:'Stay-at-Home',icon:'[S]', desc:'No offense, all defense. Hard to play against.',      boosts:{defense:16,physical:12,shotBlocking:10,skating:-6,passing:-8,shooting:-6,stickhandling:-8,stickChecks:6,faceoffs:2,anticipation:4}},
+    TwoWayD:      {name:'Two-Way D',   icon:'[=]', desc:'Balanced blueliner — leans defensive without going full lockdown.', boosts:{defense:11,positioning:6,shotBlocking:5,passing:7,skating:5,physical:4,shooting:2,stickhandling:2,stickChecks:5,faceoffs:3,anticipation:4}},
+    ShutdownD:    {name:'Shutdown D',  icon:'[L]', desc:'Assignment: stop the other teams best player.',       boosts:{defense:18,positioning:12,skating:4,shotBlocking:8,passing:-10,shooting:-4,stickhandling:-6,stickChecks:8,faceoffs:2,anticipation:6}}
   },
   G: {
     Butterfly:    {name:'Butterfly',   icon:'[B]', desc:'Positioning and post-sealing. Classic modern style.', boosts:{positioning:16,reboundControl:10,glove:-4,stamina:4}},
@@ -446,11 +452,142 @@ var ARCHETYPES = {
   }
 };
 
+/** Playable post-game: extra +/- on top of moment-accumulated pm for D (all) and two-way F. */
+function getArchetypeDefensivePlusMinusBonus(pos, arch, won, tied, goals, assists, blocks){
+  var g=+goals||0,a=+assists||0,b=+blocks||0,pts=g+a;
+  var da=String(arch||'');
+  if(pos==='D'){
+    var d=(won?2:(tied?1:-1));
+    if(b>=2) d+=1;
+    if(b>=4) d+=1;
+    if(pts>=1) d+=1;
+    if(da==='StayAtHome'||da==='ShutdownD') d+=2;
+    else if(da==='TwoWayD') d+=1;
+    else if(da==='OffensiveD') d+=0;
+    else d+=1;
+    return cl(d,-2,7);
+  }
+  if(pos==='F' && da==='TwoWay'){
+    var f=(won?1:(tied?0:-1));
+    if(b>=1) f+=1;
+    if(b>=2) f+=1;
+    if(pts===0&&won) f+=1;
+    return cl(f,-1,5);
+  }
+  return 0;
+}
+
 var ATTRS = {
-  F: ['skating','shooting','stickhandling','passing','positioning','physical','stamina'],
-  D: ['skating','passing','defense','physical','shotBlocking','positioning','stamina'],
+  F: SKATER_ATTRS_LIST.slice(),
+  D: SKATER_ATTRS_LIST.slice(),
   G: ['reflexes','positioning','glove','blocker','reboundControl','mental','stamina']
 };
+
+/**
+ * Comfort spare listing (C/LW/RW or opposite D). Many players have none.
+ * Switching listed subPos to this spare is cheap in the hub; other spots cost more.
+ */
+function rollSecondarySubPos(GG){
+  if(!GG||GG.pos==='G') return null;
+  var rng=Math.random;
+  var sub=String(GG.subPos||'');
+  if(GG.pos==='F'){
+    if(sub==='C'){
+      if(rng()<0.34) return null;
+      return rng()<0.5?'LW':'RW';
+    }
+    if(sub==='LW'){
+      if(rng()<0.28) return null;
+      return rng()<0.46?'RW':'C';
+    }
+    if(sub==='RW'){
+      if(rng()<0.28) return null;
+      return rng()<0.46?'LW':'C';
+    }
+    return null;
+  }
+  if(GG.pos==='D'){
+    if(sub!=='LD'&&sub!=='RD') return null;
+    var opposite=sub==='LD'?'RD':'LD';
+    var pot=GG.potential||'support';
+    var eliteish=(pot==='mvp'||pot==='franchise'||pot==='elite');
+    if(rng()<(eliteish?0.48:0.30)) return opposite;
+    return null;
+  }
+  return null;
+}
+
+/** Assign spare only when property absent (new career / legacy save). Preserves explicit null from saves. */
+function ensureSecondarySubPos(GG){
+  if(!GG||GG.pos==='G') return;
+  if(Object.prototype.hasOwnProperty.call(GG,'secondarySubPos')) return;
+  GG.secondarySubPos=rollSecondarySubPos(GG);
+  if(GG.secondarySubPos&&GG.secondarySubPos===GG.subPos) GG.secondarySubPos=null;
+}
+
+/** Fill missing unified skater keys after load or legacy saves. */
+function ensureUnifiedSkaterAttrs(G){
+  if(!G||!G.attrs||G.pos==='G') return;
+  var a=G.attrs;
+  var r=function(k,fb){ var v=a[k]; return typeof v==='number'&&!isNaN(v)?v:fb; };
+  var blend=function(x,y){ return Math.round(cl((x+y)/2,20,96)); };
+  if(typeof a.skating!=='number'||isNaN(a.skating)) a.skating=55;
+  if(typeof a.passing!=='number'||isNaN(a.passing)) a.passing=55;
+  if(typeof a.positioning!=='number'||isNaN(a.positioning)) a.positioning=55;
+  if(typeof a.physical!=='number'||isNaN(a.physical)) a.physical=55;
+  if(typeof a.stamina!=='number'||isNaN(a.stamina)) a.stamina=55;
+  if(typeof a.defense!=='number'||isNaN(a.defense)){
+    a.defense=blend(r('positioning',60),r('physical',58))+(G.pos==='D'?6:0);
+  }
+  if(typeof a.shotBlocking!=='number'||isNaN(a.shotBlocking)){
+    a.shotBlocking=blend(r('defense',a.defense),r('positioning',60));
+  }
+  if(typeof a.shooting!=='number'||isNaN(a.shooting)){
+    a.shooting=blend(r('stickhandling',55),r('passing',a.passing));
+  }
+  if(typeof a.stickhandling!=='number'||isNaN(a.stickhandling)){
+    a.stickhandling=blend(r('passing',a.passing),r('shooting',a.shooting));
+  }
+  if(typeof a.stickChecks!=='number'||isNaN(a.stickChecks)){
+    a.stickChecks=Math.round(cl(blend(r('defense',a.defense),r('positioning',a.positioning))+(r('physical',a.physical)-60)*0.2,22,96));
+  }
+  if(typeof a.faceoffs!=='number'||isNaN(a.faceoffs)){
+    a.faceoffs=Math.round(cl(blend(r('stickChecks',a.stickChecks),r('positioning',a.positioning))+((G.subPos||'')==='C'?5:0),22,96));
+  }
+  if(typeof a.anticipation!=='number'||isNaN(a.anticipation)){
+    a.anticipation=blend(r('positioning',a.positioning),r('passing',a.passing));
+  }
+  if(typeof a.durability!=='number'||isNaN(a.durability)){
+    a.durability=blend(typeof G.health==='number'?G.health:88, r('stamina',a.stamina));
+  }
+  if(typeof a.conditioning!=='number'||isNaN(a.conditioning)){
+    a.conditioning=blend(r('stamina',a.stamina), r('physical',a.physical));
+  }
+  var amin=typeof G._attrClampMin==='number'?G._attrClampMin:22;
+  for(var i=0;i<SKATER_ATTRS_LIST.length;i++){
+    var k=SKATER_ATTRS_LIST[i];
+    a[k]=cl(Math.round(r(k,55)),amin,99);
+  }
+  try{ ensureSecondarySubPos(G); }catch(eSec){}
+}
+
+/** Moment / shootout rolls: faceoffs blend stick checks; centres get a small draw bonus (only position-tied mechanic). */
+function getMomentAttrValue(attrName, GG){
+  if(!GG) GG=typeof G!=='undefined'?G:null;
+  if(!GG||!GG.attrs) return 60;
+  var attrs=GG.attrs;
+  var t=String(attrName||'');
+  if(t==='faceoffs'){
+    return 0.5*(+attrs.faceoffs||60)+0.5*(+attrs.stickChecks||60)+((GG.subPos||'')==='C'?3.5:0);
+  }
+  if(t==='stickChecks'){
+    return (+attrs.stickChecks||60)+0.2*((+attrs.defense||60)-60);
+  }
+  if(t==='anticipation'){
+    return (+attrs.anticipation||60)+0.15*((+attrs.positioning||60)-60);
+  }
+  return +attrs[t]||60;
+}
 
 /** Weekly attr growth multiplier by league path (OJL balanced, QMJL skill/creative, WJL heavy, euro technical, ARHL creative/slow, Asian clubs budget, college well-rounded). */
 function getLeagueAttrDevMultiplier(leagueKey, teamName, attr){
@@ -520,13 +657,17 @@ function getLeagueAttrDevMultiplier(leagueKey, teamName, attr){
 var ATTR_LABELS = {
   skating:'SKATING',shooting:'SHOOTING',stickhandling:'STICKHAND',passing:'PASSING',
   positioning:'POSITIONING',physical:'PHYSICAL',stamina:'STAMINA',defense:'DEFENSE',
-  shotBlocking:'SHOT-BLOCK',reflexes:'REFLEXES',glove:'GLOVE',blocker:'BLOCKER',
+  shotBlocking:'SHOT-BLOCK',stickChecks:'STICK CHECKS',faceoffs:'FACEOFFS',anticipation:'READ/ANTICIP.',
+  durability:'DURABILITY',conditioning:'CONDITIONING',
+  reflexes:'REFLEXES',glove:'GLOVE',blocker:'BLOCKER',
   reboundControl:'REB CTRL',mental:'MENTAL'
 };
 var ATTR_COLORS = {
   skating:'#00d2d3',shooting:'#d63031',stickhandling:'#fd79a8',passing:'#6c5ce7',
   positioning:'#0984e3',physical:'#e17055',stamina:'#00b894',defense:'#74b9ff',
-  shotBlocking:'#a29bfe',reflexes:'#ff7675',glove:'#fdcb6e',blocker:'#81ecec',
+  shotBlocking:'#a29bfe',stickChecks:'#a8e6cf',faceoffs:'#fab1a0',anticipation:'#dfe6e9',
+  durability:'#55efc4',conditioning:'#81ecec',
+  reflexes:'#ff7675',glove:'#fdcb6e',blocker:'#81ecec',
   reboundControl:'#55efc4',mental:'#dfe6e9'
 };
 
@@ -578,7 +719,7 @@ var MOMENTS = {
     {text:"PK -- shot lane opens. You are the forward who has to get in the lane or the puck goes through.",ctx:"PENALTY KILL -- SHOT BLOCK",
      opts:[
        {t:"LAY OUT -- EAT THE SLAPPER",a:'positioning',risk:'HIGH',s:0.52,pa:0.22,reward:'block',icon:'!'},
-       {t:"STICK IN LANE -- DEFLECT WIDE",a:'stickhandling',risk:'MED',s:0.58,pa:0.25,reward:'block',icon:'-'},
+       {t:"STICK IN LANE -- DEFLECT WIDE",a:'stickChecks',risk:'MED',s:0.58,pa:0.25,reward:'block',icon:'-'},
        {t:"READ AND STEP -- TIMING BLOCK",a:'positioning',risk:'MED',s:0.62,pa:0.22,reward:'block',icon:'_'},
        {t:"LET IT THROUGH -- TRUST THE GOALIE",a:'positioning',risk:'LOW',s:0.68,pa:0.18,reward:'block',icon:'*'}
      ]},
@@ -586,7 +727,7 @@ var MOMENTS = {
      opts:[
        {t:"ANGLE AND LIFT -- STEAL CLEAN",a:'stickhandling',risk:'HIGH',s:0.50,pa:0.20,reward:'assist',icon:'~'},
        {t:"BODY FINISH -- RUB HIM OUT",a:'physical',risk:'MED',s:0.56,pa:0.24,reward:'assist',icon:'!'},
-       {t:"STICK ON PUCK -- FORCE DUMP",a:'positioning',risk:'LOW',s:0.72,pa:0.20,reward:'assist',icon:'>'},
+       {t:"STICK ON PUCK -- FORCE DUMP",a:'stickChecks',risk:'LOW',s:0.72,pa:0.20,reward:'assist',icon:'>'},
        {t:"TAKE A PENALTY -- DESPERATE REACH",a:'physical',risk:'HIGH',s:0.38,pa:0.15,reward:'assist',icon:'X'}
      ]},
     {text:"FIGHT OR FLIGHT -- their tough guy squares you up after a clean hit. Crowd is howling.",ctx:"SCRAP -- TILT",
@@ -608,14 +749,21 @@ var MOMENTS = {
        {t:"TAKE THE LANE -- STICK IN PASSING LANE",a:'positioning',risk:'MED',s:0.64,pa:0.22,reward:'block',icon:'>'},
        {t:"FRONT NET BOXOUT",a:'physical',risk:'MED',s:0.60,pa:0.22,reward:'block',icon:'!'},
        {t:"QUICK CHIP -- CLEAR THE ZONE",a:'passing',risk:'LOW',s:0.72,pa:0.20,reward:'assist',icon:'^'},
-       {t:"READ INTERCEPTION -- PICK THE PASS",a:'positioning',risk:'HIGH',s:0.48,pa:0.18,reward:'assist',icon:'*'}
-     ]}
+       {t:"READ INTERCEPTION -- PICK THE PASS",a:'anticipation',risk:'HIGH',s:0.48,pa:0.18,reward:'assist',icon:'*'}
+     ]},
+    {text:"Neutral-zone draw -- you take the faceoff with a clean lane to your winger.",ctx:"FACEOFF -- POSSESSION START",
+     opts:[
+       {t:"PULL STRAIGHT BACK -- HAND-OFF TO SUPPORT",a:'faceoffs',risk:'LOW',s:0.66,pa:0.18,reward:'assist',icon:'>'},
+       {t:"SLICE ACROSS -- WIN TO THE WALL",a:'stickChecks',risk:'MED',s:0.60,pa:0.22,reward:'assist',icon:'-'},
+       {t:"JUMP THE TIMING -- CHEAT THE WING",a:'anticipation',risk:'HIGH',s:0.48,pa:0.15,reward:'assist',icon:'*'},
+       {t:"TIE UP ONLY -- TRUST THE SECOND MAN",a:'physical',risk:'MED',s:0.56,pa:0.24,reward:'assist',icon:'!'}
+     ]},
   ],
   D: [
     {text:"Their top line on a 3-on-2 against your pair. Shooter has it at the hash.",ctx:"DEFENSIVE RUSH -- 3-ON-2",
      opts:[
        {t:"ANGLE THE SHOOTER -- force wide",a:'defense',risk:'LOW',s:0.65,pa:0.25,reward:'block',icon:'>'},
-       {t:"POKE CHECK -- go for the puck",a:'shotBlocking',risk:'HIGH',s:0.45,pa:0.25,reward:'block',icon:'-'},
+       {t:"POKE CHECK -- go for the puck",a:'stickChecks',risk:'HIGH',s:0.45,pa:0.25,reward:'block',icon:'-'},
        {t:"STAY IN LANE -- trust the goalie",a:'positioning',risk:'LOW',s:0.70,pa:0.20,reward:'block',icon:'_'},
        {t:"PHYSICAL PLAY -- rub them out",a:'physical',risk:'MED',s:0.55,pa:0.20,reward:'block',icon:'!'}
      ]},

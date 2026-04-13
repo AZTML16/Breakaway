@@ -9,13 +9,13 @@ function selectOption(idx,auto){
   var m=gameMoments[curMoment];
   if(!m)return;
   var opt=m.opts[idx]||m.opts[0];
-  var attrVal=G.attrs[opt.a]||60;
+  var attrVal=getMomentAttrValue(opt.a,G);
   var base=auto?opt.s*0.5:opt.s;
   var attrBonus=(attrVal-60)*0.004;
   var moraleBonus=(G.morale-60)*0.001;
   var weightDelta=((G.weight||180)-190)/1000;
   var weightImpact=0;
-  if(G.pos==='G' || opt.a==='physical' || opt.a==='positioning') weightImpact=weightDelta;
+  if(G.pos==='G' || opt.a==='physical' || opt.a==='positioning' || opt.a==='stickChecks') weightImpact=weightDelta;
   if(opt.a==='skating' || opt.a==='agility') weightImpact=-weightDelta*0.8;
   var leagueDiff=(1.1 - (G.league.dev||1.0))*0.10; // higher league harder, lower league easier
   var mediaStress=(G.morale<45?0.03:0) + (G.league.tier==='pro'?0.02:0);

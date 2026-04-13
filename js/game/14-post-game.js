@@ -2,8 +2,190 @@
 // ============================================================
 // POST-GAME
 // ============================================================
+var _shootoutTimer=null;
+var _shootoutMoment=null;
+var _shootoutDoneCb=null;
+var _shootoutTimerSec=10;
+
+function clearShootoutTimer(){
+  if(_shootoutTimer){ clearInterval(_shootoutTimer); _shootoutTimer=null; }
+}
+
+function updateShootoutScoreboard(){
+  var h=safeEl('so-home-score'), a=safeEl('so-away-score');
+  if(h) h.textContent=gameHomeScore;
+  if(a) a.textContent=gameAwayScore;
+}
+
+function updateShootoutTimerUI(){
+  var bar=safeEl('so-timer-bar');
+  var num=safeEl('so-timer-num');
+  if(!bar||!num) return;
+  var pct=Math.max(0,_shootoutTimerSec/10)*100;
+  bar.style.width=pct+'%';
+  num.textContent=Math.ceil(Math.max(0,_shootoutTimerSec));
+  if(_shootoutTimerSec<=3){bar.style.background='linear-gradient(90deg,var(--red),#ff6b7a)';bar.style.boxShadow='0 0 14px rgba(255,71,87,.5)';}
+  else if(_shootoutTimerSec<=6){bar.style.background='linear-gradient(90deg,var(--gold),#ffe066)';bar.style.boxShadow='0 0 10px rgba(255,204,51,.35)';}
+  else{bar.style.background='linear-gradient(90deg,var(--green),#5ef9a8)';bar.style.boxShadow='0 0 12px rgba(38,222,129,.4)';}
+  try{RetroSound.timerTick(Math.ceil(Math.max(0,_shootoutTimerSec)));}catch(e){}
+}
+
+/** Playoff / world: multiple sudden-death OT rolls until someone scores. */
+function resolveSuddenDeathOTForTiedGame(label){
+  var tries=0;
+  while(gameHomeScore===gameAwayScore&&tries<12){
+    tries++;
+    if(Math.random()<0.36) continue;
+    if(Math.random()<0.52) gameHomeScore++;
+    else gameAwayScore++;
+  }
+  if(gameHomeScore===gameAwayScore){
+    if(Math.random()<0.5) gameHomeScore++;
+    else gameAwayScore++;
+  }
+  if(label) addNews(label+': Sudden-death OT decides it.','neutral');
+}
+
+/** Regular season: up to two extra OT chances before shootout. Returns true if a winner was decided. */
+function tryRegSeasonOvertimeTwoRounds(){
+  for(var r=0;r<2;r++){
+    if(Math.random()<0.42) continue;
+    if(Math.random()<0.51) gameHomeScore++;
+    else gameAwayScore++;
+    if(gameHomeScore!==gameAwayScore){
+      addNews('OVERTIME! '+(gameHomeScore>gameAwayScore?G.team.n+' wins in extra time.':G.team.n+' falls in OT.'),(gameHomeScore>gameAwayScore?'good':'bad'));
+      return true;
+    }
+  }
+  return false;
+}
+
+function getShootoutSkaterMoment(){
+  if(!MOMENTS||!MOMENTS.F) return null;
+  for(var si=0;si<MOMENTS.F.length;si++){
+    var mm=MOMENTS.F[si];
+    if(mm&&String(mm.ctx||'').indexOf('PENALTY SHOT')>=0) return mm;
+  }
+  return MOMENTS.F[0]||null;
+}
+function getShootoutGoalieMoment(){
+  return MOMENTS&&MOMENTS.G&&MOMENTS.G[3]?MOMENTS.G[3]:null;
+}
+
+/** Mirrors in-game option roll (lighter modifiers for shootout only). */
+function rollShootoutSuccess(opt, auto){
+  var attrVal=getMomentAttrValue(opt.a,G);
+  var base=auto?opt.s*0.5:opt.s;
+  var attrBonus=(attrVal-60)*0.004;
+  var moraleBonus=(G.morale-60)*0.001;
+  var weightDelta=((G.weight||180)-190)/1000;
+  var weightImpact=(G.pos==='G'||opt.a==='physical'||opt.a==='positioning')?weightDelta:(opt.a==='skating'?-weightDelta*0.8:0);
+  var leagueDiff=(1.1-(G.league.dev||1.0))*0.10;
+  var mediaStress=(G.morale<45?0.03:0)+(G.league.tier==='pro'?0.02:0);
+  var wProTight=(G.league.gender==='F'&&G.league.tier==='pro')?0.042:0;
+  var pwlTight=(G.leagueKey==='PWL')?0.03:0;
+  var globalDifficulty=0.05+wProTight+pwlTight;
+  var successThreshold=cl(base+attrBonus+moraleBonus+weightImpact-leagueDiff-mediaStress-globalDifficulty,0.07,0.91);
+  return Math.random()<successThreshold;
+}
+
+function startShootoutThen(done){
+  clearShootoutTimer();
+  _shootoutDoneCb=typeof done==='function'?done:function(){};
+  _shootoutMoment=G.pos==='G'?getShootoutGoalieMoment():getShootoutSkaterMoment();
+  if(!_shootoutMoment||!_shootoutMoment.opts||!_shootoutMoment.opts.length) _shootoutMoment=getShootoutSkaterMoment();
+  if(!_shootoutMoment||!_shootoutMoment.opts||!_shootoutMoment.opts.length){
+    if(gameHomeScore===gameAwayScore){
+      if(Math.random()<0.5) gameHomeScore++; else gameAwayScore++;
+    }
+    var cb=_shootoutDoneCb; _shootoutDoneCb=null;
+    if(cb) cb();
+    return;
+  }
+  safeEl('so-home-name').textContent=G.team.n;
+  safeEl('so-away-name').textContent=curOpponent.n;
+  updateShootoutScoreboard();
+  safeEl('so-moment-num').textContent='SHOOTOUT -- YOUR TURN';
+  safeEl('so-moment-ctx').textContent=_shootoutMoment.ctx||'';
+  safeEl('so-moment-text').textContent=_shootoutMoment.text||'';
+  var html='';
+  for(var i=0;i<_shootoutMoment.opts.length;i++){
+    var o=_shootoutMoment.opts[i];
+    var riskColor=o.risk==='HIGH'?'var(--red)':o.risk==='MED'?'var(--gold)':'var(--green)';
+    var lbl=ATTR_LABELS[o.a]||o.a;
+    html+='<button type="button" class="opt-btn" id="so-opt-'+i+'" onclick="selectShootoutOption('+i+',false)">';
+    html+='<span>'+stripBracketIcons(o.t)+'</span>';
+    html+='<span class="attr-tag">['+lbl.toUpperCase()+']</span>';
+    html+='<span class="risk-tag" style="color:'+riskColor+'">'+o.risk+'</span>';
+    html+='</button>';
+  }
+  safeEl('so-moment-opts').innerHTML=html;
+  safeEl('so-moment-result').style.display='none';
+  _shootoutTimerSec=10;
+  updateShootoutTimerUI();
+  try{RetroSound.puck();}catch(e){}
+  _shootoutTimer=setInterval(function(){
+    _shootoutTimerSec-=0.1;
+    updateShootoutTimerUI();
+    if(_shootoutTimerSec<=0){
+      clearShootoutTimer();
+      var mx=Math.max(0,_shootoutMoment.opts.length-1);
+      selectShootoutOption(ri(0,mx),true);
+    }
+  },100);
+  show('s-shootout');
+}
+
+function selectShootoutOption(idx, auto){
+  clearShootoutTimer();
+  var btns=document.querySelectorAll('#so-moment-opts .opt-btn');
+  for(var i=0;i<btns.length;i++) btns[i].disabled=true;
+  var m=_shootoutMoment;
+  if(!m||!m.opts||!m.opts.length){ var c2=_shootoutDoneCb; _shootoutDoneCb=null; if(c2) c2(); return; }
+  var opt=m.opts[idx]||m.opts[0];
+  var ok=rollShootoutSuccess(opt, auto);
+  var rEl=safeEl('so-moment-result');
+  rEl.style.display='block';
+  var isG=G.pos==='G';
+  if(isG){
+    if(ok){
+      gameHomeScore++;
+      addNews('SHOOTOUT: You stone them -- '+G.team.n+' wins.','good');
+      rEl.className='result-flash win';
+      rEl.innerHTML='<div>SAVE! SHOOTOUT WIN.</div>';
+      try{RetroSound.save();}catch(e){}
+    } else {
+      gameAwayScore++;
+      addNews('SHOOTOUT: They beat you five-hole -- loss.','bad');
+      rEl.className='result-flash lose';
+      rEl.innerHTML='<div>GOAL AGAINST -- SHOOTOUT LOSS.</div>';
+      try{RetroSound.goal();}catch(e){}
+    }
+  } else {
+    if(ok){
+      gameHomeScore++;
+      addNews('SHOOTOUT: You score -- '+G.team.n+' wins.','good');
+      rEl.className='result-flash win';
+      rEl.innerHTML='<div>GOAL! SHOOTOUT WIN.</div>';
+      try{RetroSound.goal();}catch(e){}
+    } else {
+      gameAwayScore++;
+      addNews('SHOOTOUT: You miss -- they take the extra point.','bad');
+      rEl.className='result-flash lose';
+      rEl.innerHTML='<div>NO GOAL -- SHOOTOUT LOSS.</div>';
+      try{RetroSound.uiLow();}catch(e){}
+    }
+  }
+  updateShootoutScoreboard();
+  var cb=_shootoutDoneCb;
+  _shootoutDoneCb=null;
+  setTimeout(function(){
+    _shootoutMoment=null;
+    if(cb) cb();
+  },1600);
+}
+
 function endGame(){
-  // For goalies: add bulk shots faced (key moments are snapshots; full game has 25-35+ shots)
   if(G.pos==='G'){
     var bulkShots=ri(22,34);
     var svRate=cl(0.88+(G.attrs.reflexes+G.attrs.positioning-120)*0.001,0.82,0.96);
@@ -11,30 +193,52 @@ function endGame(){
     var bulkGA=bulkShots-bulkSaves;
     gameStats.sv+=bulkSaves;
     gameStats.ga+=bulkGA;
-    // Adjust scoreline to reflect extra goals
     gameAwayScore+=bulkGA;
   }
+  var regWon=gameHomeScore>gameAwayScore;
+  var regTied=gameHomeScore===gameAwayScore;
+  var isWorld=!!G._worldStageCtx;
+  var isPlayoff=!!(G._playoffCtx&&G._isPlayoffGame);
+  var isRegSeason=!isWorld&&!isPlayoff;
+
+  if(regTied){
+    if(isWorld) resolveSuddenDeathOTForTiedGame('WORLD');
+    else if(isPlayoff) resolveSuddenDeathOTForTiedGame('PLAYOFFS');
+    else if(isRegSeason){
+      if(!tryRegSeasonOvertimeTwoRounds()){
+        beginShootoutThen(function(){ finalizeEndGameBody(regWon, regTied); });
+        return;
+      }
+    }
+  }
+
+  finalizeEndGameBody(regWon, regTied);
+}
+
+function finalizeEndGameBody(regWon, regTied){
   var won=gameHomeScore>gameAwayScore;
   var tied=gameHomeScore===gameAwayScore;
+  if(tied){
+    if(Math.random()<0.5) gameHomeScore++;
+    else gameAwayScore++;
+    won=gameHomeScore>gameAwayScore;
+    tied=false;
+    addNews('FINAL: Deadlock resolved.','neutral');
+  }
   var gRnd=Math.round(gameStats.g);
   var aRnd=Math.round(gameStats.a);
   var pm=Math.round(gameStats.pm||0);
-  if(G.xFactor==='careless' && (G._playoffCtx&&G._isPlayoffGame||G._worldStageCtx) && G.pos!=='G' && !won && !tied){
+  if(G.xFactor==='careless' && (G._playoffCtx&&G._isPlayoffGame||G._worldStageCtx) && G.pos!=='G' && !regWon && !regTied){
     pm=cl(pm-1-(Math.random()<0.45?1:0),-6,6);
   }
-  var defBonus=0;
-  if(G.pos==='D'){
-    var blkPg=Math.round(gameStats.block||0);
-    defBonus=(won?2:(tied?1:-1))+(blkPg>=2?1:0)+(blkPg>=4?1:0)+((gRnd+aRnd)>=1?1:0);
-    defBonus=cl(defBonus,-2,5);
-  }
-  var pmTotal=G.pos==='D'?pm+defBonus:pm;
+  var blkPg=Math.round(gameStats.block||0);
+  var defBonus=getArchetypeDefensivePlusMinusBonus(G.pos,G.arch,won,tied,gRnd,aRnd,blkPg);
+  var pmTotal=G.pos==='G'?pm:(pm+defBonus);
   var svpctRaw=gameStats.sv+gameStats.ga>0?gameStats.sv/(gameStats.sv+gameStats.ga):0;
   var svpctStr=gameStats.sv+gameStats.ga>0?formatSvPctFromRatio(svpctRaw):'---';
   var mAvg=getMomentScoresAverage();
 
   if(G._worldStageCtx){
-    if(tied) won=Math.random()<0.5;
     var wctx=G._worldStageCtx;
     var ev=wctx.ev;
     wctx.stats.gp++;
@@ -87,7 +291,6 @@ function endGame(){
   }
 
   if(G._playoffCtx&&G._isPlayoffGame){
-    if(tied) won=Math.random()<0.5;
     var pctx=G._playoffCtx;
     pctx.myStats.gp++;
     if(G.pos==='G'){pctx.myStats.sv+=gameStats.sv;pctx.myStats.ga+=gameStats.ga;}
@@ -138,7 +341,7 @@ function endGame(){
       if(won){ if(_h0.isMe) _hw++; else _aw++; } else { if(_h0.isMe) _aw++; else _hw++; }
     }
     var _serDone=!_prP || _hw>=PLAYOFF_SERIES_WINS || _aw>=PLAYOFF_SERIES_WINS;
-    safeEl('pg2-next-btn').textContent=_serDone?(won?'BRACKET / NEXT ROUND >':'PLAYOFFS OVER >'):'NEXT PLAYOFF GAME >';
+    safeEl('pg2-next-btn').textContent=_serDone?(won?'BRACKET / NEXT ROUND >':'PLAYOFFS OVER >'):'NEXT GAME >';
     safeEl('pg2-next-btn').onclick=function(){afterPlayoffPlayableGame(won);};
     if(won) RetroSound.gameWin(); else if(tied) RetroSound.gameTie(); else RetroSound.gameLose();
     show('s-postgame');
@@ -174,7 +377,6 @@ function endGame(){
   if(gRnd>=2) addNews(G.first+' '+G.last+' scores '+gRnd+' -- multi-goal game!','big');
   if(aRnd>=2) addNews(G.first+' '+G.last+' picks up '+aRnd+' assists -- playmaking night!','big');
   checkMilestones();
-  // Refresh social messages after game
   G.socialMessages=generateSocialMessages();
   safeEl('pg2-home-n').textContent=G.team.n;
   safeEl('pg2-away-n').textContent=curOpponent.n;
@@ -203,7 +405,6 @@ function endGame(){
       '<div class="stbox"><div class="stlbl">STAM</div><div class="stval">'+Math.round(G.stamina)+'</div></div>'+
       '</div>';
   }
-  // Game rating badge (blended: key-moment execution + box score)
   var rating=getGameRating(G.pos,gRnd,aRnd,svpctRaw,won,mAvg);
   statsHtml+=buildPostgameRatingBlock(rating,mAvg);
   safeEl('pg2-stats').innerHTML=statsHtml;
@@ -220,7 +421,6 @@ function endGame(){
     safeEl('pg2-next-btn').onclick=function(){preGame(G._curGameIdx+1);};
   }
   if(Math.random()<0.01&&G.season>2&&(G.tradeOffersThisSeason||0)===0&&(G._tradeCooldownUntilGp||0)<=G.gp) triggerTrade();
-  // Trades and press conferences based on form
   maybeTriggerTrade(gRnd,aRnd,won);
   setTimeout(function(){ maybeTriggerPostGamePressOnce(won,gRnd,aRnd); },380);
   if(won) RetroSound.gameWin(); else if(tied) RetroSound.gameTie(); else RetroSound.gameLose();

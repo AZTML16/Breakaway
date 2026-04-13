@@ -7,7 +7,7 @@ function generateSocialMessages(){
   var isWomens=G.gender==='F';
   var pts=G.goals+G.assists;
   var svPctNow=G.saves+(G.goalsAgainst||0)>0?(G.saves/(G.saves+(G.goalsAgainst||0))):0;
-  var o=ovr(G.attrs);
+  var o=ovr(G.attrs,G.pos);
   var namePool=G.gender==='M'?SOCIAL_NAMES_M:SOCIAL_NAMES_F;
   var names=shuf(namePool.slice()).slice(0,8);
   var coach=COACH_NAMES[ri(0,COACH_NAMES.length-1)];
@@ -304,8 +304,11 @@ function renderSocialTab(){
   if(!G.socialMessages||G.socialMessages.length<3) G.socialMessages=generateSocialMessages();
 
   // Profile card
-  var posStr=(G.pos==='G'?'GOALIE':G.subPos==='C'?'CENTRE':G.subPos==='LW'?'LEFT WING':G.subPos==='RW'?'RIGHT WING':G.subPos==='LD'?'LEFT DEFENSE':'RIGHT DEFENSE');
-  var ovrVal=ovr(G.attrs);
+  var posMain=(G.pos==='G'?'GOALIE':G.subPos==='C'?'CENTRE':G.subPos==='LW'?'LEFT WING':G.subPos==='RW'?'RIGHT WING':G.subPos==='LD'?'LEFT DEFENSE':'RIGHT DEFENSE');
+  var sec=G.pos!=='G'&&G.secondarySubPos?String(G.secondarySubPos):'';
+  var posSec=sec?(sec==='C'?'CENTRE':sec==='LW'?'LEFT WING':sec==='RW'?'RIGHT WING':sec==='LD'?'LEFT DEFENSE':'RIGHT DEFENSE'):'';
+  var posStr=posMain+(posSec?' · also '+posSec:'');
+  var ovrVal=ovr(G.attrs,G.pos);
   var statBadge='';
   if(G.pos==='G'){
     var svpctCard=G.saves+(G.goalsAgainst||0)>0?(Math.round(G.saves/(G.saves+(G.goalsAgainst||0))*1000)/10)+'%':'--';
@@ -332,7 +335,7 @@ function renderSocialTab(){
     (G.hometown?(G.hometown+' &bull; '):'')+G.nat+'<br>'+
     G.height+' / '+(G.weight||180)+' LB &bull; '+(G.pos==='G'?'CATCHES':'SHOOTS')+' '+G.hand+'<br>'+
     (G.favoriteTeam?'<span style="color:var(--acc)">FAV TEAM GROWING UP:</span> '+G.favoriteTeam.n+(G.favoriteTeamLeague&&LEAGUES[G.favoriteTeamLeague]?' ('+LEAGUES[G.favoriteTeamLeague].short+')':'')+'<br>':'')+
-    'AGE '+G.age+' &bull; '+G.league.short+' &bull; '+G.team.n+
+    'Age '+G.age+' &bull; '+G.league.short+' &bull; '+G.team.n+
     '</div>'+
     '<div style="margin-top:6px">'+
     '<span class="badge gold">OVR '+ovrVal+'</span>'+

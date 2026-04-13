@@ -4,7 +4,7 @@
 // ============================================================
 function checkSeasonAwards(){
   var pts=G.goals+G.assists;
-  var o=ovr(G.attrs);
+  var o=ovr(G.attrs,G.pos);
   var tier=G.league.tier;
   // Scoring title / top performer
   if(G.pos!=='G'&&pts>=60){

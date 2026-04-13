@@ -43,7 +43,7 @@ function startCareer(){
     Object.keys(arch.boosts).forEach(function(k){if(attrs[k]!==undefined)attrs[k]=cl(attrs[k]+arch.boosts[k],attrClampMin,92);});
   }
   attrList.forEach(function(a){attrs[a]=cl((G._baseAttrs&&G._baseAttrs[a]||attrs[a])+(G._extraAttrs&&G._extraAttrs[a]||0),attrClampMin,99);});
-  var pOvrInit=ovr(attrs);
+  var pOvrInit=ovr(attrs, selPos);
   if(isStartingCollegeOrPaidSemiProBlocked(lk, gender, pOvrInit)){
     notify('At 16, pick a junior path or raise OVR ('+START_LEAGUE_BYPASS_OVR_M+'+ men / '+START_LEAGUE_BYPASS_OVR_F+'+ women) for college or overseas semi-pro.','red');
     return;
@@ -116,6 +116,7 @@ function startCareer(){
     _originPlaceRaw:hometownRaw,
     _attrClampMin:attrClampMin
   };
+  try{ if(typeof ensureUnifiedSkaterAttrs==='function') ensureUnifiedSkaterAttrs(G); }catch(eEns){}
   G.standings=buildStandings(lk);
   G.allOpponents=genSeason(lk,team);
   G.socialMessages=generateSocialMessages();

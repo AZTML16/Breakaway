@@ -44,7 +44,7 @@
 <div class="vt" style="font-size:15px;color:var(--mut);line-height:1.9">
 &gt; START AT 16 IN JUNIORS OR COLLEGE; OVERSEAS JUNIOR &rarr; SEMI-PRO PATH<br>
 &gt; EVERY GAME: REAL-TIME DECISIONS WITH A 10s TIMER<br>
-&gt; MEN'S OR WOMEN'S CAREER ACROSS GLOBAL LEAGUES<br>
+&gt; Men's or women's career across global leagues<br>
 &gt; PHL -- NAML -- OJL -- QMJL -- WJL -- NCHA -- USJL -- NEJC -- CEJC -- ARJC<br>
 &gt; PWL -- PWDL -- CWHL -- NWCHA -- USWDL -- EWJC -- AWJC -- SDHL -- FWHL -- AWHL<br>
 &gt; NEGOTIATE CONTRACTS -- GET TRADED -- RETIRE A LEGEND
@@ -62,7 +62,7 @@
 <div class="panel"><div class="ptitle">TUTORIAL</div>
 <div class="vt" style="font-size:15px;color:var(--mut);line-height:1.85">
 HUB each week: play games from the schedule or use SIM WEEK. In a game you get four timed moments; keys <b>1&ndash;4</b> pick an option. Timer empty means auto pick. Passing options skew assists, shooting skews goals.<br><br>
-League playoffs use a seeded bracket (field size varies). When <b>you</b> play a series, it is <b>best-of-7</b> (first to four wins). From the hub, <b>SIM ROUND</b> resolves every series in the current round, including yours if you want to fast-sim. If you lose a series (played or simmed), the rest of the bracket sims and you move to the offseason. Playoff scoring is tighter than the regular season (especially for skill-first builds). Junior, college, and minor playoffs add extra squeeze on sim odds and on playable moments.<br><br>
+League playoffs use a seeded bracket (field size varies). Your series is <b>best-of-7</b> (first to four wins) — play games one at a time until the series ends. From the hub, <b>SIM ROUND</b> runs CPU series until it reaches yours (then stop); <b>SIM MY SERIES</b> fast-sims your matchup; <b>PLAY GAME</b> is the next live game. If you lose a series, <b>SIM ROUND</b> finishes the bracket and you go to the offseason. Playoff scoring is tighter than the regular season (especially for skill-first builds). Junior, college, and minor playoffs add extra squeeze on sim odds and on playable moments.<br><br>
 World tournaments: <b>three</b> round-robin group games, then <b>single-game</b> knockout rounds (no best-of series).<br><br>
 Career OVERALL PERFORMANCE blends every played moment score and every simmed game (from your box score for that sim). Both paths update the same grade.<br><br>
 CONTRACT tab: <b>DEMAND TRADE</b> after season 2 and 14 GP, once per season if not on cooldown. Works when your team sits low in the standings or has a weak win rate while your OVR or personal wins are strong. Outcome is random; NTC still controls whether you can refuse a deal.<br><br>
@@ -88,8 +88,8 @@ Create flow: nationality, gender, position, archetype, X-Factor, attributes, lea
 <input type="text" id="c-last" placeholder="Last name" maxlength="14">
 <div class="g2">
 <div>
-<label class="vt" style="font-size:15px;color:var(--mut)">GENDER</label>
-<select id="c-gender" onchange="onGenderChange()"><option value="M">MALE</option><option value="F">FEMALE</option></select>
+<label class="vt" style="font-size:15px;color:var(--mut)">Gender</label>
+<select id="c-gender" onchange="onGenderChange()"><option value="M">Male</option><option value="F">Female</option></select>
 </div>
 <div>
 <label class="vt" style="font-size:15px;color:var(--mut)">STARTING YEAR</label>
@@ -135,17 +135,17 @@ Create flow: nationality, gender, position, archetype, X-Factor, attributes, lea
 
 <!-- ARCHETYPE -->
 <div class="screen" id="s-arch">
-<div class="hbar"><span>BREAKAWAY</span><span>ARCHETYPE</span></div>
+<div class="hbar"><span>BREAKAWAY</span><span>Archetype</span></div>
 <div class="panel"><div class="ptitle">CHOOSE YOUR PLAYING STYLE</div>
 <div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:12px">YOUR ARCHETYPE SHAPES ATTRIBUTES AND DEVELOPMENT PATH.</div>
 <div id="arch-list"></div>
 </div>
-<button class="btn bp bw" onclick="goToPotential()">POTENTIAL &gt;</button>
+<button class="btn bp bw btn-tcase" onclick="goToPotential()">Potential &gt;</button>
 </div>
 
-<!-- POTENTIAL -->
+<!-- Potential -->
 <div class="screen" id="s-potential">
-<div class="hbar"><span>BREAKAWAY</span><span>POTENTIAL</span></div>
+<div class="hbar"><span>BREAKAWAY</span><span>Potential</span></div>
 <div class="panel"><div class="ptitle">SCOUT PROJECTION</div>
 <div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:12px">HOW SCOUTS SEE YOUR LONG-TERM UPSIDE — NOT A HARD LIMIT. YOU CAN STILL OUTPERFORM OR FALL SHORT.</div>
 <div id="potential-w-hint" class="vt" style="font-size:13px;color:var(--acc);margin-bottom:10px;line-height:1.45;display:none"></div>
@@ -156,7 +156,7 @@ Create flow: nationality, gender, position, archetype, X-Factor, attributes, lea
 
 <!-- X-FACTOR -->
 <div class="screen" id="s-xfactor">
-<div class="hbar"><span>BREAKAWAY</span><span>X-FACTOR</span></div>
+<div class="hbar"><span>BREAKAWAY</span><span>X-Factor</span></div>
 <div class="panel"><div class="ptitle">YOUR X-FACTOR</div>
 <div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:12px">ONE SIGNATURE TRAIT — SHAPES STYLE, MEDIA, AND TINY ON-ICE TENDENCIES.</div>
 <div id="xfactor-list"></div>
@@ -178,7 +178,7 @@ Create flow: nationality, gender, position, archetype, X-Factor, attributes, lea
 <!-- LEAGUE SELECT -->
 <div class="screen" id="s-league">
 <div class="hbar"><span>BREAKAWAY</span><span>STARTING LEAGUE</span></div>
-<div class="panel"><div class="ptitle">WHERE DO YOU BEGIN AT AGE 16?</div>
+<div class="panel"><div class="ptitle">Where do you begin at age 16?</div>
 <div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:12px">YOUR STARTING LEAGUE SHAPES YOUR DEVELOPMENT AND CAREER PATH.</div>
 <div id="league-list"></div>
 </div>
@@ -235,15 +235,15 @@ Create flow: nationality, gender, position, archetype, X-Factor, attributes, lea
 <div class="hub-team-crest" id="hub-icon"></div>
 <div>
 <div class="pname" id="hub-pname">PLAYER</div>
-<div class="pmeta" id="hub-pmeta">AGE 16</div>
+<div class="pmeta" id="hub-pmeta">Age 16</div>
 <div id="hub-team-ident" class="team-ident"></div>
 <div style="margin-top:6px">
 <span class="badge gold" id="hub-ovr">OVR 60</span>
 <span class="badge blue" id="hub-league-badge">OJL</span>
 <span class="badge green" id="hub-contract-badge">AMATEUR</span>
 <span class="badge mut" id="hub-morale-badge">MORALE 70</span>
-<span class="badge acc" id="hub-potential-badge" style="font-size:11px;max-width:100%;white-space:normal;text-align:center;line-height:1.25">POTENTIAL</span>
-<span class="badge gold" id="hub-xfactor-badge" style="font-size:11px;max-width:100%;white-space:normal;text-align:center;line-height:1.25" title="X-Factor">X-FACTOR</span>
+<span class="badge acc" id="hub-potential-badge" style="font-size:11px;max-width:100%;white-space:normal;text-align:center;line-height:1.25">Support Potential</span>
+<span class="badge gold" id="hub-xfactor-badge" style="font-size:11px;max-width:100%;white-space:normal;text-align:center;line-height:1.25" title="X-Factor">No X-Factor</span>
 </div>
 <div class="xpbar"><div class="xpfill" id="hub-xp" style="width:10%"></div></div>
 <div class="vt" style="font-size:12px;color:var(--mut);margin-top:4px">XP <span id="hub-xp-lbl">100/1000</span></div>
@@ -362,6 +362,25 @@ Create flow: nationality, gender, position, archetype, X-Factor, attributes, lea
 <div id="moment-opts"></div>
 <div class="vt" style="font-size:12px;color:var(--mut);margin-top:8px;opacity:.88">TIP: KEYS <b>1&ndash;4</b> = OPTIONS (FAST)</div>
 <div id="moment-result" style="display:none"></div>
+</div>
+</div>
+
+<!-- SHOOTOUT (regular season tiebreaker) -->
+<div class="screen" id="s-shootout">
+<div class="hbar"><span>BREAKAWAY</span><span>SHOOTOUT</span></div>
+<div class="scoreboard">
+<div><div class="teamname-s" id="so-home-name"></div><div class="team-score" id="so-home-score">0</div></div>
+<div><div class="score-period" id="so-period-lbl">SKILL ROUND</div><div class="vt" style="color:var(--mut);font-size:13px">REGULATION TIE</div></div>
+<div><div class="teamname-s" id="so-away-name"></div><div class="team-score" id="so-away-score">0</div></div>
+</div>
+<div class="moment-num" id="so-moment-num">SHOOTOUT</div>
+<div id="so-timer-wrap"><div id="so-timer-bar" style="width:100%"></div><div id="so-timer-num">10</div></div>
+<div class="panel">
+<div class="moment-ctx" id="so-moment-ctx"></div>
+<div class="moment-text" id="so-moment-text"></div>
+<div id="so-moment-opts"></div>
+<div class="vt" style="font-size:12px;color:var(--mut);margin-top:8px;opacity:.88">TIP: KEYS <b>1&ndash;4</b> = OPTIONS</div>
+<div id="so-moment-result" style="display:none"></div>
 </div>
 </div>
 
@@ -494,7 +513,7 @@ Create flow: nationality, gender, position, archetype, X-Factor, attributes, lea
 <div class="mbg" id="m-retire-prompt"><div class="mbox" style="text-align:center">
 <div style="margin:10px 0;display:flex;justify-content:center"><div class="retro-puck-graphic xl"><div class="puck-disc"></div></div></div>
 <div class="mtitle">RETIREMENT?</div>
-<div class="vt" style="font-size:16px;color:var(--mut);margin-bottom:14px">AGE <span id="rp-age"></span> -- YOUR BODY IS TALKING. WHAT DO YOU DO?</div>
+<div class="vt" style="font-size:16px;color:var(--mut);margin-bottom:14px">Age <span id="rp-age"></span> — your body is talking. What do you do?</div>
 <div class="g2">
 <button class="btn bd" onclick="retire()">HANG THEM UP</button>
 <button class="btn bg2" onclick="oneMoreYear()">ONE MORE YEAR</button>

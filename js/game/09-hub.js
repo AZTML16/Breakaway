@@ -3,18 +3,18 @@
 // HUB
 // ============================================================
 function renderHub(){
-  var o=ovr(G.attrs);
+  var o=ovr(G.attrs,G.pos);
   var fullName=String(G.first+' '+G.last).trim();
   applyTeamTheme(G.team&&G.team.n?G.team.n:'TEAM');
   safeEl('hub-hdr').textContent=G.league.short+' -- SEASON '+G.season+' -- '+G.year;
   safeEl('hub-pname').textContent=fullName;
   // Enhanced pmeta with jersey, hand, hometown
   var handLabel=G.hand==='L'?'L':'R';
-  var posStr=(G.pos==='G'?'G':G.subPos);
+  var posStr=(G.pos==='G'?'G':G.subPos+(G.secondarySubPos?' · also '+G.secondarySubPos:''));
   var leadTag=G.leadershipRole?(' -- '+G.leadershipRole):'';
   var homeStr=String(G.hometown||'').trim();
   safeEl('hub-pmeta').textContent=
-    'AGE '+G.age+' -- #'+G.jersey+leadTag+' -- '+posStr+' -- '+handLabel+' -- '+G.team.n+
+    'Age '+G.age+' -- #'+G.jersey+leadTag+' -- '+posStr+' -- '+handLabel+' -- '+G.team.n+
     (homeStr?' -- '+homeStr:'')+' -- '+G.nat+' -- '+G.height+' -- '+(G.weight||180)+' LB';
   var teamIdent=safeEl('hub-team-ident');
   if(teamIdent) teamIdent.innerHTML='<span class="team-wordmark">'+G.team.n+'</span>';
@@ -55,7 +55,7 @@ function renderHub(){
     var serHdr=boN<=1?'1 GAME':'BO'+boN+' (race to '+boN+')';
     if(ptitle) ptitle.innerHTML='PLAYOFFS <span style="color:var(--mut)">—</span> <span id="wk-lbl">'+escHtml(G._playoffCtx.roundName||'ROUND')+'</span> <span style="color:var(--mut)">·</span> <span id="wk-max">'+serHdr+'</span>';
     var _px=G._playoffCtx,_pr=_px.pairs&&_px.pairs[_px.pairIndex];
-    var subP='Your series is best-of-7 when you play. <b>SIM ROUND</b> resolves every series in this round (yours too). If you are eliminated, the rest of the bracket sims and you head to the offseason.';
+    var subP='<b>SIM ROUND</b> resolves CPU series up to yours. <b>SIM MY SERIES</b> fast-sims your matchup. <b>PLAY GAME</b> is one game at a time (best-of-7). If you are eliminated, <b>SIM ROUND</b> runs the rest of the bracket to a champion, then offseason.';
     if(_pr&&(_pr[0].isMe||_pr[1].isMe)&&!_px.eliminated){
       var _uW=_pr[0].isMe?_px.seriesHW:_px.seriesAW,_oW=_pr[0].isMe?_px.seriesAW:_px.seriesHW,_on=_pr[0].isMe?_pr[1].team.n:_pr[0].team.n;
       subP='Series tracker: you '+_uW+' — '+_oW+' '+_on+(boN<=1?'':' (first to '+boN+')')+'. '+subP;
@@ -172,22 +172,29 @@ function renderPlayoffHubPanel(){
   var userTurn=prCur&&(prCur[0].isMe||prCur[1].isMe)&&!ctx.eliminated;
   var seriesLive=userTurn&&(ctx.seriesHW<boN&&ctx.seriesAW<boN);
   if(userTurn&&seriesLive){
-    html+='<button type="button" class="btn bp bw" style="margin-right:8px;margin-bottom:8px" onclick="startPlayoffPregameFromHub()">PLAY NEXT PLAYOFF GAME</button>';
+    html+='<button type="button" class="btn bp bw" style="margin-right:8px;margin-bottom:8px" onclick="startPlayoffPregameFromHub()">PLAY GAME</button>';
+    html+='<button type="button" class="btn bs bw" style="margin-right:8px;margin-bottom:8px" onclick="simMyPlayoffSeriesFromHub()">SIM MY SERIES</button>';
   }
-  html+='<button type="button" class="btn bs bw" style="margin-right:8px;margin-bottom:8px" onclick="simPlayoffRoundHubStep()">SIM ROUND (ALL SERIES)</button>';
+  html+='<button type="button" class="btn bs bw" style="margin-right:8px;margin-bottom:8px" onclick="simPlayoffRoundHubStep()">SIM ROUND</button>';
   if(ctx.eliminated){
-    html+='<button type="button" class="btn bd bw" style="margin-right:8px;margin-bottom:8px" onclick="simAllRemainingPlayoffRoundsCpu()">SIM ALL REMAINING ROUNDS</button>';
-    html+='<div class="vt" style="margin-top:8px;color:var(--mut)">Eliminated — <b>SIM ROUND</b> or <b>SIM ALL REMAINING ROUNDS</b> to crown a champion.</div>';
+    html+='<div class="vt" style="margin-top:8px;color:var(--mut)">Eliminated — use <b>SIM ROUND</b> to advance the bracket until a champion is crowned.</div>';
   }
-  html+='<button type="button" class="btn bd bw" style="margin-bottom:8px" onclick="simEntirePlayoffsFromHub()">RE-SIM ENTIRE PLAYOFFS (RESET BRACKET)</button>';
   el.innerHTML=html;
 }
 
 function startPlayoffPregameFromHub(){
+  var hub=document.getElementById('s-hub');
+  if(!hub||!hub.classList.contains('on')) return;
+  var pre=document.getElementById('s-pregame');
+  if(pre&&pre.classList.contains('on')) return;
+  var ing=document.getElementById('s-ingame');
+  if(ing&&ing.classList.contains('on')) return;
   var ctx=G._playoffCtx;
   if(!ctx||!ctx.active||ctx.eliminated) return;
+  var boN=typeof PLAYOFF_SERIES_WINS==='number'?PLAYOFF_SERIES_WINS:4;
   var pr=ctx.pairs[ctx.pairIndex];
   if(!pr||(!pr[0].isMe&&!pr[1].isMe)) return;
+  if(ctx.seriesHW>=boN||ctx.seriesAW>=boN) return;
   var opp=pr[0].isMe?pr[1]:pr[0];
   ctx.playoffOpponent={n:opp.team.n,e:opp.team.e||'[-]'};
   ctx.awaitingUserGame=true;
@@ -208,39 +215,50 @@ function tryCompletePlayoffRoundFromHub(){
   return true;
 }
 
-function simPlayoffCpuMatchupsInRound(){
+/** Fast-sim the full best-of-7 at the current pairing (hub). */
+function resolveCurrentPlayoffUserSeriesSim(ctx){
+  var pr=ctx.pairs[ctx.pairIndex];
+  if(!pr||(!pr[0].isMe&&!pr[1].isMe)) return;
+  var home=pr[0], away=pr[1];
+  var userRow=home.isMe?home:away;
+  var oppRow=home.isMe?away:home;
+  while(ctx.seriesHW<PLAYOFF_SERIES_WINS && ctx.seriesAW<PLAYOFF_SERIES_WINS){
+    if(playoffSingleGameHomeWins(home,away)) ctx.seriesHW++;
+    else ctx.seriesAW++;
+    addPlayoffSimGameToMyStats();
+  }
+  var serWinner=ctx.seriesHW>ctx.seriesAW?home:away;
+  var sh=ctx.seriesHW, sa=ctx.seriesAW;
+  if(serWinner.isMe){
+    ctx._roundMatchups.push(home.team.n+' vs '+away.team.n+' -> '+userRow.team.n+' (YOU, SIM) ('+sh+'-'+sa+')');
+    addNews('YOU WIN '+ctx.roundName+' series '+sh+'-'+sa+' vs '+oppRow.team.n+' (simmed).','good');
+    ctx.winnersThisRound.push(userRow);
+    ctx.roundReached=ctx.roundName;
+  } else {
+    ctx._roundMatchups.push(home.team.n+' vs '+away.team.n+' -> '+oppRow.team.n+' ('+sh+'-'+sa+')');
+    addNews('YOU LOSE '+ctx.roundName+' series '+sa+'-'+sh+' vs '+oppRow.team.n+' (simmed).','bad');
+    ctx.winnersThisRound.push(oppRow);
+    ctx.eliminated=true;
+    ctx.roundReached=ctx.roundName;
+  }
+  ctx.seriesHW=0;
+  ctx.seriesAW=0;
+  ctx.pairIndex++;
+  ctx.awaitingUserGame=false;
+  G._isPlayoffGame=false;
+}
+
+/** includeUserSeries: when false and you are still alive, stop before your matchup so you can play or use SIM MY SERIES. When true (eliminated path), sim every series including yours. */
+function simPlayoffCpuMatchupsInRound(includeUserSeries){
+  includeUserSeries=!!includeUserSeries;
   var ctx=G._playoffCtx;
   if(!ctx||!ctx.active) return;
   while(ctx.pairIndex<ctx.pairs.length){
     var pr=ctx.pairs[ctx.pairIndex];
     var home=pr[0], away=pr[1];
     if(home.isMe||away.isMe){
-      var userRow=home.isMe?home:away;
-      var oppRow=home.isMe?away:home;
-      while(ctx.seriesHW<PLAYOFF_SERIES_WINS && ctx.seriesAW<PLAYOFF_SERIES_WINS){
-        if(playoffSingleGameHomeWins(home,away)) ctx.seriesHW++;
-        else ctx.seriesAW++;
-        addPlayoffSimGameToMyStats();
-      }
-      var serWinner=ctx.seriesHW>ctx.seriesAW?home:away;
-      var sh=ctx.seriesHW, sa=ctx.seriesAW;
-      if(serWinner.isMe){
-        ctx._roundMatchups.push(home.team.n+' vs '+away.team.n+' -> '+userRow.team.n+' (YOU, SIM) ('+sh+'-'+sa+')');
-        addNews('YOU WIN '+ctx.roundName+' series '+sh+'-'+sa+' vs '+oppRow.team.n+' (simmed).','good');
-        ctx.winnersThisRound.push(userRow);
-        ctx.roundReached=ctx.roundName;
-      } else {
-        ctx._roundMatchups.push(home.team.n+' vs '+away.team.n+' -> '+oppRow.team.n+' ('+sh+'-'+sa+')');
-        addNews('YOU LOSE '+ctx.roundName+' series '+sa+'-'+sh+' vs '+oppRow.team.n+' (simmed).','bad');
-        ctx.winnersThisRound.push(oppRow);
-        ctx.eliminated=true;
-        ctx.roundReached=ctx.roundName;
-      }
-      ctx.seriesHW=0;
-      ctx.seriesAW=0;
-      ctx.pairIndex++;
-      ctx.awaitingUserGame=false;
-      G._isPlayoffGame=false;
+      if(!includeUserSeries) break;
+      resolveCurrentPlayoffUserSeriesSim(ctx);
       continue;
     }
     var ser=simPlayoffSeriesWinner(home,away);
@@ -252,18 +270,32 @@ function simPlayoffCpuMatchupsInRound(){
   tryCompletePlayoffRoundFromHub();
 }
 
+function simMyPlayoffSeriesFromHub(){
+  var ctx=G._playoffCtx;
+  if(!ctx||!ctx.active||ctx.eliminated) return;
+  var pr=ctx.pairs[ctx.pairIndex];
+  if(!pr||(!pr[0].isMe&&!pr[1].isMe)) return;
+  var boN=typeof PLAYOFF_SERIES_WINS==='number'?PLAYOFF_SERIES_WINS:4;
+  if(ctx.seriesHW>=boN||ctx.seriesAW>=boN) return;
+  resolveCurrentPlayoffUserSeriesSim(ctx);
+  if(ctx.pairIndex>=ctx.pairs.length) tryCompletePlayoffRoundFromHub();
+  if(G._playoffCtx&&G._playoffCtx.eliminated) flushEliminatedPlayoffsCpu();
+  if(G._playoffCtx&&G._playoffCtx.active){ try{renderHub();}catch(eMy){} }
+}
+
 /** Keep simming rounds while eliminated until a champion ends the playoffs. */
 function flushEliminatedPlayoffsCpu(){
   var g=0;
   while(G._playoffCtx&&G._playoffCtx.eliminated&&G._playoffCtx.active&&g++<200){
-    simPlayoffCpuMatchupsInRound();
+    simPlayoffCpuMatchupsInRound(true);
   }
 }
 
-/** One click: finish this round (including your series if needed), then auto-run the rest if you are out. */
+/** Sim CPU series this round (stops before your series if you are still in). If eliminated, finishes the whole bracket. */
 function simPlayoffRoundHubStep(){
-  simPlayoffCpuMatchupsInRound();
-  flushEliminatedPlayoffsCpu();
+  var ctx=G._playoffCtx;
+  simPlayoffCpuMatchupsInRound(!!(ctx&&ctx.eliminated));
+  if(G._playoffCtx&&G._playoffCtx.eliminated) flushEliminatedPlayoffsCpu();
   if(G._playoffCtx&&G._playoffCtx.active){
     try{renderHub();}catch(eR0){}
   }
@@ -275,26 +307,6 @@ function simAllRemainingPlayoffRoundsCpu(){
   if(G._playoffCtx&&G._playoffCtx.active){
     try{renderHub();}catch(eR){}
   }
-}
-
-function simEntirePlayoffsFromHub(){
-  confirmInGame('Sim the entire playoffs from scratch (fast)? Your current bracket progress will be replaced by one full simulation.', function(){
-    G._playoffCtx=null;
-    G._isPlayoffGame=false;
-    var playoff=simulatePlayoffs();
-    G.wonCup=playoff.wonCup;
-    recordPlayoffLogFromResult(playoff);
-    _lastPlayoffRecapHTML=buildPlayoffRecapHTML(playoff);
-    if(G.wonCup){
-      G.careerCups++;
-      G.socialFollowers=(G.socialFollowers||0)+ri(500,2200);
-      G.awards.push({name:'League Champion',icon:'[C]',desc:'Won the '+G.league.short+' championship',season:G.season});
-    } else {
-      addNews('Playoffs (sim): eliminated in the '+(playoff.roundReached||'playoffs')+'.','neutral');
-    }
-    finishSeasonToOffseason();
-    renderHub();
-  });
 }
 
 function renderWeekGames(){
@@ -372,20 +384,119 @@ function hubTab(tab){
 
 function renderAttrTab(){
   var html='';
-  var keys=Object.keys(G.attrs);
   var potK=G.potential&&POTENTIALS[G.potential]?G.potential:'support';
   html+='<div class="vt" style="font-size:13px;color:var(--mut);margin-bottom:10px;line-height:1.45">'+
-    '<span style="color:var(--acc)">PROJECTION:</span> '+potentialTierWord(potK)+' — '+POTENTIALS[potK].desc+'</div>';
-  for(var i=0;i<keys.length;i++){
-    var k=keys[i]; var v=G.attrs[k];
+    '<span style="color:var(--acc)">Projection:</span> '+potentialTierWord(potK)+' — '+POTENTIALS[potK].desc+'</div>';
+  html+='<div class="vt" style="font-size:12px;color:var(--mut);margin-bottom:10px;line-height:1.45">Forwards and D share the same sheet. <b>OVR</b> uses the rating row only. <b>Listed spot</b> ('+String(G.subPos||'—')+') nudges centre faceoff rolls only. <b>Comfort spare</b> is a second natural spot (not everyone has one); moving there is easy — selling coaches on a brand-new spot costs more. <b>Durability / conditioning</b> are tracked but not in OVR.</div>';
+  if(G.pos==='F'||G.pos==='D'){
+    var spare=G.secondarySubPos?String(G.secondarySubPos):'';
+    html+='<div class="vt" style="font-size:11px;color:var(--acc);margin-bottom:6px">LISTED: <b>'+String(G.subPos||'—')+'</b> &nbsp;·&nbsp; COMFORT SPARE: <b>'+(spare||'none')+'</b></div>';
+    html+='<div class="vt" style="font-size:11px;color:var(--mut);margin-bottom:6px">Roster card spot</div>';
+    html+='<div class="g2" style="margin-bottom:10px;gap:6px;flex-wrap:wrap">';
+    if(G.pos==='F'){
+      html+='<button type="button" class="btn '+(G.subPos==='C'?'bp':'bs')+'" onclick="hubChangeListedSubPos(\'C\')">C</button>';
+      html+='<button type="button" class="btn '+(G.subPos==='LW'?'bp':'bs')+'" onclick="hubChangeListedSubPos(\'LW\')">LW</button>';
+      html+='<button type="button" class="btn '+(G.subPos==='RW'?'bp':'bs')+'" onclick="hubChangeListedSubPos(\'RW\')">RW</button>';
+    } else {
+      html+='<button type="button" class="btn '+(G.subPos==='LD'?'bp':'bs')+'" onclick="hubChangeListedSubPos(\'LD\')">LD</button>';
+      html+='<button type="button" class="btn '+(G.subPos==='RD'?'bp':'bs')+'" onclick="hubChangeListedSubPos(\'RD\')">RD</button>';
+    }
+    html+='</div>';
+    html+='<div class="g2" style="margin-bottom:12px;gap:8px">'+
+      '<button type="button" class="btn bs bw" onclick="hubTrainSkill()">EXTRA TRAINING</button>'+
+      '<button type="button" class="btn bs bw" onclick="hubSwitchSkaterPos()">SWITCH F / D</button></div>';
+  }
+  function attrRow(k,v){
     var color=ATTR_COLORS[k]||'var(--mut)';
     var lbl=ATTR_LABELS[k]||k;
-    html+='<div class="srow"><div class="slbl">'+lbl+'</div><div class="sbar"><div class="sfill" style="background:'+color+';width:'+Math.round(v)+'%"></div></div><div class="sval">'+Math.round(v)+'</div></div>';
+    return '<div class="srow"><div class="slbl">'+lbl+'</div><div class="sbar"><div class="sfill" style="background:'+color+';width:'+Math.round(v)+'%"></div></div><div class="sval">'+Math.round(v)+'</div></div>';
   }
+  if(G.pos==='G'){
+    var gk=ATTRS.G||[];
+    for(var gi=0;gi<gk.length;gi++) html+=attrRow(gk[gi],G.attrs[gk[gi]]||0);
+  } else {
+    html+='<div class="vt" style="font-size:12px;color:var(--gold);margin:4px 0">RATING (OVR)</div>';
+    var rk=typeof SKATER_RATING_ATTR_KEYS!=='undefined'?SKATER_RATING_ATTR_KEYS:[];
+    for(var ri=0;ri<rk.length;ri++) html+=attrRow(rk[ri],G.attrs[rk[ri]]||0);
+    html+='<div class="vt" style="font-size:12px;color:var(--acc);margin:10px 0 4px">BASE</div>';
+    var bk=typeof SKATER_BASE_ATTR_KEYS!=='undefined'?SKATER_BASE_ATTR_KEYS:[];
+    for(var bi=0;bi<bk.length;bi++) html+=attrRow(bk[bi],G.attrs[bk[bi]]||0);
+  }
+  html+='<div class="vt" style="font-size:12px;color:var(--mut);margin-top:10px">TEAM STATUS: HEALTH / STAMINA / MORALE</div>';
   safeEl('hub-attr-bars').innerHTML=html;
   safeEl('b-health').style.width=G.health+'%';safeEl('v-health').textContent=Math.round(G.health);
   safeEl('b-stam').style.width=G.stamina+'%';safeEl('v-stam').textContent=Math.round(G.stamina);
   safeEl('b-morale').style.width=G.morale+'%';safeEl('v-morale').textContent=Math.round(G.morale);
+}
+
+function hubTrainSkill(){
+  if(!G||G.pos==='G'){ notify('Extra training is for skaters.','gold'); return; }
+  if((G._hubTrainWeek|0)==(G.week|0)){ notify('Already logged extra work this week.','gold'); return; }
+  if((G.stamina|0)<18){ notify('Need more stamina (18+) before another heavy session.','red'); return; }
+  if(typeof SKATER_RATING_ATTR_KEYS==='undefined'||!SKATER_RATING_ATTR_KEYS.length) return;
+  G.stamina=cl(G.stamina-15,0,100);
+  var pick=SKATER_RATING_ATTR_KEYS[ri(0,SKATER_RATING_ATTR_KEYS.length-1)];
+  var cap=getAttrCapForAge(G.age||16);
+  var amin=G._attrClampMin||40;
+  var gain=rd(0.8,1.55)*getPotentialDevMult(G.potential||'support');
+  G.attrs[pick]=cl(Math.round((G.attrs[pick]||55)+gain),amin,cap);
+  G._hubTrainWeek=G.week;
+  addNews('EXTRA TRAINING: '+String(ATTR_LABELS[pick]||pick).toUpperCase()+' +'+Math.round(gain*10)/10+'.','good');
+  renderHub(); hubTab('attrs');
+}
+
+function hubChangeListedSubPos(target){
+  if(!G||G.pos==='G') return;
+  var t=String(target||'');
+  if(G.pos==='F'){
+    if(t!=='C'&&t!=='LW'&&t!=='RW') return;
+  } else if(G.pos==='D'){
+    if(t!=='LD'&&t!=='RD') return;
+  } else return;
+  if(t===G.subPos){ notify('Already listed at '+t+'.','gold'); return; }
+  if(G.secondarySubPos&&t===G.secondarySubPos){
+    var old=G.subPos;
+    G.subPos=t;
+    G.secondarySubPos=old;
+    G.morale=cl(G.morale-1,0,100);
+    addNews('LISTING: Slide to comfort spare ('+t+') — coaches already knew you could play there.','neutral');
+    renderHub(); hubTab('attrs');
+    return;
+  }
+  if((G._hubSubPosHardWeek|0)===(G.week|0)){
+    notify('Staff only wants one big position experiment per week. Use your comfort spare or wait.','gold');
+    return;
+  }
+  if((G.stamina|0)<12){
+    notify('Too tired to sell coaches on a new spot this week.','red');
+    return;
+  }
+  G._hubSubPosHardWeek=G.week;
+  G.stamina=cl(G.stamina-8,0,100);
+  G.morale=cl(G.morale-9,0,100);
+  G.subPos=t;
+  delete G.secondarySubPos;
+  try{ if(typeof ensureSecondarySubPos==='function') ensureSecondarySubPos(G); }catch(eSub){}
+  addNews('LISTING: Roster card now '+t+' -- extra video and reps to win trust.','neutral');
+  renderHub(); hubTab('attrs');
+}
+
+function hubSwitchSkaterPos(){
+  if(!G||G.pos==='G') return;
+  delete G.secondarySubPos;
+  if(G.pos==='F'){
+    G.pos='D';
+    if(!ARCHETYPES.D[G.arch]) G.arch='TwoWayD';
+    G.subPos=Math.random()<0.5?'LD':'RD';
+  } else {
+    G.pos='F';
+    if(!ARCHETYPES.F[G.arch]) G.arch='TwoWay';
+    G.subPos='C';
+  }
+  try{ if(typeof ensureUnifiedSkaterAttrs==='function') ensureUnifiedSkaterAttrs(G); }catch(eSw){}
+  G.morale=cl(G.morale-4,0,100);
+  addNews('LISTED POSITION: Now '+G.pos+' ('+G.subPos+') on the roster card.','neutral');
+  renderHub(); hubTab('attrs');
 }
 
 function renderStandingsTab(){
@@ -458,7 +569,7 @@ function renderCareerTab(){
       : '<div class="stbox"><div class="stlbl">G</div><div class="stval" style="color:var(--red)">'+G.cGoals+'</div></div>'+
         '<div class="stbox"><div class="stlbl">A</div><div class="stval" style="color:var(--acc)">'+G.cAssists+'</div></div>'+
         '<div class="stbox"><div class="stlbl">PTS</div><div class="stval" style="color:var(--gold)">'+cp+'</div></div>'+
-        '<div class="stbox"><div class="stlbl">OVR</div><div class="stval">'+ovr(G.attrs)+'</div></div>');
+        '<div class="stbox"><div class="stlbl">OVR</div><div class="stval">'+ovr(G.attrs,G.pos)+'</div></div>');
   var og=getCareerOverallGradeDisplay();
   cGrid+='<div class="stbox" style="grid-column:1/-1;padding:10px 8px">'+
     '<div class="stlbl">OVERALL PERFORMANCE</div>'+

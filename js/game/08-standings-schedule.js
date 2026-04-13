@@ -103,7 +103,7 @@ function evaluateLeadershipAtSeasonEnd(){
   } else {
     var ppg=G.gp>0?(G.goals+G.assists)/G.gp:0;
     var ppgBar=getPpgCaliberOvrThreshold(G.leagueKey);
-    var oLead=ovr(G.attrs);
+    var oLead=ovr(G.attrs,G.pos);
     elite=ppg>=1.0&&oLead>=ppgBar;
     decent=ppg>=0.65&&oLead>=Math.max(48,ppgBar-12);
     severe=ppg<0.35||oLead<Math.max(42,ppgBar-22);
@@ -212,7 +212,7 @@ function ensureGoalieStartMask(){
 /** Team game with backup in net -- no GP / saves / GA for you. */
 function simBackupGoalieNight(opp,gameIndex,weeklyStats){
   var backup=(G._goalieBackupNamesForWeek&&G._goalieBackupNamesForWeek[gameIndex])?G._goalieBackupNamesForWeek[gameIndex]:BACKUP_GOALIE_NAMES[0];
-  var perf=ovr(G.attrs);
+  var perf=ovr(G.attrs,G.pos);
   var baseline=getLeagueBaselineOvr(G.leagueKey);
   var rel=(perf-baseline)/20;
   var perfBias=cl(rel,-1.2,1.4);

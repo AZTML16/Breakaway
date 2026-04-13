@@ -19,26 +19,33 @@ function roundWeightToTen(w){
   w=+w||0;
   return Math.round(cl(w,95,320)/10)*10;
 }
-/** Target weight by age from rookie (16) baseline — men gain more; women smaller curve. */
+/** Total listed-weight gain from age 16 to late 30s (lighter teen frames fill out more). */
+function careerWeightGainTotal(sw,isF){
+  sw=roundWeightToTen(cl(sw,95,320));
+  var lean=cl((200-sw)/105,0,1);
+  var maleGain=Math.round(52+lean*22);
+  maleGain=cl(maleGain,25,85);
+  if(isF) return Math.round(maleGain*0.48);
+  return maleGain;
+}
+/** Target weight by age — gradual gain through career; most by late 20s, more to ~38; men gain more. */
 function getTargetWeightForAge(age, gender, startW){
   var sw=roundWeightToTen(cl(startW,95,320));
   var isF=gender==='F';
-  var teenMult=isF?0.58:1;
-  var adultMult=isF?0.52:1;
-  var drastic=cl(Math.round(50-sw*0.13),18,52)*teenMult;
-  var w18=sw+drastic;
-  var adultExtra=cl(Math.round(30-sw*0.08),10,32)*adultMult;
-  var w25=w18+adultExtra;
+  var total=careerWeightGainTotal(sw,isF);
+  var midFrac=isF?0.82:0.78;
+  var midGain=total*midFrac;
+  var lateGain=total-midGain;
   if(age<=16) return roundWeightToTen(sw);
-  if(age<=18){
-    var t=(age-16)/2;
-    return roundWeightToTen(sw+(w18-sw)*t);
+  if(age<=27){
+    var t=(age-16)/11;
+    return roundWeightToTen(sw+midGain*t);
   }
-  if(age<=25){
-    var t2=(age-18)/7;
-    return roundWeightToTen(w18+(w25-w18)*t2);
+  if(age<=40){
+    var t2=(age-27)/13;
+    return roundWeightToTen(sw+midGain+lateGain*t2);
   }
-  return roundWeightToTen(w25);
+  return roundWeightToTen(sw+total);
 }
 function applyPhysiqueGrowthAfterAgeUp(prevAge, newAge){
   if(!G||newAge<=prevAge) return;
@@ -51,8 +58,9 @@ function applyPhysiqueGrowthAfterAgeUp(prevAge, newAge){
   var tgtW=getTargetWeightForAge(newAge, g, startW);
   var oldW=G.weight||startW;
   G.weight=roundWeightToTen(tgtW);
-  if(newAge>=17 && newAge<=20 && (G._heightGainBudget|0)>0){
-    var chance=g==='F'?0.28:0.40;
+  var heightAgeMax=g==='F'?18:20;
+  if(newAge>=17 && newAge<=heightAgeMax && (G._heightGainBudget|0)>0){
+    var chance=g==='F'?0.32:0.38;
     var maxIn=startH+(g==='F'?1:2);
     if(Math.random()<chance && (G.heightInches||startH)<maxIn){
       G.heightInches=Math.min((G.heightInches||startH)+1,maxIn);
@@ -61,7 +69,7 @@ function applyPhysiqueGrowthAfterAgeUp(prevAge, newAge){
       addNews('GROWTH: Now listed at '+G.height+'.','neutral');
     }
   }
-  if(newAge<=25 && Math.abs(G.weight-oldW)>=10){
+  if(newAge<=40 && Math.abs(G.weight-oldW)>=10){
     addNews('BODY: Playing weight now '+G.weight+' LB (age '+newAge+').','neutral');
   }
 }

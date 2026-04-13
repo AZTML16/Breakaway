@@ -224,7 +224,7 @@ function demandTrade(){
   var denom=Math.max(1,row.w+row.l+row.otl);
   var winPct=row.w/denom;
   var badTeam=(myI>=Math.floor(n*0.58))||(winPct<0.39&&row.gp>=12);
-  var o=ovr(G.attrs);
+  var o=ovr(G.attrs,G.pos);
   var bar=getPpgCaliberOvrThreshold(G.leagueKey);
   var myForm=(G.gp>=10&&(G.w/G.gp)>=0.52);
   var goodPlayer=(o>=bar-12)||myForm;

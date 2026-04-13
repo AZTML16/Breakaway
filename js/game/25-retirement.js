@@ -38,7 +38,7 @@ function renderRetire(){
     '<div class="vt" style="font-size:12px;color:var(--mut);margin-top:6px;line-height:1.35">'+rOg.txt+'<br><span style="opacity:.88">'+rOg.sub+'</span></div>'+
     '</div>';
   statHtml+='<div class="vt" style="font-size:15px;color:var(--mut);line-height:1.8">';
-  statHtml+='FINAL AGE: '+G.age+' &bull; FINAL OVR: '+ovr(G.attrs)+' &bull; CUPS: '+G.careerCups+'<br>';
+  statHtml+='Final age: '+G.age+' &bull; Final OVR: '+ovr(G.attrs,G.pos)+' &bull; Cups: '+G.careerCups+'<br>';
   if(G.hometown) statHtml+='FROM: '+G.hometown+' &bull; ';
   statHtml+='#'+G.jersey+' &bull; '+G.nat+' &bull; '+(G.weight||180)+' LB';
   statHtml+='</div>';

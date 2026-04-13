@@ -223,7 +223,7 @@ function simSkaterGoalAssistSplit(totalPts, perfBias, won){
     var fa=G.arch||'';
     if(fa==='Sniper'||fa==='PowerForward') pGoal+=0.07;
     if(fa==='Playmaker') pGoal-=0.08;
-    if(fa==='TwoWay') pGoal-=0.04;
+    if(fa==='TwoWay') pGoal-=0.07;
     if(fa==='Grinder'||fa==='Enforcer') pGoal-=0.09;
   }
   if((G.xFactor==='elite_vision'||G.xFactor==='smart_iq') && (G.pos==='F'||G.pos==='D')) pGoal-=0.07;
@@ -288,7 +288,7 @@ function simWeek(){
       continue;
     }
     // Simulate game
-    var playerOvr=ovr(G.attrs);
+    var playerOvr=ovr(G.attrs,G.pos);
     var leagueDev=G.league.dev||1.0;
     var rel=(playerOvr-baseline)/20; // Relative to league average: same OVR means different value by tier.
     var perfBias=cl(rel,-1.2,1.4);
@@ -343,15 +343,28 @@ function simWeek(){
       gameStats.a=gaSplit.a;
       gameStats.sog=Math.max(1,Math.round(ri(2,5)+gamePts+perfBias*0.9));
       var blk=G.pos==='D'?ri(0,3):ri(0,2);
+      if(G.pos==='F'&&G.arch==='TwoWay'&&Math.random()<0.36) blk+=1;
       if(G.xFactor==='good_stick'&&G.pos==='D') blk+=Math.random()<0.48?1:0;
       if(G.xFactor==='heavy_hitter'&&(G.pos==='D'||G.pos==='F')) blk+=Math.random()<0.24?1:0;
       if(G.xFactor==='careless'&&isCarelessSlumping()&&(G.pos==='D'||G.pos==='F')&&Math.random()<0.38) blk=Math.max(0,blk-1);
       gameStats.block=blk;
-      // Smoother +/-; defensemen get a stronger two-way / shutdown tilt.
+      // Smoother +/-; defensemen & two-way forwards trend higher when structure holds.
       var defSkill=((G.attrs.mental||60)+(G.attrs.physical||60)-120)/30;
-      var defBias=(G.pos==='D'?0.88:0) + cl(defSkill,-0.6,0.9)*(G.pos==='D'?0.42:0.35) + (gameStats.block>=2?(G.pos==='D'?0.42:0.3):0) + (G.pos==='D'&&gameStats.block>=1?0.18:0);
+      var posRead=((G.attrs.positioning||60)-60)/50;
+      var archPm=0;
+      if(G.pos==='D'){
+        var dArch=G.arch||'';
+        if(dArch==='StayAtHome'||dArch==='ShutdownD') archPm=0.52;
+        else if(dArch==='TwoWayD') archPm=0.34;
+        else if(dArch==='OffensiveD') archPm=0.1;
+        else archPm=0.22;
+      } else if(G.pos==='F' && G.arch==='TwoWay'){
+        archPm=0.3+cl(posRead,-0.12,0.28);
+      }
+      var defBias=(G.pos==='D'?1.06:0) + archPm + cl(defSkill,-0.6,0.9)*(G.pos==='D'?0.52:0.36) + (gameStats.block>=2?(G.pos==='D'?0.48:0.34):0) + (G.pos==='D'&&gameStats.block>=1?0.22:0) + (G.pos==='F'&&gameStats.block>=1&&G.arch==='TwoWay'?0.14:0);
       var rawPm=(gameHomeScore>gameAwayScore?1:gameHomeScore<gameAwayScore?-1:0) + ((gameStats.g+gameStats.a)>=2?1:0) + defBias + rd(-0.62,0.62);
-      gameStats.pm=cl(rawPm,-2,G.pos==='D'?3:2);
+      var pmCap=G.pos==='D'?4:(G.pos==='F'&&G.arch==='TwoWay'?3:2);
+      gameStats.pm=cl(rawPm,-2,pmCap);
     }
     // Light team-support tilt: close games can swing either way, but less often against the player.
     if(gameHomeScore===gameAwayScore && Math.random()<0.58) gameHomeScore++;
