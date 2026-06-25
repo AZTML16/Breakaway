@@ -4,56 +4,34 @@
 // ============================================================
 
 var NATS = [
-  {c:'CA',n:'Canada'},{c:'US',n:'United States'},{c:'SE',n:'Swedish'},
-  {c:'FI',n:'Finnish'},{c:'RU',n:'Russian'},{c:'CZ',n:'Czech'},
-  {c:'SK',n:'Slovak'},{c:'CH',n:'Swiss'},{c:'DE',n:'German'},
-  {c:'AT',n:'Austrian'},{c:'LV',n:'Latvian'},{c:'BY',n:'Belarusian'},
-  {c:'SI',n:'Slovenian'},{c:'DK',n:'Danish'},{c:'NO',n:'Norwegian'},
-  {c:'FR',n:'French'},{c:'JP',n:'Japanese'},{c:'KR',n:'South Korean'},
-  {c:'CN',n:'Chinese'},{c:'AU',n:'Australian'},{c:'HU',n:'Hungarian'},
-  {c:'PL',n:'Polish'},{c:'IT',n:'Italian'},{c:'KZ',n:'Kazakhstani'},
-  {c:'UA',n:'Ukrainian'},{c:'NL',n:'Dutch'},{c:'BE',n:'Belgian'},
-  {c:'GB',n:'British'},{c:'IE',n:'Irish'},{c:'BR',n:'Brazilian'},
-  {c:'MX',n:'Mexican'},{c:'ZA',n:'South African'},{c:'NG',n:'Nigerian'},
-  {c:'GH',n:'Ghanaian'},{c:'IN',n:'Indian'},{c:'TR',n:'Turkish'},
-  {c:'SA',n:'Saudi Arabian'},{c:'EE',n:'Estonian'},{c:'LT',n:'Lithuanian'},
-  {c:'RO',n:'Romanian'},{c:'HR',n:'Croatian'},{c:'RS',n:'Serbian'},
-  {c:'NZ',n:'New Zealander'},{c:'AR',n:'Argentinian'},{c:'CO',n:'Colombian'},
-  {c:'PT',n:'Portuguese'},{c:'ES',n:'Spanish'},{c:'GR',n:'Greek'},
-  {c:'MA',n:'Moroccan'},{c:'IR',n:'Iranian'},{c:'MN',n:'Mongolian'},
-  {c:'EG',n:'Egyptian'},{c:'TN',n:'Tunisian'},{c:'DZ',n:'Algerian'},
-  {c:'KE',n:'Kenyan'},{c:'ET',n:'Ethiopian'},{c:'PK',n:'Pakistani'},
-  {c:'BD',n:'Bangladeshi'},{c:'LK',n:'Sri Lankan'},{c:'PH',n:'Filipino'},
-  {c:'TH',n:'Thai'},{c:'ID',n:'Indonesian'},{c:'MY',n:'Malaysian'},
-  {c:'CL',n:'Chilean'},{c:'PE',n:'Peruvian'},{c:'VE',n:'Venezuelan'},
-  {c:'UY',n:'Uruguayan'},{c:'CR',n:'Costa Rican'},{c:'DO',n:'Dominican'}
+  {c:'AF',n:'Afghanistan'},{c:'AL',n:'Albania'},{c:'DZ',n:'Algeria'},{c:'AD',n:'Andorra'},{c:'AO',n:'Angola'},{c:'AG',n:'Antigua and Barbuda'},{c:'AR',n:'Argentina'},{c:'AM',n:'Armenia'},{c:'AU',n:'Australia'},{c:'AT',n:'Austria'},{c:'AZ',n:'Azerbaijan'},{c:'BS',n:'Bahamas'},{c:'BH',n:'Bahrain'},{c:'BD',n:'Bangladesh'},{c:'BB',n:'Barbados'},{c:'BY',n:'Belarus'},{c:'BE',n:'Belgium'},{c:'BZ',n:'Belize'},{c:'BJ',n:'Benin'},{c:'BT',n:'Bhutan'},{c:'BO',n:'Bolivia'},{c:'BA',n:'Bosnia and Herzegovina'},{c:'BW',n:'Botswana'},{c:'BR',n:'Brazil'},{c:'BN',n:'Brunei'},{c:'BG',n:'Bulgaria'},{c:'BF',n:'Burkina Faso'},{c:'BI',n:'Burundi'},{c:'CV',n:'Cabo Verde'},{c:'KH',n:'Cambodia'},{c:'CM',n:'Cameroon'},{c:'CA',n:'Canada'},{c:'CF',n:'Central African Republic'},{c:'TD',n:'Chad'},{c:'CL',n:'Chile'},{c:'CN',n:'China'},{c:'CO',n:'Colombia'},{c:'KM',n:'Comoros'},{c:'CG',n:'Republic of the Congo'},{c:'CD',n:'Democratic Republic of the Congo'},{c:'CR',n:'Costa Rica'},{c:'CI',n:'Cote d\'Ivoire'},{c:'HR',n:'Croatia'},{c:'CU',n:'Cuba'},{c:'CY',n:'Cyprus'},{c:'CZ',n:'Czechia'},{c:'DK',n:'Denmark'},{c:'DJ',n:'Djibouti'},{c:'DM',n:'Dominica'},{c:'DO',n:'Dominican Republic'},{c:'EC',n:'Ecuador'},{c:'EG',n:'Egypt'},{c:'SV',n:'El Salvador'},{c:'GQ',n:'Equatorial Guinea'},{c:'ER',n:'Eritrea'},{c:'EE',n:'Estonia'},{c:'SZ',n:'Eswatini'},{c:'ET',n:'Ethiopia'},{c:'FJ',n:'Fiji'},{c:'FI',n:'Finland'},{c:'FR',n:'France'},{c:'GA',n:'Gabon'},{c:'GM',n:'Gambia'},{c:'GE',n:'Georgia'},{c:'DE',n:'Germany'},{c:'GH',n:'Ghana'},{c:'GR',n:'Greece'},{c:'GD',n:'Grenada'},{c:'GT',n:'Guatemala'},{c:'GN',n:'Guinea'},{c:'GW',n:'Guinea-Bissau'},{c:'GY',n:'Guyana'},{c:'HT',n:'Haiti'},{c:'HN',n:'Honduras'},{c:'HU',n:'Hungary'},{c:'IS',n:'Iceland'},{c:'IN',n:'India'},{c:'ID',n:'Indonesia'},{c:'IR',n:'Iran'},{c:'IQ',n:'Iraq'},{c:'IE',n:'Ireland'},{c:'IT',n:'Italy'},{c:'JM',n:'Jamaica'},{c:'JP',n:'Japan'},{c:'JO',n:'Jordan'},{c:'KZ',n:'Kazakhstan'},{c:'KE',n:'Kenya'},{c:'KI',n:'Kiribati'},{c:'KW',n:'Kuwait'},{c:'KG',n:'Kyrgyzstan'},{c:'LA',n:'Laos'},{c:'LV',n:'Latvia'},{c:'LB',n:'Lebanon'},{c:'LS',n:'Lesotho'},{c:'LR',n:'Liberia'},{c:'LY',n:'Libya'},{c:'LI',n:'Liechtenstein'},{c:'LT',n:'Lithuania'},{c:'LU',n:'Luxembourg'},{c:'MG',n:'Madagascar'},{c:'MW',n:'Malawi'},{c:'MY',n:'Malaysia'},{c:'MV',n:'Maldives'},{c:'ML',n:'Mali'},{c:'MT',n:'Malta'},{c:'MH',n:'Marshall Islands'},{c:'MR',n:'Mauritania'},{c:'MU',n:'Mauritius'},{c:'MX',n:'Mexico'},{c:'FM',n:'Micronesia'},{c:'MD',n:'Moldova'},{c:'MC',n:'Monaco'},{c:'MN',n:'Mongolia'},{c:'ME',n:'Montenegro'},{c:'MA',n:'Morocco'},{c:'MZ',n:'Mozambique'},{c:'MM',n:'Myanmar'},{c:'NA',n:'Namibia'},{c:'NR',n:'Nauru'},{c:'NP',n:'Nepal'},{c:'NL',n:'Netherlands'},{c:'NZ',n:'New Zealand'},{c:'NI',n:'Nicaragua'},{c:'NE',n:'Niger'},{c:'NG',n:'Nigeria'},{c:'KP',n:'North Korea'},{c:'MK',n:'North Macedonia'},{c:'NO',n:'Norway'},{c:'OM',n:'Oman'},{c:'PK',n:'Pakistan'},{c:'PW',n:'Palau'},{c:'PS',n:'Palestine'},{c:'PA',n:'Panama'},{c:'PG',n:'Papua New Guinea'},{c:'PY',n:'Paraguay'},{c:'PE',n:'Peru'},{c:'PH',n:'Philippines'},{c:'PL',n:'Poland'},{c:'PT',n:'Portugal'},{c:'QA',n:'Qatar'},{c:'RO',n:'Romania'},{c:'RU',n:'Russia'},{c:'RW',n:'Rwanda'},{c:'KN',n:'Saint Kitts and Nevis'},{c:'LC',n:'Saint Lucia'},{c:'VC',n:'Saint Vincent and the Grenadines'},{c:'WS',n:'Samoa'},{c:'SM',n:'San Marino'},{c:'ST',n:'Sao Tome and Principe'},{c:'SA',n:'Saudi Arabia'},{c:'SN',n:'Senegal'},{c:'RS',n:'Serbia'},{c:'SC',n:'Seychelles'},{c:'SL',n:'Sierra Leone'},{c:'SG',n:'Singapore'},{c:'SK',n:'Slovakia'},{c:'SI',n:'Slovenia'},{c:'SB',n:'Solomon Islands'},{c:'SO',n:'Somalia'},{c:'ZA',n:'South Africa'},{c:'KR',n:'South Korea'},{c:'SS',n:'South Sudan'},{c:'ES',n:'Spain'},{c:'LK',n:'Sri Lanka'},{c:'SD',n:'Sudan'},{c:'SR',n:'Suriname'},{c:'SE',n:'Sweden'},{c:'CH',n:'Switzerland'},{c:'SY',n:'Syria'},{c:'TW',n:'Taiwan'},{c:'TJ',n:'Tajikistan'},{c:'TZ',n:'Tanzania'},{c:'TH',n:'Thailand'},{c:'TL',n:'Timor-Leste'},{c:'TG',n:'Togo'},{c:'TO',n:'Tonga'},{c:'TT',n:'Trinidad and Tobago'},{c:'TN',n:'Tunisia'},{c:'TR',n:'Turkey'},{c:'TM',n:'Turkmenistan'},{c:'TV',n:'Tuvalu'},{c:'UG',n:'Uganda'},{c:'UA',n:'Ukraine'},{c:'AE',n:'United Arab Emirates'},{c:'GB',n:'United Kingdom'},{c:'US',n:'United States'},{c:'UY',n:'Uruguay'},{c:'UZ',n:'Uzbekistan'},{c:'VU',n:'Vanuatu'},{c:'VA',n:'Vatican City'},{c:'VE',n:'Venezuela'},{c:'VN',n:'Vietnam'},{c:'YE',n:'Yemen'},{c:'ZM',n:'Zambia'},{c:'ZW',n:'Zimbabwe'}
 ];
 
 /** Schedule / team counts mirror real circuits (fictional names): PHL≈NHL, NAML≈AHL, OJL≈OHL, QMJL≈QMJHL, WJL≈WHL, NCHA≈NCAA D-I men, USJL≈USHL, NEJC/CEJC/ARJC≈overseas junior pipelines, NEHL≈SHL, CEHL≈Liiga, ARHL≈KHL, PWL≈PWHL, PWDL≈minor pro women, EWJC/AWJC≈women overseas junior, etc. */
 var LEAGUES = {
-  PHL:  {name:'Pro Hockey League',short:'PHL',tier:'pro',gender:'M',games:82,gamesPerWeek:4,dev:0.7,salBase:750000,desc:'Top mens pro — 32 clubs, 82-game schedule (NHL-style).'},
-  NAML: {name:'North American Minors League',short:'NAML',tier:'minor',gender:'M',games:72,gamesPerWeek:3,dev:0.9,salBase:60000,desc:'PHL farm system — 32 teams, 72 games (AHL-style); clubs that share a PHL nickname use the same crest colours as the parent club.'},
-  OJL:  {name:'Ontario Junior League',short:'OJL',tier:'junior',gender:'M',games:68,dev:1.4,salBase:0,desc:'Ontario major junior — 20 teams, 68 games (OHL-style).'},
-  QMJL: {name:'Quebec-Maritimes Junior League',short:'QMJL',tier:'junior',gender:'M',games:68,dev:1.3,salBase:0,desc:'Quebec & Maritimes juniors — 18 teams, 68 games (QMJHL-style).'},
-  WJL:  {name:'Western Junior League',short:'WJL',tier:'junior',gender:'M',games:68,dev:1.3,salBase:0,desc:'Western major junior — 22 teams, 68 games (WHL-style).'},
-  NCHA: {name:"Nat'l Collegiate Hockey Assoc.",short:'NCHA',tier:'college',gender:'M',games:34,dev:1.2,salBase:0,desc:'U.S. Division I only — 50 programs, ~34-game regular season (NCAA-style).'},
-  USJL: {name:'US Junior League',short:'USJL',tier:'junior',gender:'M',games:62,dev:1.2,salBase:0,desc:'Premier US junior — 16 teams, 62 games (USHL-style).'},
-  NEJC: {name:'Northern European Junior Circuit',short:'NEJC',tier:'junior',gender:'M',games:44,dev:1.35,salBase:0,desc:'Nordic development — same hockey culture as NEHL but lighter pace and competition until you are ready.'},
-  CEJC: {name:'Central European Junior Circuit',short:'CEJC',tier:'junior',gender:'M',games:46,dev:1.32,salBase:0,desc:'Continental feeder — CEHL-style structure, easier nights than the paid league.'},
-  ARJC: {name:'Eurasian Junior Circuit',short:'ARJC',tier:'junior',gender:'M',games:48,dev:1.28,salBase:0,desc:'Russia & Asia-Pacific program hockey — developmental step before ARHL money and travel.'},
-  NEHL: {name:'Northern European Hockey League',short:'NEHL',tier:'euro',gender:'M',games:52,dev:1.1,salBase:55000,desc:'Swedish top tier — 14 teams, 52 games (SHL-style).'},
-  CEHL: {name:'Central European Hockey League',short:'CEHL',tier:'euro',gender:'M',games:60,dev:1.1,salBase:50000,desc:'Finnish elite league — 15 teams, 60 games (Liiga-style).'},
-  ARHL: {name:'Asian-Russian Hockey League',short:'ARHL',tier:'asia',gender:'M',games:68,dev:1.0,salBase:120000,desc:'Eurasian mega-league — 24 teams, 68 games (KHL-style).'},
-  PWL:  {name:"Pro Women's League",short:'PWL',tier:'pro',gender:'F',games:24,dev:0.7,salBase:75000,desc:"Elite women's pro — 6 teams, 24-game season (PWHL-style length)."},
-  PWDL: {name:"Pro Women's Development League",short:'PWDL',tier:'minor',gender:'F',games:56,dev:0.9,salBase:28000,desc:"Pro farm league — 12 teams, 56 games (AHL-style women's dev)."},
-  CWHL: {name:"Canadian Women's Hockey League",short:'CWHL',tier:'junior',gender:'F',games:38,dev:1.3,salBase:0,desc:"Canadian junior women's loop — 10 teams, 38-game slate (major junior women's style)."},
-  NWCHA:{name:"Nat'l Women's Collegiate Hockey Assoc.",short:'NWCHA',tier:'college',gender:'F',games:34,dev:1.1,salBase:0,desc:"U.S. Division I women — 14 programs, ~34 games (all schools U.S.-based)."},
-  USWDL:{name:"US Women's Development League",short:'USWDL',tier:'junior',gender:'F',games:52,dev:1.2,salBase:0,desc:"US junior development — 16 teams (USHL-style footprint)."},
-  EWJC:{name:"European Women's Junior Circuit",short:'EWJC',tier:'junior',gender:'F',games:36,dev:1.22,salBase:0,desc:"European women's program loop — same road as SDHL/FWHL but softer competition while you develop."},
-  AWJC:{name:"Asian Women's Junior Circuit",short:'AWJC',tier:'junior',gender:'F',games:34,dev:1.2,salBase:0,desc:"Asian women's program hockey — feeder path into AWHL contracts."},
-  SDHL: {name:"Swedish Development Hockey League",short:'SDHL',tier:'euro',gender:'F',games:36,dev:1.1,salBase:18000,desc:"Sweden women's SDHL — 10 teams, 36 games."},
-  FWHL: {name:"Finnish Women's Hockey League",short:'FWHL',tier:'euro',gender:'F',games:36,dev:1.1,salBase:16000,desc:"Finland women's top loop — 10 teams, 36 games."},
-  AWHL: {name:"Asian Women's Hockey League",short:'AWHL',tier:'asia',gender:'F',games:36,dev:1.0,salBase:20000,desc:"Asia women's pro — 8 teams, 36 games."}
+  PHL:  {name:'Professional Hockey League',short:'PHL',tier:'pro',gender:'M',games:82,gamesPerWeek:4,dev:0.65,salBase:750000,desc:'Top mens pro — 32 teams, 82 games.'},
+  NAML: {name:'North American Minor League',short:'NAML',tier:'minor',gender:'M',games:72,gamesPerWeek:3,dev:0.9,salBase:60000,desc:'PHL farm system — 32 teams, 72 games.'},
+  OJL:  {name:'Ontario Junior League',short:'OJL',tier:'junior',gender:'M',games:68,dev:1.50,salBase:5000,desc:'Ontario major junior — 20 teams, 68 games.'},
+  QMJL: {name:'Quebec-Maritimes Junior League',short:'QMJL',tier:'junior',gender:'M',games:68,dev:1.25,salBase:1000,desc:'Quebec & Maritimes  major juniors — 18 teams, 68 games.'},
+  WJL:  {name:'Western Junior League',short:'WJL',tier:'junior',gender:'M',games:68,dev:1.40,salBase:2000,desc:'Western major junior — 22 teams, 68 games.'},
+  NCHA: {name:"Nat'l Collegiate Hockey Assoc.",short:'NCHA',tier:'college',gender:'M',games:34,dev:1.25,salBase:5000,desc:'U.S. Division I — 50 schools, 34-game regular season.'},
+  USJL: {name:'US Junior League',short:'USJL',tier:'junior',gender:'M',games:62,dev:1.38,salBase:1000,desc:'US major junior — 16 teams, 62 games.'},
+  NEJC: {name:'Northern European Junior Circuit',short:'NEJC',tier:'junior',gender:'M',games:44,dev:1.36,salBase:0,desc:'Nordic development.'},
+  CEJC: {name:'Central European Junior Circuit',short:'CEJC',tier:'junior',gender:'M',games:46,dev:1.34,salBase:0,desc:'European junior development loop.'},
+  ARJC: {name:'Eurasian Junior Circuit',short:'ARJC',tier:'junior',gender:'M',games:48,dev:1.32,salBase:0,desc:'Russia & Asia-Pacific program hockey.'},
+  NEHL: {name:'Northern European Hockey League',short:'NEHL',tier:'euro',gender:'M',games:52,dev:1.05,salBase:55000,desc:'Swedish top tier — 14 teams, 52 games.'},
+  CEHL: {name:'Central European Hockey League',short:'CEHL',tier:'euro',gender:'M',games:60,dev:1.05,salBase:50000,desc:'Finnish elite league — 15 teams, 60 games.'},
+  ARHL: {name:'Asian-Russian Hockey League',short:'ARHL',tier:'asia',gender:'M',games:68,dev:0.95,salBase:60000,desc:'Eurasian mega-league — 24 teams, 68 games.'},
+  PWL:  {name:"Pro Women's League",short:'PWL',tier:'pro',gender:'F',games:24,dev:0.7,salBase:20000,desc:"Elite women's pro — 6 teams, 24-game season."},
+  PWDL: {name:"Pro Women's Development League",short:'PWDL',tier:'minor',gender:'F',games:56,dev:0.9,salBase:5000,desc:"Pro farm league — 12 teams, 56 games."},
+  CWHL: {name:"Canadian Women's Hockey League",short:'CWHL',tier:'junior',gender:'F',games:38,dev:1.25,salBase:0,desc:"Canadian junior women's loop — 10 teams, 38-game slate."},
+  NWCHA:{name:"Nat'l Women's Collegiate Hockey Assoc.",short:'NWCHA',tier:'college',gender:'F',games:34,dev:1.12,salBase:0,desc:"U.S. Division I women — 14 programs, 34 games."},
+  USWDL:{name:"US Women's Development League",short:'USWDL',tier:'junior',gender:'F',games:52,dev:1.25,salBase:0,desc:"US junior development — 16 teams, 62-games."},
+  EWJC:{name:"European Women's Junior Circuit",short:'EWJC',tier:'junior',gender:'F',games:36,dev:1.35,salBase:0,desc:"European women's program loop."},
+  AWJC:{name:"Asian Women's Junior Circuit",short:'AWJC',tier:'junior',gender:'F',games:34,dev:1.32,salBase:0,desc:"Asian women's program hockey "},
+  EDHL: {name:"European Development Hockey League",short:'EDHL',tier:'euro',gender:'F',games:36,dev:1.1,salBase:0,desc:"Sweden women's league — 10 teams, 36 games."},
+  WEPC: {name:"Women's Elite Performance  Camp",short:'WEPC',tier:'college',gender:'F',games:36,dev:1.9,salBase:0,desc:"Women's private development Camp — 10 camps, 36 games."},
+  AWHL: {name:"Asian Women's Hockey League",short:'AWHL',tier:'asia',gender:'F',games:36,dev:1.0,salBase:1000,desc:"Asia women's pro — 8 teams, 36 games."}
 };
 
 // TEAMS — fictional names; counts mirror LEAGUES (see comment above).
@@ -223,15 +201,15 @@ var TEAMS = {
     {n:'Beijing Dragon Program',e:'[J]'},{n:'Shanghai Pearl Circuit',e:'[J]'},{n:'Taipei Frost Academy',e:'[J]'},
     {n:'Busan Thunder Program',e:'[J]'},{n:'Hong Kong Harbor Program',e:'[J]'}
   ],
-  SDHL: [
+  EDHL: [
     {n:'Stockholm Crowns',e:'[S]'},{n:'Göteborg Ironwomen',e:'[S]'},{n:'Malmö Northwomen',e:'[S]'},
     {n:'Luleå Polarbears',e:'[S]'},{n:'Linköping Lightning',e:'[S]'},{n:'Skellefteå Timberwolves',e:'[S]'},
     {n:'Brynas',e:'[S]'},{n:'HV71',e:'[S]'},{n:'Djurgården',e:'[S]'},{n:'Örebro HK W',e:'[S]'}
   ],
-  FWHL: [
-    {n:'Helsinki Lynx',e:'[F]'},{n:'Turku Timberwolves',e:'[F]'},{n:'Tampere Ironwomen',e:'[F]'},
-    {n:'Espoo Northwomen',e:'[F]'},{n:'Lahti Snowlions',e:'[F]'},{n:'Oulu Polarbears',e:'[F]'},
-    {n:'Karpat',e:'[F]'},{n:'HIFK',e:'[F]'},{n:'Ilves',e:'[F]'},{n:'TPS',e:'[F]'}
+  WEPC: [
+    {n:'Helsinki Lynx Camp',e:'[F]'},{n:'Turku Timberwolves HC',e:'[F]'},{n:'Tampere Ironwomen Club',e:'[F]'},
+    {n:'Espoo Northwomen Development',e:'[F]'},{n:'Lahti Snowlions HC',e:'[F]'},{n:'Kamp Oulu Polarbears',e:'[F]'},
+    {n:'HC Karpat',e:'[F]'},{n:'Club HIFK',e:'[F]'},{n:'Ilves Kamp',e:'[F]'},{n:'TPS HC',e:'[F]'}
   ],
   AWHL: [
     {n:'Sapporo Polarbears',e:'[A]'},{n:'Tōkyō Icehawks',e:'[A]'},{n:'Seoul Comets',e:'[A]'},
@@ -314,7 +292,7 @@ function buildAutoStandingsLayout(lk,numDiv){
 
 function getStandingsLayoutForLeague(lk){
   if(LEAGUE_STANDINGS_LAYOUT[lk]) return LEAGUE_STANDINGS_LAYOUT[lk];
-  var autoKeys={ARHL:4,USJL:4,NEHL:2,CEHL:2,PWDL:3,CWHL:2,USWDL:4,SDHL:2,FWHL:2,AWHL:2,NEJC:2,CEJC:2,ARJC:2,EWJC:2,AWJC:2};
+  var autoKeys={ARHL:4,USJL:4,NEHL:2,CEHL:2,PWDL:3,CWHL:2,USWDL:4,EDHL:2,WEPC:2,AWHL:2,NEJC:2,CEJC:2,ARJC:2,EWJC:2,AWJC:2};
   if(autoKeys[lk]) return buildAutoStandingsLayout(lk,autoKeys[lk]);
   return null;
 }
@@ -598,26 +576,26 @@ function getLeagueAttrDevMultiplier(leagueKey, teamName, attr){
   var asiaPac=/Seoul|Yokohama|Sapporo|Tokyo|Busan|Taipei|Astana/i.test(tn);
 
   if(lk==='OJL'){
-    M={skating:1.12,positioning:1.08,physical:1.07,stickhandling:1.07,passing:1.07,shooting:1.06,stamina:1.05,defense:1.05,shotBlocking:1.04,
-      reflexes:1.05,glove:1.04,blocker:1.04,reboundControl:1.04,mental:1.05};
+    M={skating:1.22,positioning:1.18,physical:1.17,stickhandling:1.17,passing:1.17,shooting:1.06,stamina:1.15,defense:1.15,shotBlocking:1.04,
+      reflexes:1.05,glove:1.04,blocker:1.04,reboundControl:1.04,mental:1.15};
   } else if(lk==='QMJL'){
-    M={physical:0.8,defense:0.84,shotBlocking:0.87,stickhandling:1.14,passing:1.12,positioning:0.92,stamina:0.94,skating:0.96,shooting:0.98,
-      reflexes:0.94,glove:0.95,blocker:0.95,reboundControl:0.93,mental:1.08};
+    M={physical:0.51,defense:0.84,shotBlocking:0.87,stickhandling:1.14,passing:1.12,positioning:0.92,stamina:0.94,skating:0.96,shooting:0.98,
+      reflexes:0.94,glove:0.95,blocker:0.95,reboundControl:0.93,mental:0.78};
   } else if(lk==='WJL'){
-    M={physical:1.13,shooting:1.05,defense:1.06,shotBlocking:1.04,stickhandling:0.89,passing:0.92,skating:0.98,stamina:1.03,
+    M={physical:1.23,shooting:1.05,defense:1.06,shotBlocking:1.04,stickhandling:0.89,passing:0.92,skating:0.98,stamina:1.03,
       reflexes:1.03,glove:1.04,blocker:1.06,reboundControl:1.05,mental:0.97};
   } else if(lk==='USJL'){
-    M={positioning:0.88,physical:0.9,stamina:0.95,defense:0.93,shotBlocking:0.94,
-      mental:0.92,reflexes:0.96};
+    M={positioning:0.88,physical:0.9,stamina:0.95,defense:1.13,shotBlocking:0.94,
+      mental:1.12,reflexes:1.36};
   } else if(lk==='NEJC'||lk==='CEJC'||lk==='ARJC'){
     M={passing:1.06,stickhandling:1.05,positioning:1.04,skating:1.03,defense:1.02,shooting:1.02,physical:0.97,stamina:1.02,
-      mental:1.04,reflexes:1.03,glove:1.02,blocker:1.02,reboundControl:1.02};
+      mental:0.84,reflexes:1.03,glove:1.02,blocker:1.02,reboundControl:1.02};
   } else if(lk==='EWJC'||lk==='AWJC'){
-    M={passing:1.05,positioning:1.04,skating:1.03,stickhandling:1.03,stamina:1.02,physical:0.95,
-      reflexes:1.03,glove:1.02,blocker:1.02,reboundControl:1.02,mental:1.03};
+    M={passing:1.05,positioning:1.24,skating:1.13,stickhandling:1.03,stamina:1.02,physical:0.95,
+      reflexes:1.03,glove:1.02,blocker:1.02,reboundControl:1.02,mental:0.13};
   } else if(lk==='NEHL'||lk==='CEHL'){
-    M={passing:1.1,positioning:1.08,stickhandling:1.07,skating:1.03,defense:1.03,physical:0.93,shooting:1.02,
-      mental:1.06,reflexes:1.04,glove:1.03,blocker:1.03,reboundControl:1.04};
+    M={passing:1.24,positioning:1.38,stickhandling:1.17,skating:1.23,defense:1.33,physical:0.93,shooting:1.02,
+      mental:0.96,reflexes:1.04,glove:1.03,blocker:1.03,reboundControl:1.04};
   } else if(lk==='ARHL'){
     if(chinaKhl){
       M={physical:0.72,stamina:0.78,skating:0.8,positioning:0.88,stickhandling:1.08,passing:1.06,shooting:0.95,defense:0.85,shotBlocking:0.86,
@@ -627,25 +605,25 @@ function getLeagueAttrDevMultiplier(leagueKey, teamName, attr){
         reflexes:0.93,glove:0.94,blocker:0.94,reboundControl:0.93,mental:0.95};
     } else {
       M={stickhandling:1.12,passing:1.1,shooting:1.04,skating:0.86,stamina:0.9,positioning:0.96,physical:0.97,
-        reflexes:0.94,glove:0.95,blocker:0.95,reboundControl:0.94,mental:1.1};
+        reflexes:1.54,glove:1.45,blocker:1.35,reboundControl:1.24,mental:0.91};
     }
   } else if(lk==='NCHA'||lk==='NWCHA'){
-    M={skating:1.03,shooting:1.03,stickhandling:1.04,passing:1.04,positioning:1.05,defense:1.04,physical:0.93,stamina:1.02,
-      reflexes:1.04,glove:1.03,blocker:1.03,reboundControl:1.04,mental:1.05};
+    M={skating:1.23,shooting:1.23,stickhandling:1.24,passing:1.24,positioning:1.25,defense:1.24,physical:1.13,stamina:1.22,
+      reflexes:1.14,glove:1.23,blocker:1.13,reboundControl:1.14,mental:0.95};
   } else if(lk==='CWHL'){
     M={skating:1.05,passing:1.05,positioning:1.04,stickhandling:1.04,stamina:1.03,
-      reflexes:1.03,glove:1.02,blocker:1.02,reboundControl:1.02,mental:1.04};
+      reflexes:1.03,glove:1.02,blocker:1.02,reboundControl:1.02,mental:0.24};
   } else if(lk==='USWDL'){
-    M={positioning:0.9,physical:0.92,defense:0.93,mental:0.93};
+    M={positioning:0.9,physical:0.92,defense:0.93,mental:0.33};
   } else if(lk==='PWDL'){
-    M={positioning:0.93,physical:0.95,mental:0.96};
-  } else if(lk==='SDHL'||lk==='FWHL'){
+    M={positioning:0.93,physical:0.95,mental:0.46};
+  } else if(lk==='EDHL'||lk==='WEPC'){
     M={passing:1.08,positioning:1.06,stickhandling:1.05,skating:1.02,physical:0.94,
-      reflexes:1.05,glove:1.04,mental:1.05};
+      reflexes:1.05,glove:1.04,mental:0.05};
   } else if(lk==='AWHL'){
     if(/Seoul|Beijing|Shanghai|Tokyo|Sapporo|Shenzhen|Taipei|Busan/i.test(tn)){
       M={physical:0.78,stamina:0.85,skating:0.88,passing:1.05,positioning:0.9,
-        reflexes:0.88,glove:0.9,blocker:0.9,reboundControl:0.88,mental:0.92};
+        reflexes:0.88,glove:0.9,blocker:0.9,reboundControl:0.88,mental:0.12};
     } else {
       M={passing:1.05,positioning:1.03,stickhandling:1.03};
     }
@@ -657,10 +635,10 @@ function getLeagueAttrDevMultiplier(leagueKey, teamName, attr){
 var ATTR_LABELS = {
   skating:'SKATING',shooting:'SHOOTING',stickhandling:'STICKHAND',passing:'PASSING',
   positioning:'POSITIONING',physical:'PHYSICAL',stamina:'STAMINA',defense:'DEFENSE',
-  shotBlocking:'SHOT-BLOCK',stickChecks:'STICK CHECKS',faceoffs:'FACEOFFS',anticipation:'READ/ANTICIP.',
+  shotBlocking:'SHOT-BLOCK',stickChecks:'STICK CHECKS',faceoffs:'FACEOFFS',anticipation:'ANTICIPATION',
   durability:'DURABILITY',conditioning:'CONDITIONING',
   reflexes:'REFLEXES',glove:'GLOVE',blocker:'BLOCKER',
-  reboundControl:'REB CTRL',mental:'MENTAL'
+  reboundControl:'REBOUNDS',mental:'MENTAL'
 };
 var ATTR_COLORS = {
   skating:'#00d2d3',shooting:'#d63031',stickhandling:'#fd79a8',passing:'#6c5ce7',
