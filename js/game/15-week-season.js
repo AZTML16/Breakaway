@@ -18,6 +18,7 @@ function nextWeek(){
     var tnDev=G.team&&G.team.n||'';
     for(var i=0;i<attrList.length;i++){
       var a=attrList[i];
+      if(a==='conditioning') continue;
       var leagueMult=getLeagueAttrDevMultiplier(lkDev, tnDev, a);
       var inc=rd(0,0.4)*dev*pDev*(G.morale/100)*youthW*leagueMult;
       if(typeof SKATER_BASE_ATTR_KEYS!=='undefined' && SKATER_BASE_ATTR_KEYS.indexOf(a)>=0) inc*=0.4;
@@ -32,6 +33,7 @@ function nextWeek(){
 
   G.health=cl(G.health+ri(3,8),0,100);
   G.stamina=cl(G.stamina+ri(10,20),0,100);
+  if(typeof updatePlayerConditioning==='function') updatePlayerConditioning();
   G.week++;
   G.weekGames=0;
   G._lifeScenarioRolledThisWeek=false;
@@ -45,36 +47,36 @@ function nextWeek(){
 }
 
 var PLAYOFF_SERIES_WINS=4;
-/** Simmed playoff games: slightly flatter power curve + extra bite when your team is playing. */
-var PLAYOFF_SIM_POWER_DIV=36;
-var PLAYOFF_SIM_PLAYER_HURDLE=0.086;
+/** Simmed playoff games: flatter power curve, heavier player penalty, grind favors physical teams. */
+var PLAYOFF_SIM_POWER_DIV=44;
+var PLAYOFF_SIM_PLAYER_HURDLE=0.124;
 function getPlayoffYoungLeagueSimHurdle(){
   if(typeof G==='undefined'||!G||!G.league) return 0;
   var t=G.league.tier;
-  if(t==='junior'||t==='college') return 0.026;
-  if(t==='minor') return 0.015;
-  return 0;
+  if(t==='junior'||t==='college') return 0.038;
+  if(t==='minor') return 0.022;
+  return 0.008;
 }
 function getPlayoffYoungLeaguePlayablePressure(){
   if(typeof G==='undefined'||!G||!G.league) return 0;
   var t=G.league.tier;
-  if(t==='junior'||t==='college') return 0.03;
-  if(t==='minor') return 0.017;
-  return 0;
+  if(t==='junior'||t==='college') return 0.042;
+  if(t==='minor') return 0.028;
+  return 0.012;
 }
 /** Extra bracket-sim power for physical/defensive profiles and brat/heavy hitter in playoffs (stacks with OVR). */
 function getPlayoffSimGrindPowerBonus(){
   if(typeof G==='undefined'||!G||!G.attrs) return 0;
-  var bon=((G.attrs.physical!=null?G.attrs.physical:60)-60)/50;
+  var bon=((G.attrs.physical!=null?G.attrs.physical:60)-60)/38;
   if(G.pos==='D'){
-    bon+=((G.attrs.defense||60)+(G.attrs.shotBlocking||60)+(G.attrs.positioning||60)-180)/110;
+    bon+=((G.attrs.defense||60)+(G.attrs.anticipation||60)+(G.attrs.physical||60)-180)/88;
   }
   if(G.pos==='F'){
-    bon+=((G.attrs.stickChecks||60)+(G.attrs.defense||60)+(G.attrs.anticipation||60)-180)/130;
+    bon+=((G.attrs.stickChecks||60)+(G.attrs.defense||60)+(G.attrs.anticipation||60)-180)/105;
   }
-  if(G.xFactor==='brat') bon+=0.26;
-  if(G.xFactor==='heavy_hitter') bon+=0.2;
-  return cl(bon,-0.12,1.08);
+  if(G.xFactor==='brat') bon+=0.32;
+  if(G.xFactor==='heavy_hitter') bon+=0.26;
+  return cl(bon,-0.08,1.22);
 }
 function playoffSingleGameHomeWins(home,away){
   var pk=getXFactorPlayoffPowerMult();
@@ -82,11 +84,11 @@ function playoffSingleGameHomeWins(home,away){
   var awayPower=(away.pts/(away.gp||1))+ (away.isMe?(ovr(G.attrs,G.pos)/5)*pk:0);
   if(home.isMe) homePower+=getPlayoffSimGrindPowerBonus();
   if(away.isMe) awayPower+=getPlayoffSimGrindPowerBonus();
-  var prob=cl(0.5 + (homePower-awayPower)/PLAYOFF_SIM_POWER_DIV,0.1,0.9);
+  var prob=cl(0.5 + (homePower-awayPower)/PLAYOFF_SIM_POWER_DIV,0.08,0.92);
   if(home.isMe||away.isMe){
     var ph=PLAYOFF_SIM_PLAYER_HURDLE+getPlayoffYoungLeagueSimHurdle();
-    if(home.isMe) prob=cl(prob-ph,0.06,0.93);
-    else prob=cl(prob+ph,0.06,0.93);
+    if(home.isMe) prob=cl(prob-ph,0.05,0.88);
+    else prob=cl(prob+ph,0.05,0.88);
   }
   return Math.random()<prob;
 }
@@ -102,22 +104,25 @@ function addPlayoffSimGameToMyStats(){
   var myStats=G._playoffCtx.myStats;
   myStats.gp++;
   if(G.pos==='G'){
-    var psv=ri(24,40);
-    var pga=ri(1,5);
-    if(G.xFactor==='careless'&&typeof isCarelessSlumping==='function'&&isCarelessSlumping()) pga+=Math.random()<0.42?ri(1,2):0;
+    var psv=ri(18,32);
+    var pga=ri(2,5);
+    if(G.xFactor==='careless'&&typeof isCarelessSlumping==='function'&&isCarelessSlumping()) pga+=Math.random()<0.48?ri(1,2):0;
     myStats.sv+=psv;
     myStats.ga+=pga;
   } else {
-    var pg=ri(0,2), pa=ri(0,2);
+    var pg=Math.random()<0.22?1:0;
+    var pa=Math.random()<0.28?1:0;
+    if(Math.random()<0.06) pg=Math.min(pg+1,2);
+    if(Math.random()<0.05) pa=Math.min(pa+1,2);
     var sp=getXFactorSkaterPtsMult('playoff');
     if(sp>1){
-      if(Math.random()<(sp-1)*0.52) pg++;
-      if(Math.random()<(sp-1)*0.44) pa++;
+      if(Math.random()<(sp-1)*0.38) pg++;
+      if(Math.random()<(sp-1)*0.32) pa++;
     } else if(sp<1){
-      if(Math.random()<(1-sp)*0.48 && pg>0) pg--;
-      if(Math.random()<(1-sp)*0.4 && pa>0) pa--;
+      if(Math.random()<(1-sp)*0.55 && pg>0) pg--;
+      if(Math.random()<(1-sp)*0.48 && pa>0) pa--;
     }
-    pg=cl(pg,0,4); pa=cl(pa,0,4);
+    pg=cl(pg,0,2); pa=cl(pa,0,2);
     myStats.g+=pg; myStats.a+=pa;
   }
 }
@@ -130,7 +135,6 @@ function simulatePlayoffs(){
   addNews('PLAYOFFS BEGIN in '+G.league.short+' with '+bracket.length+' teams (best-of-7)'+poNote+'.','big');
   var roundReached='';
   var current=bracket;
-  var roundNames={8:'Quarterfinals',4:'Semifinals',2:'Finals'};
   var summary={field:[],rounds:[],champion:''};
   var myStats={gp:0,g:0,a:0,sv:0,ga:0};
   for(var b=0;b<bracket.length;b++){
@@ -138,7 +142,7 @@ function simulatePlayoffs(){
   }
   while(current.length>1){
     var next=[];
-    var roundName=roundNames[current.length]||current.length+'-team round';
+    var roundName=getPlayoffRoundName(current.length);
     addNews('PLAYOFF ROUND: '+roundName+' begins in '+G.league.short+'.','neutral');
     var roundRows=[];
     for(var i=0;i<current.length/2;i++){
@@ -253,8 +257,7 @@ function startPlayoffRoundPlayable(){
     finishPlayablePlayoffs();
     return;
   }
-  var roundNames={8:'Quarterfinals',4:'Semifinals',2:'Finals'};
-  ctx.roundName=roundNames[teams.length]||(teams.length+'-team round');
+  ctx.roundName=getPlayoffRoundName(teams.length);
   ctx.pairs=[];
   for(var i=0;i<teams.length/2;i++){
     ctx.pairs.push([teams[i],teams[teams.length-1-i]]);
@@ -438,8 +441,20 @@ var TOP_HOCKEY_COUNTRIES = [
   'Latvian','Danish','Norwegian','Belarusian','Japanese'
 ];
 
-function isTopHockeyCountry(nat){
+function isEliteIntlHockeyCountry(nat){
   return TOP_HOCKEY_COUNTRIES.indexOf(nat)!==-1;
+}
+function isTopHockeyCountry(nat){
+  return isEliteIntlHockeyCountry(nat);
+}
+/** Non-elite programs play the annual World Faceoff instead of WJ / World Tournament. */
+function isWorldFaceoffCountry(nat){
+  return !isEliteIntlHockeyCountry(nat);
+}
+/** World Stage / elite tournaments: much stingier scoring than league play. */
+function getWorldStageScoringMult(ev){
+  if(ev&&ev.isFaceoff) return 0.72;
+  return 0.42;
 }
 
 // World Stage: some national programs are harder to qualify from than others.
@@ -487,7 +502,12 @@ function getNationalTeamName(nat){
   return map[nat]||('Team '+nat);
 }
 
-function pickRandomWorldOpponentLabel(){
+function pickRandomWorldOpponentLabel(faceoff){
+  if(faceoff){
+    var pool=NATS.map(function(n){return n.n;}).filter(function(n){return n!==G.nat;});
+    if(!pool.length) return 'WORLD SELECT TEAM';
+    return getNationalTeamName(pool[ri(0,pool.length-1)]);
+  }
   var pool=TOP_HOCKEY_COUNTRIES.filter(function(n){return n!==G.nat;});
   if(!pool.length) return 'WORLD SELECT TEAM';
   return getNationalTeamName(pool[ri(0,pool.length-1)]);
@@ -499,7 +519,7 @@ function beginWorldStagePlayableFromEval(ev){
     phase:'group',
     rrW:0,
     rrL:0,
-    oppLabel:pickRandomWorldOpponentLabel(),
+    oppLabel:pickRandomWorldOpponentLabel(!!ev.isFaceoff),
     stats:{gp:0,g:0,a:0,sv:0,ga:0},
     medal:'',
     htmlLines:[],
@@ -586,7 +606,7 @@ function afterWorldStagePlayableGame(won){
     ctx.htmlLines.push('<div style="padding:5px;border-left:3px solid var(--acc);margin-bottom:4px">GROUP GAME '+(ctx.rrW+ctx.rrL)+': '+(won?'W':'L')+'</div>');
     addNews(tName+' GROUP GAME '+(ctx.rrW+ctx.rrL)+': '+nt+' '+(won?'WIN':'LOSS')+'.','neutral');
     if(ctx.rrW+ctx.rrL<3){
-      ctx.oppLabel=pickRandomWorldOpponentLabel();
+      ctx.oppLabel=pickRandomWorldOpponentLabel(!!ev.isFaceoff);
       preGame(0);
       return;
     }
@@ -641,16 +661,51 @@ function startNextQueuedWorldStagePlayable(){
 }
 
 function startOffseasonWorldStageFlow(){
-  var jev=evaluateWorldTournament('junior');
-  var sev=evaluateWorldTournament('senior');
+  G._worldFaceoffInvited=false;
+  G._worldFaceoffDeclined=false;
+  var jev,sev,fev;
+  if(isEliteIntlHockeyCountry(G.nat)){
+    jev=evaluateWorldTournament('junior');
+    sev=evaluateWorldTournament('senior');
+    fev={ok:false};
+  } else {
+    var nt0=getNationalTeamName(G.nat);
+    jev={ok:false,msg:'<div>World Juniors: '+nt0+' does not participate in the elite U20 tournament.</div>'};
+    sev={ok:false,msg:'<div>World Tournament: '+nt0+' does not participate in the elite senior championship.</div>'};
+    fev=evaluateWorldFaceoff();
+  }
   if(!jev.ok) _lastWorldStageHTML+=jev.msg||'';
   if(!sev.ok) _lastWorldStageHTML+=sev.msg||'';
+  if(!fev.ok&&fev.msg) _lastWorldStageHTML+=fev.msg;
+  if(fev.ok){
+    G._worldFaceoffInvited=true;
+    openStaffChat('WORLD FACEOFF -- THIS OFFSEASON',
+      [{sender:'National Program', color:'var(--gold)', text:getNationalTeamName(G.nat)+' has named you to the World Faceoff roster — a developmental international event for emerging hockey nations. You are on the team regardless of age or OVR. Simulate, play the games, or decline the invitation.'}],
+      [
+        {label:'SIM WORLD FACEOFF', fn:function(){
+          runInternationalTournamentFromEval(fev);
+          closeOffseasonWorldStageAndShow();
+        }},
+        {label:'PLAY NATIONAL GAMES', fn:function(){
+          G._worldStagePlayQueue=[fev];
+          startNextQueuedWorldStagePlayable();
+        }},
+        {label:'DECLINE INVITATION', fn:function(){
+          G._worldFaceoffDeclined=true;
+          _lastWorldStageHTML+='<div style="margin-top:6px;color:var(--mut)">WORLD FACEOFF: You declined international duty with '+fev.nt+'.</div>';
+          addNews(G.first+' '+G.last+' declines World Faceoff duty with '+fev.nt+'.','neutral');
+          closeOffseasonWorldStageAndShow();
+        }}
+      ]
+    );
+    return;
+  }
   if(jev.ok||sev.ok){
     var bits=[];
     if(jev.ok) bits.push('WORLD JUNIORS');
     if(sev.ok) bits.push('WORLD TOURNAMENT');
     openStaffChat('WORLD STAGE -- THIS OFFSEASON',
-      [{sender:'National Program', color:'var(--gold)', text:'International duty: '+bits.join(' & ')+'. Simulate the full run or play the national-team games (same 3-moment games as league play).'}],
+      [{sender:'National Program', color:'var(--gold)', text:'International duty: '+bits.join(' & ')+'. Simulate the full run or play the national-team games (same 3-moment games as league play). Elite events — scoring is brutal.'}],
       [
         {label:'SIM TOURNAMENTS', fn:function(){
           if(jev.ok) runInternationalTournamentFromEval(jev);
@@ -670,6 +725,16 @@ function startOffseasonWorldStageFlow(){
   closeOffseasonWorldStageAndShow();
 }
 
+function evaluateWorldFaceoff(){
+  var tName='WORLD FACEOFF';
+  var nt=getNationalTeamName(G.nat);
+  if(!isWorldFaceoffCountry(G.nat)){
+    return {ok:false,msg:''};
+  }
+  var teamPower=cl(0.38+(G.league.dev||1)*0.14+rd(-0.08,0.22),0.22,0.92);
+  return {ok:true,isFaceoff:true,isJunior:false,tName:tName,nt:nt,reqOvr:0,pOvr:ovr(G.attrs,G.pos),teamPower:teamPower,guaranteed:true};
+}
+
 function closeOffseasonWorldStageAndShow(){
   safeEl('offseason-playoff-recap').innerHTML=_lastPlayoffRecapHTML||'NO PLAYOFF RECAP YET.';
   safeEl('offseason-world-stage').innerHTML=_lastWorldStageHTML||'NO TOURNAMENT UPDATE YET.';
@@ -679,10 +744,14 @@ function closeOffseasonWorldStageAndShow(){
 }
 
 function evaluateWorldTournament(kind){
+  if(kind==='faceoff') return evaluateWorldFaceoff();
   var isJunior=kind==='junior';
   var tName=isJunior?'WORLD JUNIORS':'WORLD TOURNAMENT OF HOCKEY';
-  var reqOvrBase=isJunior?64:78;
   var nt=getNationalTeamName(G.nat);
+  if(isWorldFaceoffCountry(G.nat)){
+    return {ok:false,msg:'<div>'+tName+': '+nt+' does not participate — your federation plays the annual <b>World Faceoff</b> instead.</div>'};
+  }
+  var reqOvrBase=isJunior?66:80;
   if(isJunior){
     // World Juniors: U20 — under 20 only (no 18+ floor).
     if(G.age>=20) return {ok:false,msg:'<div>'+tName+': '+nt+' age ineligible (World Juniors — under 20 only).</div>'};
@@ -710,12 +779,16 @@ function runInternationalTournament(kind){
 function runInternationalTournamentFromEval(ev){
   var isJunior=ev.isJunior;
   var tName=ev.tName, nt=ev.nt, pOvr=ev.pOvr;
+  var isFaceoff=!!ev.isFaceoff;
   var teamPower=cl(ev.teamPower*getXFactorWorldTeamPowerMult(),0.05,1.35);
-  _lastWorldStageHTML+='<div style="margin-bottom:8px;color:var(--gold);font-size:15px">'+tName+': SELECTED FOR '+nt.toUpperCase()+'</div>';
+  var winBase=isFaceoff?0.52:0.45;
+  var winScale=isFaceoff?0.22:0.28;
+  var scoreMult=getWorldStageScoringMult(ev);
+  _lastWorldStageHTML+='<div style="margin-bottom:8px;color:var(--gold);font-size:15px">'+tName+': SELECTED FOR '+nt.toUpperCase()+(isFaceoff?' (GUARANTEED ROSTER)':'')+'</div>';
   addNews('WORLD STAGE: '+G.first+' '+G.last+' selected for '+nt+' at '+tName+'.','big');
   var rrW=0, rrL=0;
   for(var gix=1;gix<=3;gix++){
-    var win=Math.random()<cl(0.45+teamPower*0.28,0.2,0.85);
+    var win=Math.random()<cl(winBase+teamPower*winScale,0.2,0.88);
     if(win) rrW++; else rrL++;
     _lastWorldStageHTML+='<div style="padding:5px;border-left:3px solid var(--acc);margin-bottom:4px">GROUP GAME '+gix+': '+(win?'W':'L')+'</div>';
     addNews(tName+' GROUP GAME '+gix+': '+nt+' '+(win?'WIN':'LOSS')+'.','neutral');
@@ -743,19 +816,19 @@ function runInternationalTournamentFromEval(ev){
     addNews(tName+': '+nt+' exit after group stage.','neutral');
   }
 
-  var gp=ri(4,7);
+  var gp=ri(isFaceoff?3:4,isFaceoff?5:7);
   if(G.pos==='G'){
-    var shots=ri(70,130);
-    var svRate=cl(0.89 + (pOvr-70)*0.001 + rd(-0.01,0.01),0.84,0.95);
-    if(G.xFactor==='clutch') svRate=cl(svRate+0.009,0.84,0.956);
-    if(G.xFactor==='regular_season') svRate=cl(svRate-0.007,0.84,0.95);
-    if(G.xFactor==='careless'&&isCarelessSlumping()) svRate=cl(svRate-0.006,0.84,0.95);
+    var shots=ri(isFaceoff?55:70,isFaceoff?95:130);
+    var svRate=cl((isFaceoff?0.9:0.87) + (pOvr-70)*0.0008 + rd(-0.01,0.01),0.82,0.95);
+    if(G.xFactor==='clutch') svRate=cl(svRate+0.009,0.82,0.956);
+    if(G.xFactor==='regular_season') svRate=cl(svRate-0.007,0.82,0.95);
+    if(G.xFactor==='careless'&&isCarelessSlumping()) svRate=cl(svRate-0.006,0.82,0.95);
     var sv=Math.round(shots*svRate);
     var ga=shots-sv;
     addNews((medal?medal+' MEDAL! ':'')+nt+' '+tName+' run -- '+G.first+' '+G.last+' posts '+sv+' SV and '+ga+' GA in '+gp+' games.','big');
     _lastWorldStageStats={team:nt,tournament:tName,gp:gp,sv:sv,ga:ga,g:0,a:0};
   } else {
-    var pts=Math.max(0,Math.round(gp*(0.2 + (pOvr-60)*0.018 + rd(0,0.3))*getXFactorSkaterPtsMult('world')));
+    var pts=Math.max(0,Math.round(gp*(isFaceoff?0.14:0.08)+(pOvr-60)*(isFaceoff?0.008:0.004)+rd(0,isFaceoff?0.18:0.08))*scoreMult*getXFactorSkaterPtsMult('world'));
     var g=Math.round(pts*rd(0.35,0.6));
     var a=Math.max(0,pts-g);
     addNews((medal?medal+' MEDAL! ':'')+nt+' '+tName+' run -- '+G.first+' '+G.last+' records '+g+'G '+a+'A in '+gp+' games.','big');
@@ -803,6 +876,16 @@ function runInternationalTournamentFromEval(ev){
 }
 
 function endRegSeason(){
+  if(G._inOffseason){
+    notify('OFFSEASON — USE NEXT SEASON WHEN READY','gold');
+    show('s-offseason');
+    return;
+  }
+  if(G._playoffCtx&&G._playoffCtx.active){
+    notify('PLAYOFFS IN PROGRESS','gold');
+    renderHub();show('s-hub');
+    return;
+  }
   _lastPlayoffRecapHTML='';
   // Rebuild once here so playoff qualification uses current, stable standings.
   G.standings=buildStandings(G.leagueKey);

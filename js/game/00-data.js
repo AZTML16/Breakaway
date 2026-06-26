@@ -371,8 +371,17 @@ function getPlayoffDivisionTeamLists(lk){
 function playoffTargetFieldSize(n){
   if(n<2) return 0;
   var evenMax=n%2===0?n:n-1;
-  var want=Math.min(8, Math.max(4, Math.floor(n/2)*2));
+  var want;
+  if(n>=18) want=16;
+  else if(n>=10) want=8;
+  else if(n>=4) want=4;
+  else want=2;
   return Math.min(want, evenMax);
+}
+
+function getPlayoffRoundName(teamCount){
+  var names={16:'First Round',8:'Quarterfinals',4:'Semifinals',2:'Finals'};
+  return names[teamCount]||(teamCount+'-team round');
 }
 
 /** Division winners + wild cards (remaining spots by league points), then seeded 1..n for bracket pairings. */
@@ -424,25 +433,25 @@ var START_LEAGUE_BYPASS_OVR_M=72;
 var START_LEAGUE_BYPASS_OVR_F=50;
 
 /** All skaters (F/D) share this rating set for OVR + moments. */
-var SKATER_RATING_ATTR_KEYS=['skating','shooting','stickhandling','passing','positioning','physical','stamina','defense','shotBlocking','stickChecks','faceoffs','anticipation'];
+var SKATER_RATING_ATTR_KEYS=['skating','shooting','stickhandling','passing','physical','defense','stickChecks','anticipation','conditioning'];
 /** Tracked on sheet but excluded from OVR (injury/load style). */
-var SKATER_BASE_ATTR_KEYS=['durability','conditioning'];
+var SKATER_BASE_ATTR_KEYS=['durability'];
 var SKATER_ATTRS_LIST=SKATER_RATING_ATTR_KEYS.concat(SKATER_BASE_ATTR_KEYS);
 
 var ARCHETYPES = {
   F: {
-    Sniper:       {name:'Sniper',      icon:'[*]', desc:'Pure goal scorer. Deadly accuracy, elite shot.',      boosts:{shooting:15,stickhandling:5,physical:-8,passing:-3,defense:-3,shotBlocking:-2,stickChecks:-2,faceoffs:-4,anticipation:4}},
-    Playmaker:    {name:'Playmaker',   icon:'[~]', desc:'Elite vision and distribution. Creates for others.',  boosts:{passing:16,stickhandling:10,skating:5,physical:-8,shooting:-5,defense:-2,shotBlocking:-1,stickChecks:2,faceoffs:2,anticipation:6}},
-    PowerForward: {name:'Power Fwd',   icon:'[!]', desc:'Big body scorer. Dominates corners and crease.',      boosts:{physical:14,shooting:8,stamina:5,skating:-5,stickhandling:-4,defense:2,shotBlocking:4,stickChecks:2,faceoffs:0,anticipation:-2}},
-    TwoWay:       {name:'Two-Way',     icon:'[=]', desc:'Trust-first forward: details, sticks, and lane reads before flash.', boosts:{positioning:18,passing:6,physical:7,stamina:6,shooting:-4,stickhandling:-3,defense:6,shotBlocking:5,stickChecks:7,faceoffs:5,anticipation:5}},
-    Grinder:      {name:'Grinder',     icon:'[G]', desc:'Outworks everyone. Low skill ceiling, high motor.',   boosts:{physical:16,stamina:14,shooting:-12,stickhandling:-10,passing:-4,defense:4,shotBlocking:6,stickChecks:8,faceoffs:2,anticipation:0}},
-    Enforcer:     {name:'Enforcer',    icon:'[X]', desc:'Protector. Fights, hits, intimidates.',               boosts:{physical:20,stamina:8,shooting:-16,passing:-12,stickhandling:-8,defense:2,shotBlocking:3,stickChecks:4,faceoffs:-4,anticipation:-6}}
+    Sniper:       {name:'Sniper',      icon:'[*]', desc:'Pure goal scorer. Deadly accuracy, elite shot.',      boosts:{shooting:15,stickhandling:5,physical:-8,passing:-3,defense:-5,stickChecks:-2,anticipation:4}},
+    Playmaker:    {name:'Playmaker',   icon:'[~]', desc:'Elite vision and distribution. Creates for others.',  boosts:{passing:16,stickhandling:12,skating:5,physical:-8,shooting:-5,defense:-3,stickChecks:2,anticipation:6}},
+    PowerForward: {name:'Power Fwd',   icon:'[!]', desc:'Big body scorer. Dominates corners and crease.',      boosts:{physical:19,shooting:8,skating:-5,stickhandling:-4,defense:2,stickChecks:2,anticipation:-2}},
+    TwoWay:       {name:'Two-Way',     icon:'[=]', desc:'Trust-first forward: details, sticks, and lane reads before flash.', boosts:{anticipation:23,passing:6,physical:13,shooting:-4,stickhandling:-3,defense:11,stickChecks:7}},
+    Grinder:      {name:'Grinder',     icon:'[G]', desc:'Outworks everyone. Low skill ceiling, high motor.',   boosts:{physical:30,shooting:-12,stickhandling:-10,passing:-4,defense:10,stickChecks:8,anticipation:0}},
+    Enforcer:     {name:'Enforcer',    icon:'[X]', desc:'Protector. Fights, hits, intimidates.',               boosts:{physical:28,shooting:-16,passing:-12,stickhandling:-8,defense:2,stickChecks:4,anticipation:-6}}
   },
   D: {
-    OffensiveD:   {name:'Offensive D', icon:'[+]', desc:'Offensive defenseman — joins the attack, shoots and passes from the blue line.', boosts:{passing:18,skating:10,defense:-12,shotBlocking:-6,shooting:6,stickhandling:4,stickChecks:-2,faceoffs:-2,anticipation:3}},
-    StayAtHome:   {name:'Stay-at-Home',icon:'[S]', desc:'No offense, all defense. Hard to play against.',      boosts:{defense:16,physical:12,shotBlocking:10,skating:-6,passing:-8,shooting:-6,stickhandling:-8,stickChecks:6,faceoffs:2,anticipation:4}},
-    TwoWayD:      {name:'Two-Way D',   icon:'[=]', desc:'Balanced blueliner — leans defensive without going full lockdown.', boosts:{defense:11,positioning:6,shotBlocking:5,passing:7,skating:5,physical:4,shooting:2,stickhandling:2,stickChecks:5,faceoffs:3,anticipation:4}},
-    ShutdownD:    {name:'Shutdown D',  icon:'[L]', desc:'Assignment: stop the other teams best player.',       boosts:{defense:18,positioning:12,skating:4,shotBlocking:8,passing:-10,shooting:-4,stickhandling:-6,stickChecks:8,faceoffs:2,anticipation:6}}
+    OffensiveD:   {name:'Offensive D', icon:'[+]', desc:'Offensive defenseman — joins the attack, shoots and passes from the blue line.', boosts:{passing:18,skating:10,defense:-18,shooting:6,stickhandling:6,stickChecks:-2,anticipation:3}},
+    StayAtHome:   {name:'Stay-at-Home',icon:'[S]', desc:'No offense, all defense. Hard to play against.',      boosts:{defense:26,physical:12,skating:-6,passing:-8,shooting:-6,stickhandling:-8,stickChecks:6,anticipation:4}},
+    TwoWayD:      {name:'Two-Way D',   icon:'[=]', desc:'Balanced blueliner — leans defensive without going full lockdown.', boosts:{defense:16,anticipation:10,passing:7,skating:5,physical:4,shooting:2,stickhandling:5,stickChecks:5}},
+    ShutdownD:    {name:'Shutdown D',  icon:'[L]', desc:'Assignment: stop the other teams best player.',       boosts:{defense:26,anticipation:18,skating:4,passing:-10,shooting:-4,stickhandling:-6,stickChecks:8}}
   },
   G: {
     Butterfly:    {name:'Butterfly',   icon:'[B]', desc:'Positioning and post-sealing. Classic modern style.', boosts:{positioning:16,reboundControl:10,glove:-4,stamina:4}},
@@ -525,22 +534,40 @@ function ensureSecondarySubPos(GG){
   if(GG.secondarySubPos&&GG.secondarySubPos===GG.subPos) GG.secondarySubPos=null;
 }
 
+/** Fold removed skater attrs into the unified sheet (legacy saves). */
+function migrateLegacySkaterAttrs(a, GG){
+  if(!a) return;
+  var blend=function(x,y){ return Math.round(cl((x+y)/2,20,96)); };
+  if(typeof a.positioning==='number'){
+    a.anticipation=blend(typeof a.anticipation==='number'?a.anticipation:55, a.positioning);
+    delete a.positioning;
+  }
+  if(typeof a.shotBlocking==='number'){
+    a.defense=Math.round(cl(Math.max(a.defense||55, blend(a.defense||55, a.shotBlocking)),20,96));
+    delete a.shotBlocking;
+  }
+  if(typeof a.faceoffs==='number'){
+    a.stickhandling=blend(typeof a.stickhandling==='number'?a.stickhandling:55, a.faceoffs);
+    delete a.faceoffs;
+  }
+  if(typeof a.stamina==='number' && GG&&GG.pos!=='G'){
+    a.physical=blend(typeof a.physical==='number'?a.physical:55, a.stamina);
+    delete a.stamina;
+  }
+}
+
 /** Fill missing unified skater keys after load or legacy saves. */
 function ensureUnifiedSkaterAttrs(G){
   if(!G||!G.attrs||G.pos==='G') return;
   var a=G.attrs;
+  migrateLegacySkaterAttrs(a, G);
   var r=function(k,fb){ var v=a[k]; return typeof v==='number'&&!isNaN(v)?v:fb; };
   var blend=function(x,y){ return Math.round(cl((x+y)/2,20,96)); };
   if(typeof a.skating!=='number'||isNaN(a.skating)) a.skating=55;
   if(typeof a.passing!=='number'||isNaN(a.passing)) a.passing=55;
-  if(typeof a.positioning!=='number'||isNaN(a.positioning)) a.positioning=55;
   if(typeof a.physical!=='number'||isNaN(a.physical)) a.physical=55;
-  if(typeof a.stamina!=='number'||isNaN(a.stamina)) a.stamina=55;
   if(typeof a.defense!=='number'||isNaN(a.defense)){
-    a.defense=blend(r('positioning',60),r('physical',58))+(G.pos==='D'?6:0);
-  }
-  if(typeof a.shotBlocking!=='number'||isNaN(a.shotBlocking)){
-    a.shotBlocking=blend(r('defense',a.defense),r('positioning',60));
+    a.defense=blend(60,r('physical',58))+(G.pos==='D'?6:0);
   }
   if(typeof a.shooting!=='number'||isNaN(a.shooting)){
     a.shooting=blend(r('stickhandling',55),r('passing',a.passing));
@@ -549,44 +576,47 @@ function ensureUnifiedSkaterAttrs(G){
     a.stickhandling=blend(r('passing',a.passing),r('shooting',a.shooting));
   }
   if(typeof a.stickChecks!=='number'||isNaN(a.stickChecks)){
-    a.stickChecks=Math.round(cl(blend(r('defense',a.defense),r('positioning',a.positioning))+(r('physical',a.physical)-60)*0.2,22,96));
-  }
-  if(typeof a.faceoffs!=='number'||isNaN(a.faceoffs)){
-    a.faceoffs=Math.round(cl(blend(r('stickChecks',a.stickChecks),r('positioning',a.positioning))+((G.subPos||'')==='C'?5:0),22,96));
+    a.stickChecks=Math.round(cl(blend(r('defense',a.defense),r('anticipation',60))+(r('physical',a.physical)-60)*0.2,22,96));
   }
   if(typeof a.anticipation!=='number'||isNaN(a.anticipation)){
-    a.anticipation=blend(r('positioning',a.positioning),r('passing',a.passing));
-  }
-  if(typeof a.durability!=='number'||isNaN(a.durability)){
-    a.durability=blend(typeof G.health==='number'?G.health:88, r('stamina',a.stamina));
+    a.anticipation=blend(r('passing',a.passing),r('defense',a.defense));
   }
   if(typeof a.conditioning!=='number'||isNaN(a.conditioning)){
-    a.conditioning=blend(r('stamina',a.stamina), r('physical',a.physical));
+    a.conditioning=blend(r('physical',a.physical), 52);
   }
+  if(typeof a.durability!=='number'||isNaN(a.durability)){
+    a.durability=blend(typeof G.health==='number'?G.health:88, r('physical',a.physical));
+  }
+  delete a.positioning; delete a.shotBlocking; delete a.faceoffs;
+  if(G.pos!=='G') delete a.stamina;
   var amin=typeof G._attrClampMin==='number'?G._attrClampMin:22;
   for(var i=0;i<SKATER_ATTRS_LIST.length;i++){
     var k=SKATER_ATTRS_LIST[i];
     a[k]=cl(Math.round(r(k,55)),amin,99);
   }
   try{ ensureSecondarySubPos(G); }catch(eSec){}
+  try{ if(typeof updatePlayerConditioning==='function') updatePlayerConditioning(); }catch(eCond){}
 }
 
-/** Moment / shootout rolls: faceoffs blend stick checks; centres get a small draw bonus (only position-tied mechanic). */
+/** Moment / shootout rolls — faceoffs use puck control (stickhandling + stick checks). */
 function getMomentAttrValue(attrName, GG){
   if(!GG) GG=typeof G!=='undefined'?G:null;
   if(!GG||!GG.attrs) return 60;
   var attrs=GG.attrs;
-  var t=String(attrName||'');
-  if(t==='faceoffs'){
-    return 0.5*(+attrs.faceoffs||60)+0.5*(+attrs.stickChecks||60)+((GG.subPos||'')==='C'?3.5:0);
+  var raw=String(attrName||'');
+  if(GG.pos!=='G'){
+    if(raw==='positioning') return (+attrs.anticipation||60);
+    if(raw==='shotBlocking') return (+attrs.defense||60)+0.12*((+attrs.physical||60)-60);
+    if(raw==='faceoffs') return 0.55*(+attrs.stickhandling||60)+0.45*(+attrs.stickChecks||60)+((GG.subPos||'')==='C'?3.5:0);
+    if(raw==='stamina') return (+attrs.physical||60);
   }
-  if(t==='stickChecks'){
+  if(raw==='stickChecks'){
     return (+attrs.stickChecks||60)+0.2*((+attrs.defense||60)-60);
   }
-  if(t==='anticipation'){
-    return (+attrs.anticipation||60)+0.15*((+attrs.positioning||60)-60);
+  if(raw==='anticipation'){
+    return (+attrs.anticipation||60);
   }
-  return +attrs[t]||60;
+  return +attrs[raw]||60;
 }
 
 /** Weekly attr growth multiplier by league path (OJL balanced, QMJL skill/creative, WJL heavy, euro technical, ARHL creative/slow, Asian clubs budget, college well-rounded). */
@@ -652,21 +682,28 @@ function getLeagueAttrDevMultiplier(leagueKey, teamName, attr){
   }
 
   var v=M[attr];
+  if(v==null&&attr==='anticipation') v=M.positioning;
+  if(v==null&&attr==='defense') v=M.shotBlocking;
+  if(v==null&&attr==='physical') v=M.stamina;
+  if(v==null&&attr==='stickhandling') v=M.faceoffs;
+  if(v==null&&attr==='conditioning') v=M.stamina;
   return cl(typeof v==='number'?v:1,0.62,1.28);
 }
 var ATTR_LABELS = {
-  skating:'SKATING',shooting:'SHOOTING',stickhandling:'STICKHAND',passing:'PASSING',
-  positioning:'POSITIONING',physical:'PHYSICAL',stamina:'STAMINA',defense:'DEFENSE',
-  shotBlocking:'SHOT-BLOCK',stickChecks:'STICK CHECKS',faceoffs:'FACEOFFS',anticipation:'READ/ANTICIP.',
-  durability:'DURABILITY',conditioning:'CONDITIONING',
+  skating:'SKATING',shooting:'SHOOTING',stickhandling:'CONTROL',passing:'PASSING',
+  physical:'PHYSICAL',defense:'DEFENSE',
+  stickChecks:'STICK CHECKS',anticipation:'AWARENESS',conditioning:'CONDITIONING',
+  durability:'DURABILITY',
+  positioning:'POSITIONING',stamina:'STAMINA',
   reflexes:'REFLEXES',glove:'GLOVE',blocker:'BLOCKER',
   reboundControl:'REB CTRL',mental:'MENTAL'
 };
 var ATTR_COLORS = {
   skating:'#00d2d3',shooting:'#d63031',stickhandling:'#fd79a8',passing:'#6c5ce7',
-  positioning:'#0984e3',physical:'#e17055',stamina:'#00b894',defense:'#74b9ff',
-  shotBlocking:'#a29bfe',stickChecks:'#a8e6cf',faceoffs:'#fab1a0',anticipation:'#dfe6e9',
-  durability:'#55efc4',conditioning:'#81ecec',
+  physical:'#e17055',defense:'#74b9ff',
+  stickChecks:'#a8e6cf',anticipation:'#dfe6e9',conditioning:'#81ecec',
+  durability:'#55efc4',
+  positioning:'#0984e3',stamina:'#00b894',
   reflexes:'#ff7675',glove:'#fdcb6e',blocker:'#81ecec',
   reboundControl:'#55efc4',mental:'#dfe6e9'
 };

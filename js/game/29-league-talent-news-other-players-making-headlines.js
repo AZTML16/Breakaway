@@ -21,10 +21,11 @@ function getRandomTalentName(){
 }
 
 function addLeagueTalentNews(){
+  var peerName=typeof getTeammateNameForNews==='function'?getTeammateNameForNews():getRandomTalentName();
   var news=[
-    function(){var n=getRandomTalentName();addNews(n+' hits '+ri(2,5)+' points in last 3 games -- leading scorer push in '+G.league.short+'.','neutral');},
+    function(){var n=peerName;addNews(n+' hits '+ri(2,5)+' points in last 3 games -- leading scorer push in '+G.league.short+'.','neutral');},
     function(){var n=getRandomTalentName();addNews(n+' traded to '+shuf(TEAMS[G.leagueKey]||[{n:'rival'}])[0].n+' -- blockbuster move shakes up the league.','neutral');},
-    function(){var n=getRandomTalentName();addNews(n+' named '+G.league.short+' Player of the Week after '+ri(3,5)+'-point outing.','neutral');},
+    function(){var n=peerName;addNews(n+' named '+G.league.short+' Player of the Week after '+ri(3,5)+'-point outing.','neutral');},
     function(){var n=getRandomTalentName();addNews(n+' signs extension -- stays with club through next season.','neutral');},
     function(){var n=getRandomTalentName();addNews(n+' placed on injured reserve -- '+ri(2,6)+' week timeline.','neutral');},
     function(){var n=getRandomTalentName();addNews('Scouts raving about '+n+' -- projected top prospect for upcoming draft.','neutral');},

@@ -79,7 +79,7 @@ function rollShootoutSuccess(opt, auto){
   var attrBonus=(attrVal-60)*0.004;
   var moraleBonus=(G.morale-60)*0.001;
   var weightDelta=((G.weight||180)-190)/1000;
-  var weightImpact=(G.pos==='G'||opt.a==='physical'||opt.a==='positioning')?weightDelta:(opt.a==='skating'?-weightDelta*0.8:0);
+  var weightImpact=(G.pos==='G'||opt.a==='physical'||opt.a==='positioning'||opt.a==='anticipation')?weightDelta:(opt.a==='skating'?-weightDelta*0.8:0);
   var leagueDiff=(1.1-(G.league.dev||1.0))*0.10;
   var mediaStress=(G.morale<45?0.03:0)+(G.league.tier==='pro'?0.02:0);
   var wProTight=(G.league.gender==='F'&&G.league.tier==='pro')?0.042:0;
@@ -369,6 +369,7 @@ function finalizeEndGameBody(regWon, regTied){
   if(G.pos==='G'){G.goalsAgainst=(G.goalsAgainst||0)+gameStats.ga;G.cGoalsAgainst=(G.cGoalsAgainst||0)+gameStats.ga;}
   G.plusminus+=pmTotal;
   G.stamina=cl(G.stamina-ri(6,14),0,100);
+  if(typeof updatePlayerConditioning==='function') updatePlayerConditioning();
   G.morale=cl(G.morale+(G.xFactor==='careless'?(won?5:tied?1:-2):(won?5:tied?1:-4)),0,100);
   if(!G.isInjured&&Math.random()<0.018) triggerInjury();
   G.xp+=Math.round((G.pos==='G'?Math.round(ri(14,38)*getXFactorGoalieXpMult(getXFactorGameContext())):ri(20,45))*getPotentialXpMult(G.potential||'support'));

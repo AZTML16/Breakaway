@@ -134,9 +134,35 @@ function teamPalette(){
 /** PHL franchise nicknames (last word) → shared palette for farm/junior affiliates only (never college). */
 var PHL_FRANCHISE_PALETTES={
   Monarchs:   {bg:'#2a1f38',accent:'#e4c04d',sec:'#9b7ed9',text:'#f2ebe3',trim:'#cfd5e6',style:0},
-  Sentinels:  {bg:'#1a2430',accent:'#d62828',sec:'#94a3b8',text:'#eef2f7',trim:'#b8c0cc',style:1},
+  Voyageurs:  {bg:'#0a2463',accent:'#c8102e',sec:'#ffffff',text:'#e8eef8',trim:'#dde4f0',style:3},
   Ramparts:   {bg:'#0c1f3e',accent:'#d4af37',sec:'#3d6fb8',text:'#ffffff',trim:'#a8c0e8',style:2},
-  Voyageurs:  {bg:'#0a2463',accent:'#c8102e',sec:'#ffffff',text:'#e8eef8',trim:'#dde4f0',style:3}
+  Sentinels:  {bg:'#1a2430',accent:'#d62828',sec:'#94a3b8',text:'#eef2f7',trim:'#b8c0cc',style:1},
+  Stars:      {bg:'#0a1628',accent:'#ffd700',sec:'#c0c8d8',text:'#f8f9fc',trim:'#d4af37',style:4},
+  Outlaws:    {bg:'#1a1208',accent:'#ff6b00',sec:'#8b4513',text:'#fff4e8',trim:'#d4a574',style:5},
+  Colonials:  {bg:'#1c2840',accent:'#c8102e',sec:'#f5f0e6',text:'#ffffff',trim:'#b8c4d8',style:6},
+  Ironclad:   {bg:'#2c3e50',accent:'#95a5a6',sec:'#5d6d7e',text:'#ecf0f1',trim:'#bdc3c7',style:7},
+  Snowhawks:  {bg:'#0d2137',accent:'#7ec8e3',sec:'#ffffff',text:'#e8f4fc',trim:'#a8d4e8',style:8},
+  Founders:   {bg:'#002868',accent:'#bf9b30',sec:'#ffffff',text:'#f5f0e8',trim:'#d4c49a',style:9},
+  Smelters:   {bg:'#2d2d2d',accent:'#ff5722',sec:'#78909c',text:'#fff5f0',trim:'#b0bec5',style:10},
+  Diplomats:  {bg:'#1a365d',accent:'#c8102e',sec:'#002868',text:'#f0f4f8',trim:'#a8b8d0',style:11},
+  Tundra:     {bg:'#1a2838',accent:'#89cff0',sec:'#e8f4f8',text:'#f8fcff',trim:'#b8d4e8',style:12},
+  Blizzard:   {bg:'#0f1f2e',accent:'#a8d8ea',sec:'#ffffff',text:'#f0f8ff',trim:'#c8e0f0',style:13},
+  Tempest:    {bg:'#1a1f2e',accent:'#4fc3f7',sec:'#607d8b',text:'#e8f4f8',trim:'#90a4ae',style:14},
+  Rivermen:   {bg:'#0d2818',accent:'#4fc3f7',sec:'#2e7d32',text:'#e8fff0',trim:'#81c784',style:15},
+  Troubadours:{bg:'#2d1b3d',accent:'#9b59b6',sec:'#f1c40f',text:'#faf0ff',trim:'#d4b8e8',style:16},
+  Mountaineers:{bg:'#1e3a2f',accent:'#66bb6a',sec:'#8d6e63',text:'#f0fff4',trim:'#a5d6a7',style:17},
+  Roughnecks: {bg:'#1a1a0a',accent:'#ffc107',sec:'#5d4037',text:'#fff8e0',trim:'#d4a574',style:18},
+  Drillers:   {bg:'#261610',accent:'#d84315',sec:'#ff8f00',text:'#fff5e8',trim:'#e8a87c',style:19},
+  Rainmakers: {bg:'#0c1929',accent:'#42a5f5',sec:'#b0bec5',text:'#e8f4ff',trim:'#90caf9',style:20},
+  Tidal:      {bg:'#0a2a2a',accent:'#26a69a',sec:'#80cbc4',text:'#e0f7f4',trim:'#4db6ac',style:21},
+  Altitude:   {bg:'#2d1b4e',accent:'#7e57c2',sec:'#eceff1',text:'#f5f0ff',trim:'#b39ddb',style:22},
+  Archers:    {bg:'#1a0a0a',accent:'#e53935',sec:'#ffd54f',text:'#fff5f5',trim:'#ef9a9a',style:23},
+  Neon:       {bg:'#1a0a1f',accent:'#ff00ff',sec:'#00e5ff',text:'#fff0ff',trim:'#e040fb',style:24},
+  Storm:      {bg:'#121820',accent:'#ffeb3b',sec:'#546e7a',text:'#f5f5f5',trim:'#cfd8dc',style:25},
+  Tide:       {bg:'#0a1e3c',accent:'#00bcd4',sec:'#ffffff',text:'#e0f7fa',trim:'#4dd0e1',style:26},
+  Surf:       {bg:'#00695c',accent:'#ffcc80',sec:'#4db6ac',text:'#fff8e8',trim:'#80cbc4',style:27},
+  Rail:       {bg:'#263238',accent:'#ff7043',sec:'#90a4ae',text:'#eceff1',trim:'#b0bec5',style:28},
+  Scorch:     {bg:'#1f1008',accent:'#ff5722',sec:'#ffab40',text:'#fff3e0',trim:'#ff8a65',style:29}
 };
 /** Same crest as parent club only in pro/minor/major-junior/US junior chains (PHL↔NAML, OJL, etc.). */
 var AFFILIATE_SHARED_LOGO_LEAGUES={PHL:1,NAML:1,OJL:1,QMJL:1,WJL:1,USJL:1,PWDL:1};
@@ -396,7 +422,7 @@ function ovr(attrs, pos){
     }
     return gc?Math.round(gs/gc):60;
   }
-  var keys=typeof SKATER_RATING_ATTR_KEYS!=='undefined'?SKATER_RATING_ATTR_KEYS:['skating','shooting','stickhandling','passing','positioning','physical','stamina'];
+  var keys=typeof SKATER_RATING_ATTR_KEYS!=='undefined'?SKATER_RATING_ATTR_KEYS:['skating','shooting','stickhandling','passing','physical','defense','stickChecks','anticipation','conditioning'];
   var ss=0,cc=0;
   for(var j=0;j<keys.length;j++){
     var vv=attrs[keys[j]];

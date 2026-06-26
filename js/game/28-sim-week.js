@@ -5,7 +5,7 @@
 function getLeagueBaselineOvr(leagueKey){
   var perLeague={
     // Men
-    OJL:64, QMJL:62, WJL:61, USJL:60, NCHA:67,
+    OJL:66, QMJL:63, WJL:62, USJL:59, NCHA:67,
     NEJC:54, CEJC:55, ARJC:56,
     NEHL:70, CEHL:72, ARHL:74, NAML:78, PHL:90,
     // Women (tighter baselines vs men — sim was too generous, esp. PWL)
@@ -336,7 +336,11 @@ function simWeek(){
         expGamePts=cl(0.22+ptSkill*0.2+domBoost*0.12+rd(0,0.28),0,maxThisGame);
       }
       var wSimFac=getSimWomenLeagueScoringFactor(G.leagueKey,G.league);
-      expGamePts=cl(expGamePts*wSimFac*getXFactorSkaterPtsMult('reg'),0,maxThisGame);
+      var leagueScFac=typeof getLeagueSimScoringFactor==='function'?getLeagueSimScoringFactor(G.leagueKey):1;
+      var ppgBar=typeof getPpgCaliberOvrThreshold==='function'?getPpgCaliberOvrThreshold(G.leagueKey):72;
+      var ppgHurdle=playerOvr>=ppgBar?1:cl(0.55+(playerOvr-(ppgBar-18))/36,0.42,0.92);
+      var condFac=(G.pos!=='G')?cl(0.9+((G.attrs.conditioning||60)-60)/320,0.86,1.08):1;
+      expGamePts=cl(expGamePts*wSimFac*leagueScFac*ppgHurdle*condFac*getXFactorSkaterPtsMult('reg'),0,maxThisGame);
       var gamePts=Math.min(maxThisGame,Math.max(0,Math.round(expGamePts+rd(-0.35,0.55))));
       var gaSplit=simSkaterGoalAssistSplit(gamePts,perfBias,gameHomeScore>gameAwayScore);
       gameStats.g=gaSplit.g;
@@ -350,7 +354,7 @@ function simWeek(){
       gameStats.block=blk;
       // Smoother +/-; defensemen & two-way forwards trend higher when structure holds.
       var defSkill=((G.attrs.mental||60)+(G.attrs.physical||60)-120)/30;
-      var posRead=((G.attrs.positioning||60)-60)/50;
+      var posRead=((G.attrs.anticipation||60)-60)/50;
       var archPm=0;
       if(G.pos==='D'){
         var dArch=G.arch||'';

@@ -25,17 +25,83 @@ function teamLogoFont(seed,forWordmark){
 function teamLogoFitFs(charCount,minFs,maxFs){
   var n=Math.max(1,charCount|0);
   if(n<=4) return maxFs;
-  if(n<=7) return minFs+(maxFs-minFs)*0.72;
-  if(n<=10) return minFs+(maxFs-minFs)*0.48;
-  return Math.max(minFs,maxFs-(n-4)*0.38);
+  if(n<=6) return minFs+(maxFs-minFs)*0.82;
+  if(n<=8) return minFs+(maxFs-minFs)*0.58;
+  if(n<=10) return minFs+(maxFs-minFs)*0.42;
+  return Math.max(minFs,maxFs-(n-3)*0.42);
+}
+
+/** Trim long mascot names for crest wordmarks without losing identity. */
+function teamLogoShortNick(nick,maxLen){
+  var s=String(nick||'TEAM').trim();
+  maxLen=maxLen||9;
+  if(s.length<=maxLen) return s;
+  s=s.replace(/(ettes|ettes|ians|men|ers|ors|s)$/i,'');
+  if(s.length<=maxLen) return s;
+  if(s.length>maxLen+2){
+    var vow=s.replace(/[^aeiou]/gi,'').length;
+    if(vow<2) return s.slice(0,maxLen);
+    return s.slice(0,maxLen-1)+'.';
+  }
+  return s.slice(0,maxLen);
 }
 
 function teamLogoTextFitAttrs(str,optMinLen,textLengthMax){
   var L=String(str||'').length;
-  var minLen=optMinLen!=null?optMinLen:9;
+  var minLen=optMinLen!=null?optMinLen:5;
   if(L<minLen) return '';
-  var tl=Math.min(textLengthMax!=null?textLengthMax:30,6+L*2.15);
+  var tl=Math.min(textLengthMax!=null?textLengthMax:28,5+L*2.05);
   return ' textLength="'+tl.toFixed(1)+'" lengthAdjust="spacingAndGlyphs"';
+}
+
+/** Map mascot keywords → hand-tuned crest mark (gfx-0 ids) so logos resemble the team. */
+var TEAM_NICK_LOGO_THEMES=[
+  [/monarch|royal|king|queen|crown|regal|emperor/i,4],
+  [/voyageur|voyag|mariner|sailor|harbour|harbor|seafarer|tidal|surf/i,5],
+  [/storm|thunder|tempest|lightning|outlaw/i,8],
+  [/blaze|fire|forge|scorch|furnace|neon|founder/i,16],
+  [/blizzard|snow|frost|tundra|ice|glacier/i,5],
+  [/wolf|husky|hound|coyote|copperhead/i,1],
+  [/bear|grizzly|bruin/i,0],
+  [/eagle|hawk|falcon|raptor|snowhawk/i,13],
+  [/shark|fish|tidal/i,32],
+  [/star|stellar/i,9],
+  [/iron|steel|rail|rivet|smelter|archer/i,30],
+  [/mountain|mountaineer|altitude|summit|peak/i,3],
+  [/colonial|diplomat|sentinel|rampart|fort/i,14],
+  [/copper|miner|driller|roughneck|roughnecks/i,21],
+  [/sun|solar|sunblazer/i,17],
+  [/tide|wave|rainmaker|surf/i,5],
+  [/archer|target/i,17],
+  [/troubadour|music/i,29],
+  [/diplomat|diplomats/i,14],
+  [/grind|grinder|thresh|wheat/i,12],
+  [/river|rivermen/i,22],
+  [/ghost|phantom/i,15],
+  [/surge|pulse|volt/i,8],
+  [/mustang|stallion|horse/i,27],
+  [/crusher|crush/i,11],
+  [/outlaw/i,8],
+  [/colonial/i,14],
+  [/iron|ironclad/i,30],
+  [/founder/i,16],
+  [/smelter/i,16],
+  [/neon/i,17],
+  [/rainmaker/i,5],
+  [/scorch/i,16],
+  [/tidal|tide/i,5],
+  [/surf/i,5],
+  [/rail/i,30],
+  [/altitude/i,3]
+];
+
+function teamLogoThemeGraphicId(teamName){
+  var nick=String((teamNameParts(teamName).nick||'')).toLowerCase();
+  if(!nick) return null;
+  for(var i=0;i<TEAM_NICK_LOGO_THEMES.length;i++){
+    if(TEAM_NICK_LOGO_THEMES[i][0].test(nick)) return TEAM_NICK_LOGO_THEMES[i][1];
+  }
+  return null;
 }
 
 /** Same string for all PHL-affiliate tiers with a franchise palette; else team + league. */
@@ -49,15 +115,16 @@ function teamLogoIdentityBlob(teamName,leagueKey){
 function teamLogoRecipeFromTeam(teamName,leagueKey){
   var B=teamLogoIdentityBlob(teamName,leagueKey);
   var gc=typeof TEAM_LOGO_GRAPHIC_COUNT==='number'?TEAM_LOGO_GRAPHIC_COUNT:320;
+  var themed=teamLogoThemeGraphicId(teamName);
+  var graphic=themed!=null?themed:(hashStr(B+'|graphic')%gc);
   return {
     shell: hashStr(B+'|shell') & 15,
     stripe: hashStr(B+'|stripe') & 7,
-    graphic: hashStr(B+'|graphic') % gc,
+    graphic: graphic,
     textMode: hashStr(B+'|textm') & 7,
     wordStyle: hashStr(B+'|wstyle') & 3,
     wordSkew: (hashStr(B+'|wskew') % 19) - 9,
-    wordOnly: (hashStr(B+'|wocrest') % 5) === 0,
-    /* 0 classic, 1 action, 2 minimal, 3 slick sheen, 4 memorial ribbon, 5 roundel rings, 6 underline swoosh */
+    wordOnly: (hashStr(B+'|wocrest') % 6) === 0,
     crestFamily: hashStr(B+'|cvibe') % 7
   };
 }
@@ -148,7 +215,7 @@ function teamLogoSVGCollege(teamName,size,cols,leagueKey){
   var uid='c'+(hashStr(B+'|cuid')%90000+100);
   var parts=teamNameParts(teamName);
   var nick=parts.nick||'TEAM';
-  var wordmark=nick.length>12?nick.slice(0,12):nick;
+  var wordmark=teamLogoShortNick(nick,10);
   var wm=escHtml(wordmark);
   var tag=escHtml(collegeBannerTag(teamName));
   var simp=!!cols.simplePalette;
@@ -159,7 +226,8 @@ function teamLogoSVGCollege(teamName,size,cols,leagueKey){
   var ini=teamInitials(teamName);
   var midBlend=hexBlend(bg,ac,simp?0.1:0.25);
   var gcx=typeof TEAM_LOGO_GRAPHIC_COUNT==='number'?TEAM_LOGO_GRAPHIC_COUNT:320;
-  var gmark=hashStr(B+'|colgraphic')%gcx;
+  var themed=teamLogoThemeGraphicId(teamName);
+  var gmark=themed!=null?themed:(hashStr(B+'|colgraphic')%gcx);
   var graphicMini='<g transform="translate(18,15) scale(.46) translate(-18,-14)" opacity="'+(simp?'.28':'.42')+'">'+teamLogoGraphicSVG(gmark,cols)+'</g>';
   var gBanner='<g transform="translate(4,7) scale(.76)">'+teamLogoGraphicSVG(gmark,cols)+'</g>';
   var cwmRot=(hashStr(B+'|cwmrot')%13)-6;
@@ -441,7 +509,8 @@ function teamLogoSVG(teamName,size,leagueKey){
   var parts=teamNameParts(teamName);
   var monoFont=teamLogoFont(hashStr(B+'|pf0'),false), wordFont=teamLogoFont(hashStr(B+'|pf1'),true);
   var nick=parts.nick||'TEAM';
-  var wordmark=escHtml(nick.length>11?nick.slice(0,11):nick);
+  var shortNick=teamLogoShortNick(nick,9);
+  var wordmark=escHtml(shortNick);
   var bg=cols.bg, ac=cols.accent, sc=cols.secondary||cols.sec, tx=cols.text, bd=cols.trim||cols.border||'rgba(255,255,255,.12)';
   var sw=cols.echo?1.1:0.6;
   var uid='r'+(hashStr(B+'|puid')%80000+1000);
@@ -461,7 +530,7 @@ function teamLogoSVG(teamName,size,leagueKey){
   if(vibe.stripeKill) stripeSvg='';
   if(r.wordOnly){
     defs=teamLogoMergeClipDef(defs,uid);
-    var nickLen=Math.min(12,nick.length);
+    var nickLen=shortNick.length;
     var fsW=teamLogoFitFs(nickLen,5.4,11);
     var mainSt=hashStr(B+'|wom')&3;
     var wmMain=teamLogoNickTextSVG('wo'+uid+'1',wordmark,wordFont,tx,{y:20.5,fs:fsW,style:mainSt,skew:r.wordSkew,italic:(hashStr(B+'|woi')%2===0),op:0.94,fitMinLen:5,fitMax:30});
@@ -476,7 +545,7 @@ function teamLogoSVG(teamName,size,leagueKey){
     var sc2=Math.min(sc,1.02);
     return '<g transform="translate(18,'+y+') scale('+sc2+') translate(-18,-14)">'+teamLogoGraphicSVG(r.graphic,cols)+'</g>';
   }
-  var nickLen=Math.min(12,nick.length);
+  var nickLen=shortNick.length;
   var wsty=r.wordStyle,wsk=r.wordSkew;
   var fsB=teamLogoFitFs(nickLen,3.5,5.3), fsH=teamLogoFitFs(nickLen,4.6,7.4), fsSm=teamLogoFitFs(nickLen,3.2,4.5);
   var wb=teamLogoNickTextSVG('p'+uid+'b',wordmark,wordFont,tx,{y:31.5,fs:fsB,style:wsty,skew:wsk,italic:true,op:0.92,fitMinLen:6,fitMax:29});

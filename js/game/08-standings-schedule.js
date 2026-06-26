@@ -38,22 +38,23 @@ function getGamesPerWeek(lk){
   return (LEAGUES[lk] && LEAGUES[lk].gamesPerWeek) ? LEAGUES[lk].gamesPerWeek : 3;
 }
 
-/** OVR at which you're considered "PPG-caliber" for this league (women's leagues: -30 vs men's bar — e.g. PWL 60 vs PHL 90). */
+/** OVR at which you're considered "PPG-caliber" for this league (women's leagues: -40 vs men's bar). */
 function getPpgCaliberOvrThreshold(leagueKey){
   var L=LEAGUES[leagueKey]||{};
   var isF=L.gender==='F';
-  var base=72;
+  var base=65;
   if(leagueKey==='PHL'||leagueKey==='PWL') base=90;
-  else if(L.tier==='college') base=70;
+  else if(L.tier==='college') base=75;
+  else if(L.tier==='minor'||L.tier==='euro'||L.tier==='asia') base=80;
   else if(L.tier==='junior'){
-    base=65;
-    if(leagueKey==='NEJC'||leagueKey==='CEJC'||leagueKey==='ARJC'||leagueKey==='EWJC'||leagueKey==='AWJC') base=60;
-  } else if(L.tier==='euro'||L.tier==='asia'){
-    var harder=['NEHL','CEHL','ARHL','SDHL','FWHL','AWHL'];
-    base= harder.indexOf(leagueKey)!==-1 ? 75 : 70;
+    if(leagueKey==='OJL'||leagueKey==='CWHL') base=65;
+    else if(leagueKey==='QMJL'||leagueKey==='WJL') base=64;
+    else if(leagueKey==='USJL'||leagueKey==='USWDL') base=62;
+    else if(leagueKey==='NEJC'||leagueKey==='CEJC'||leagueKey==='ARJC'||leagueKey==='EWJC'||leagueKey==='AWJC') base=58;
+    else base=63;
   }
-  if(isF) base-=30;
-  return Math.max(28, base);
+  if(isF) base=Math.max(25, base-40);
+  return base;
 }
 
 /** Men's ELC-ready bar; women's path is 30 OVR lower (e.g. 80 → 50). */
@@ -143,6 +144,8 @@ function onTeamChangeLeadershipReset(){
     if(Math.random()<0.45) G.leadershipRole='';
   }
   G.teamTenure=0;
+  G._teamRosterKey=null;
+  G._leagueStatsKey=null;
   maybeClearDraftRightsIfLeftHoldingClub();
 }
 

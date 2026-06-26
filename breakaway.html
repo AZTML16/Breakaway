@@ -261,6 +261,8 @@ Create flow: nationality, gender, position, archetype, X-Factor, attributes, lea
 <button class="tab" onclick="hubTab('attrs')">ATTRS</button>
 <button class="tab" onclick="hubTab('contract')">CONTRACT</button>
 <button class="tab" onclick="hubTab('standings')">STANDINGS</button>
+<button class="tab" onclick="hubTab('depth')">DEPTH</button>
+<button class="tab" onclick="hubTab('leaders')">LEADERS</button>
 <button class="tab" onclick="hubTab('career')">CAREER</button>
 <button class="tab" onclick="hubTab('awards')">AWARDS</button>
 <button class="tab" onclick="hubTab('social')">SOCIAL</button>
@@ -288,6 +290,12 @@ Create flow: nationality, gender, position, archetype, X-Factor, attributes, lea
 </div>
 <div id="tab-standings" style="display:none">
 <div class="panel"><div class="ptitle">LEAGUE STANDINGS</div><div id="hub-standings"></div></div>
+</div>
+<div id="tab-depth" style="display:none">
+<div class="panel"><div class="ptitle">DEPTH CHART</div><div id="hub-depth-chart"></div></div>
+</div>
+<div id="tab-leaders" style="display:none">
+<div class="panel"><div class="ptitle">LEAGUE LEADERS</div><div id="hub-league-leaders"></div></div>
 </div>
 <div id="tab-career" style="display:none">
 <div class="panel"><div class="ptitle">CAREER STATS</div><div class="sgrid" id="career-stats-grid"></div></div>
@@ -617,6 +625,7 @@ Create flow: nationality, gender, position, archetype, X-Factor, attributes, lea
 <script src="js/game/27-sim-injured-game.js"></script>
 <script src="js/game/28-sim-week.js"></script>
 <script src="js/game/29-league-talent-news-other-players-making-headlines.js"></script>
+<script src="js/game/31-league-roster-depth-stats.js"></script>
 <script src="js/game/30-boot.js"></script>
 <script src="js/team-logos/composer.js"></script>
 </body>

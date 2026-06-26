@@ -24,14 +24,18 @@ function selectOption(idx,auto){
   var pwlTight=(G.leagueKey==='PWL')?0.03:0;
   // overall promotion of difficulty: goals/assists are a little rarer
   var globalDifficulty=0.08+wProTight+pwlTight;
-  var playoffPressure=(G._playoffCtx&&G._isPlayoffGame)?(0.082+getPlayoffYoungLeaguePlayablePressure()):0;
+  var playoffPressure=(G._playoffCtx&&G._isPlayoffGame)?(0.102+getPlayoffYoungLeaguePlayablePressure()):0;
+  var worldStagePressure=0;
+  if(G._worldStageCtx&&G._worldStageCtx.ev){
+    worldStagePressure=G._worldStageCtx.ev.isFaceoff?0.038:(0.118+0.024);
+  }
   var playoffGrindEdge=0;
   if(G._playoffCtx&&G._isPlayoffGame){
     var phGr=(G.attrs.physical||60)-60;
     playoffGrindEdge+=phGr/850;
-    if(G.pos==='D') playoffGrindEdge+=((G.attrs.defense||60)+(G.attrs.shotBlocking||60)-120)/720;
+    if(G.pos==='D') playoffGrindEdge+=((G.attrs.defense||60)+(G.attrs.anticipation||60)-120)/720;
     if(opt.a==='physical') playoffGrindEdge+=0.044;
-    if(G.pos==='D'&&(opt.a==='defense'||opt.a==='shotBlocking'||opt.a==='positioning')) playoffGrindEdge+=0.036;
+    if(G.pos==='D'&&(opt.a==='defense'||opt.a==='anticipation'||opt.a==='positioning'||opt.a==='shotBlocking')) playoffGrindEdge+=0.036;
     if(G.xFactor==='brat'){
       if(opt.a==='physical'||opt.reward==='fight'||opt.reward==='scrum') playoffGrindEdge+=0.048;
       if(G.pos==='D') playoffGrindEdge+=0.024;
@@ -39,7 +43,7 @@ function selectOption(idx,auto){
     if(G.xFactor==='heavy_hitter'&&opt.a==='physical') playoffGrindEdge+=0.038;
     playoffGrindEdge=cl(playoffGrindEdge,0,0.13);
   }
-  var successThreshold=cl(base+attrBonus+moraleBonus+weightImpact+playoffGrindEdge-leagueDiff-mediaStress-globalDifficulty-playoffPressure,0.03,0.92);
+  var successThreshold=cl(base+attrBonus+moraleBonus+weightImpact+playoffGrindEdge-leagueDiff-mediaStress-globalDifficulty-playoffPressure-worldStagePressure,0.03,0.92);
   var roll=Math.random();
   var outcome='fail';
   if(roll<successThreshold) outcome='success';

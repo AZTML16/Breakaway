@@ -313,6 +313,10 @@ function renderWeekGames(){
   var el=safeEl('week-games');
   var perWeek=getGamesPerWeek(G.leagueKey);
   var totalWks=Math.ceil((G.league.games||68)/perWeek);
+  if(G._inOffseason){
+    el.innerHTML='<div class="vt" style="font-size:16px;color:var(--gold)">OFFSEASON</div><div class="vt" style="font-size:14px;color:var(--mut);margin:8px 0">Season complete — finish contract talks and camp prep on the offseason screen.</div><button class="btn bp bw" onclick="show(\'s-offseason\')">OFFSEASON SCREEN &gt;</button>';
+    return;
+  }
   if(G._playoffCtx&&G._playoffCtx.active){
     renderPlayoffHubPanel();
     return;
@@ -367,7 +371,7 @@ function renderNewsFeed(){
 
 function hubTab(tab){
   G.activeTab=tab;
-  var tabs=['season','attrs','contract','standings','career','awards','social'];
+  var tabs=['season','attrs','contract','standings','depth','leaders','career','awards','social'];
   for(var i=0;i<tabs.length;i++){
     var el=safeEl('tab-'+tabs[i]);
     if(el) el.style.display=tabs[i]===tab?'block':'none';
@@ -376,6 +380,8 @@ function hubTab(tab){
   for(var i=0;i<tabBtns.length;i++) tabBtns[i].classList.toggle('on',tabs[i]===tab);
   if(tab==='attrs') renderAttrTab();
   if(tab==='standings') renderStandingsTab();
+  if(tab==='depth') renderDepthChartTab();
+  if(tab==='leaders') renderLeagueLeadersTab();
   if(tab==='career') renderCareerTab();
   if(tab==='awards') renderAwardsTab();
   if(tab==='contract') renderContractTab();
@@ -387,7 +393,7 @@ function renderAttrTab(){
   var potK=G.potential&&POTENTIALS[G.potential]?G.potential:'support';
   html+='<div class="vt" style="font-size:13px;color:var(--mut);margin-bottom:10px;line-height:1.45">'+
     '<span style="color:var(--acc)">Projection:</span> '+potentialTierWord(potK)+' — '+POTENTIALS[potK].desc+'</div>';
-  html+='<div class="vt" style="font-size:12px;color:var(--mut);margin-bottom:10px;line-height:1.45">Forwards and D share the same sheet. <b>OVR</b> uses the rating row only. <b>Listed spot</b> ('+String(G.subPos||'—')+') nudges centre faceoff rolls only. <b>Comfort spare</b> is a second natural spot (not everyone has one); moving there is easy — selling coaches on a brand-new spot costs more. <b>Durability / conditioning</b> are tracked but not in OVR.</div>';
+  html+='<div class="vt" style="font-size:12px;color:var(--mut);margin-bottom:10px;line-height:1.45">Forwards and D share the same sheet. <b>OVR</b> includes all rating rows. <b>Control</b> covers stickhandling and draws. <b>Awareness</b> is reads/lanes. <b>Defense</b> covers blocks. <b>Physical</b> includes endurance. <b>Conditioning</b> shifts with games played and summer work. <b>Durability</b> is outside OVR.</div>';
   if(G.pos==='F'||G.pos==='D'){
     var spare=G.secondarySubPos?String(G.secondarySubPos):'';
     html+='<div class="vt" style="font-size:11px;color:var(--acc);margin-bottom:6px">LISTED: <b>'+String(G.subPos||'—')+'</b> &nbsp;·&nbsp; COMFORT SPARE: <b>'+(spare||'none')+'</b></div>';
@@ -435,7 +441,8 @@ function hubTrainSkill(){
   if((G.stamina|0)<18){ notify('Need more stamina (18+) before another heavy session.','red'); return; }
   if(typeof SKATER_RATING_ATTR_KEYS==='undefined'||!SKATER_RATING_ATTR_KEYS.length) return;
   G.stamina=cl(G.stamina-15,0,100);
-  var pick=SKATER_RATING_ATTR_KEYS[ri(0,SKATER_RATING_ATTR_KEYS.length-1)];
+  var trainPool=SKATER_RATING_ATTR_KEYS.filter(function(k){return k!=='conditioning';});
+  var pick=trainPool[ri(0,trainPool.length-1)];
   var cap=getAttrCapForAge(G.age||16);
   var amin=G._attrClampMin||40;
   var gain=rd(0.8,1.55)*getPotentialDevMult(G.potential||'support');

@@ -153,3 +153,19 @@ function tickSocialFollowers(){
   if((G.wonCup||G.careerCups)&&Math.random()<0.08) base+=ri(8,30);
   G.socialFollowers=Math.min(9999999,(G.socialFollowers||0)+base);
 }
+
+/** Drift conditioning from games played, summer work, and base fitness. Skaters only. */
+function updatePlayerConditioning(opts){
+  if(!G||!G.attrs||G.pos==='G') return;
+  opts=opts||{};
+  var total=G.league&&G.league.games||68;
+  var played=Math.max(G.gp||0, ((G.week||1)-1)*(typeof getGamesPerWeek==='function'?getGamesPerWeek(G.leagueKey):3)+(G.weekGames||0));
+  var playRatio=cl(played/Math.max(1,total),0,1);
+  var phys=G.attrs.physical||60;
+  var off=opts.offseasonBoost||0;
+  var decay=opts.offseasonDecay||0;
+  var target=cl(44+phys*0.24+playRatio*22+off-decay,32,96);
+  var cur=G.attrs.conditioning||52;
+  var drift=opts.offseasonBoost?0.55:(opts.offseasonDecay?0.5:0.28);
+  G.attrs.conditioning=Math.round(cl(cur*(1-drift)+target*drift,32,96));
+}

@@ -94,29 +94,46 @@ function sendOffer(){
   var myYrs=parseInt(safeEl('cn-yrs-slider').value,10);
   var diff=mySal-cnTeamOffer.sal;
   var extra=(cnNTC?cnMaxSal*0.05:0)+(cnBonus?cnMaxSal*0.03:0);
+  var isRfa=getProContractType()==='RFA'&&G.league&&G.league.tier==='pro';
+  var pickBurden=isRfa?getRfaCompPickBurden(mySal+extra,cnMaxSal):0;
   addContractLog('Round '+cnRounds+': You ask '+fmt(mySal)+'/yr -- '+myYrs+'yr'+(cnNTC?' + NTC':'')+(cnBonus?' + BONUS':''),'gold');
+  if(isRfa&&pickBurden>=2.5){
+    addContractLog('Rights team balks — matching this deal costs ~'+Math.ceil(pickBurden)+' draft picks.','mut');
+  }
   if(diff+extra<=0){
     addContractLog('TEAM ACCEPTS YOUR TERMS!','green');
     finalizeContract(mySal,myYrs,cnNTC,cnBonus);
-  } else if(diff+extra<cnMaxSal*0.15&&cnRounds<3){
+  } else if(isRfa&&pickBurden>=3.5&&(diff+extra)>=cnMaxSal*0.06){
+    RetroSound.notifyBad();
+    addContractLog('TEAM WILL NOT MATCH — compensation is too steep. Take less or walk.','red');
+  } else if(diff+extra<cnMaxSal*(isRfa&&pickBurden<=1.2?0.18:0.15)&&cnRounds<3){
     RetroSound.ping();
-    var counter=Math.min(Math.round(cnTeamOffer.sal*1.05),Math.round(cnMaxSal*0.88));
+    var counter=Math.min(Math.round(cnTeamOffer.sal*(isRfa?1.03:1.05)),Math.round(cnMaxSal*(isRfa?0.82:0.88)));
     cnTeamOffer.sal=counter;
     addContractLog('Team counters: '+fmt(cnTeamOffer.sal)+'/yr -- '+cnTeamOffer.yrs+'yr','mut');
     updateContractUI();
   } else {
     RetroSound.notifyBad();
-    addContractLog('TEAM CANNOT MEET YOUR DEMANDS.','red');
+    addContractLog(isRfa?'TEAM CANNOT MATCH WITHOUT GIVING UP TOO MANY PICKS.':'TEAM CANNOT MEET YOUR DEMANDS.','red');
   }
 }
 
 function acceptCurrentOffer(){finalizeContract(cnTeamOffer.sal,cnTeamOffer.yrs,false,false);}
 
+function returnAfterContractTalks(){
+  if(G&&G._inOffseason){show('s-offseason');return;}
+  renderHub();show('s-hub');
+}
+
 function walkAway(){
   RetroSound.walkAway();
   G.pendingContract=false;
-  addNews(G.first+' '+G.last+' walks away -- enters free agency.','neutral');
-  renderHub();show('s-hub');
+  if(G._inOffseason && (G.contractYrsLeft||0)<=0){
+    convertPlayerToFreeAgency(G.first+' '+G.last+' walks away from talks');
+  } else {
+    addNews(G.first+' '+G.last+' walks away -- enters free agency.','neutral');
+  }
+  returnAfterContractTalks();
 }
 
 function getProContractType(){
@@ -151,11 +168,13 @@ function finalizeContract(sal,yrs,ntc,bonus){
   G.contract={sal:sal,yrs:yrs,type:cType,ntc:ntc,bonus:bonus};
   if(cType==='ENTRY LEVEL'){G.hadELC=true;G.elcYears=3;}
   G.contractYrsLeft=yrs;G.pendingContract=false;
+  if(G._inOffseason) G._offseasonContractSigned=true;
   if(sal>0){
     G.careerEarnings=(G.careerEarnings||0)+(bonus?Math.round(sal*0.1):0);
   }
   addNews(G.first+' '+G.last+' signs '+yrs+'-year deal worth '+fmt(sal*yrs)+' total!','big');
-  notify('CONTRACT SIGNED!','gold');renderHub();show('s-hub');
+  notify('CONTRACT SIGNED!','gold');
+  returnAfterContractTalks();
 }
 
 function addContractLog(msg,color){
