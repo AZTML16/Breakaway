@@ -872,28 +872,33 @@ var NEXT_TIER = {
 
 // SOCIAL SYSTEM DATA
 var SOCIAL_NAMES_M = [
-  'Jake Morrison','Tyler Kovacs','Brandon Leclair','Mike Zalenski','Stefan Holmberg',
-  'Marcus Webb','Kyle Bernier','Dani Saarinen','Ryan Okafor','Lukas Petrov',
-  'Caden Tremblay','Wyatt Forsberg','Niko Haugen','Dmitri Volkov','Jesse Fairbanks',
+  'Jake Morrison','Tylarettini Kovalev','Brandon Leclair','Mike Zalenski','Steven Holmberg',
+  'Marcus Webb','Kyle Bernier','Daniil Saarinen','Chi Okafor','Lukas Petrov',
+  'Caden Tremblay-Bouchard','Wyatt Forsberg','Niko Haugen','Dmitri Volkov','Jesse Fairbanks',
   'Alexei Kuznetsov','Jordan Ashworth','Patrik Sundqvist','Connor Healy','Mikael Lindqvist',
-  'Brayden Callahan','Tomas Dvoracek','Owen Ritchie','Sergei Malashenko','Nick Carvalho',
-  'Mohammad Al-Rashid','Yusuf Okonkwo','Hiroshi Tanaka','Wei Zhang','Jamal Osei',
+  'Brayden Callahan','Tomas Dvoracek','Owen Ritchie','Sergei Malashenko-Duguchev','Nick Carvalho',
+  'Mohammad Al-Rashad','Yusuf Okonkwo','Hiroshi Tanaka','Wei Zhang','Jamal Osei',
   'Luca Ferretti','Carlos Reyes','Aarav Sharma','Matteo Russo','Kenji Watanabe',
-  'Rafael Moura','Ibrahim Diallo','Arjun Nair','Hamid Rezaei','Felix Nguyen', 'Rajeshna Patel', 'Diyaco El-Diablo'
+  'Rafael Moura','Ibrahim AbdulKarim','Arjun Nair','Hamid Rezaei','Felix Nguyen', 'Rajeshna Patel',
+  'Diyaco El-Diablo', 'Jin-Song Kim', 'Santiago Martinez', 'Omar Al-Mansoori', 'Tariq Hassan', 
+  'Diego Fernandez', 'Liam McConnor', 'Mateo Silva', 'Ethan Thompson', 'Noah Williams', 'Lucas O\'Reilly'
 ];
 var SOCIAL_NAMES_F = [
-  'Emma Morrison','Taylor Kovacs','Brianna Leclair','Mia Zalenski','Sofia Holmberg',
-  'Maya Webb','Dani Saarinen','Raina Okafor','Luisa Petrov','Keiran Walsh',
-  'Cassidy Forsberg','Hana Lindqvist','Nadia Volkov','Jules Ashworth','Petra Dvoracek',
+  'Emma Morrison','Taylor Kunastov','Brianna Leclair','Mia Zalenski','Sofia Holmberg',
+  'Maya Webb-Paul','Dani Saarinen','Raina Okafor','Luisa Petrov','Keiran Walsh',
+  'Cassidy Forsberg','Hana Lindqvist','Nadia Volkov','Jules Ashworth-Middlestein','Petra Dvoracek',
   'Skylar Callahan','Annika Sundqvist','Riley Fairbanks','Izzy Carvalho','Bea Tremblay',
   'Chloe Ritchie','Vera Malashenko','Sasha Kuznetsov','Margot Healy','Imogen Bernier',
   'Fatima Al-Hassani','Yuki Tanaka','Priya Sharma','Amara Diallo','Mei-Ling Chen',
-  'Valentin Russo','Aisha Osei','Layla Rezaei','Ingrid Haugen','Zara Okonkwo'
+  'Valentin Russo','Aisha Osei','Layla Rezaei-Habib','Ingrid Haugensen','Zara Okonkwo', 
+  'Sofia Martinez', 'Aaliyah Nair', 'Leila Al-Mansoori', 'Nina Watanabe', 'Isabella Fernandez',
+  'Camila Silva', 'Luna Thompson', 'Aria Williams', 'Maya O\'Connor', 'Elena Reyes',
+  'Hajpreet Singh', 'Ava Nguyen', 'Amara Hassan', 'Zara Mahmous', 'Mia Jong'
 ];
 var COACH_NAMES = [
   'Coach Williams','Coach Bruneau','Coach Reilly','Coach MacPherson','Coach Lindqvist',
   'Coach Bertrand','Coach Hakala','Coach Petranuk','Coach Delacroix','Coach Aziz',
-  'Coach Yamamoto','Coach Kowalski','Coach Ferreira','Coach Nkosi','Coach Andersen'
+  'Coach Yamamoto','Coach Kowalski','Coach Ferreira','Coach Nkosi','Coach Andersen', 'Coach Mohammed'
 ];
 var FAN_HANDLES = [
   'HockeyFan2039','PuckHead99','IceTimeDaily','GoalieNerd42','SlapshotKing',
