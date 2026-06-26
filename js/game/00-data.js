@@ -184,7 +184,7 @@ var TEAMS = {
     {n:'Granite State Wildcats',e:'[U]'},{n:'Empire State Lions W',e:'[U]'}
   ],
   USWDL: [
-    {n:'Boston Blades',e:'[U]'},{n:'Providence Seafarers',e:'[U]'},{n:'Rochester Ironhorses',e:'[U]'},
+    {n:'Boston Blades',e:'[U]'},{n:'Providence Seafarers',ee44:'[U]'},{n:'Rochester Ironhorses',e:'[U]'},
     {n:'Hartford Whalemen',e:'[U]'},{n:'Detroit Valkyries Summit',e:'[U]'},{n:'Minneapolis Tempest',e:'[U]'},
     {n:'Chicago Sirens Pulse',e:'[U]'},{n:'Milwaukee Lakeshore',e:'[U]'},{n:'Cleveland Comets',e:'[U]'},
     {n:'Buffalo Beauts Beacon',e:'[U]'},{n:'Pittsburgh Forge',e:'[U]'},{n:'New Jersey Tide',e:'[U]'},
@@ -401,26 +401,26 @@ var START_LEAGUES_F = ['CWHL','NWCHA','USWDL','EWJC','AWJC'];
 var START_LEAGUE_BYPASS_OVR_M=72;
 var START_LEAGUE_BYPASS_OVR_F=50;
 
-/** All skaters (F/D) share this rating set for OVR + moments. */
-var SKATER_RATING_ATTR_KEYS=['skating','shooting','stickhandling','passing','positioning','physical','stamina','defense','shotBlocking','stickChecks','faceoffs','anticipation'];
-/** Tracked on sheet but excluded from OVR (injury/load style). */
-var SKATER_BASE_ATTR_KEYS=['durability','conditioning'];
+/** All skaters (F/D) share this rating set for OVR + moments. OffensiveAwareness = hockey IQ with puck, DefensiveAwareness = positioning/reads without puck. */
+var SKATER_RATING_ATTR_KEYS=['skating','shooting','stickhandling','passing','positioning','physical','stamina','offensiveAwareness','defensiveAwareness'];
+/** Tracked on sheet but excluded from OVR (injury/load style). Faceoffs is centre-only and does not affect OVR. */
+var SKATER_BASE_ATTR_KEYS=['faceoffs','shotBlocking','durability','conditioning'];
 var SKATER_ATTRS_LIST=SKATER_RATING_ATTR_KEYS.concat(SKATER_BASE_ATTR_KEYS);
 
 var ARCHETYPES = {
   F: {
-    Sniper:       {name:'Sniper',      icon:'[*]', desc:'Pure goal scorer. Deadly accuracy, elite shot.',      boosts:{shooting:15,stickhandling:5,physical:-8,passing:-3,defense:-3,shotBlocking:-2,stickChecks:-2,faceoffs:-4,anticipation:4}},
-    Playmaker:    {name:'Playmaker',   icon:'[~]', desc:'Elite vision and distribution. Creates for others.',  boosts:{passing:16,stickhandling:10,skating:5,physical:-8,shooting:-5,defense:-2,shotBlocking:-1,stickChecks:2,faceoffs:2,anticipation:6}},
-    PowerForward: {name:'Power Fwd',   icon:'[!]', desc:'Big body scorer. Dominates corners and crease.',      boosts:{physical:14,shooting:8,stamina:5,skating:-5,stickhandling:-4,defense:2,shotBlocking:4,stickChecks:2,faceoffs:0,anticipation:-2}},
-    TwoWay:       {name:'Two-Way',     icon:'[=]', desc:'Trust-first forward: details, sticks, and lane reads before flash.', boosts:{positioning:18,passing:6,physical:7,stamina:6,shooting:-4,stickhandling:-3,defense:6,shotBlocking:5,stickChecks:7,faceoffs:5,anticipation:5}},
-    Grinder:      {name:'Grinder',     icon:'[G]', desc:'Outworks everyone. Low skill ceiling, high motor.',   boosts:{physical:16,stamina:14,shooting:-12,stickhandling:-10,passing:-4,defense:4,shotBlocking:6,stickChecks:8,faceoffs:2,anticipation:0}},
-    Enforcer:     {name:'Enforcer',    icon:'[X]', desc:'Protector. Fights, hits, intimidates.',               boosts:{physical:20,stamina:8,shooting:-16,passing:-12,stickhandling:-8,defense:2,shotBlocking:3,stickChecks:4,faceoffs:-4,anticipation:-6}}
+    Sniper:       {name:'Sniper',      icon:'[*]', desc:'Pure goal scorer. Deadly accuracy, elite shot.',      boosts:{shooting:15,stickhandling:5,physical:-8,passing:-3,offensiveAwareness:4,defensiveAwareness:-3,shotBlocking:-2,faceoffs:-4}},
+    Playmaker:    {name:'Playmaker',   icon:'[~]', desc:'Elite vision and distribution. Creates for others.',  boosts:{passing:16,stickhandling:10,skating:5,physical:-8,shooting:-5,offensiveAwareness:6,defensiveAwareness:-2,shotBlocking:-1,faceoffs:2}},
+    PowerForward: {name:'Power Fwd',   icon:'[!]', desc:'Big body scorer. Dominates corners and crease.',      boosts:{physical:14,shooting:8,stamina:5,skating:-5,stickhandling:-4,offensiveAwareness:-2,defensiveAwareness:2,shotBlocking:4,faceoffs:0}},
+    TwoWay:       {name:'Two-Way',     icon:'[=]', desc:'Trust-first forward: details, sticks, and lane reads before flash.', boosts:{positioning:18,passing:6,physical:7,stamina:6,shooting:-4,stickhandling:-3,offensiveAwareness:5,defensiveAwareness:8,shotBlocking:5,faceoffs:5}},
+    Grinder:      {name:'Grinder',     icon:'[G]', desc:'Outworks everyone. Low skill ceiling, high motor.',   boosts:{physical:16,stamina:14,shooting:-12,stickhandling:-10,passing:-4,offensiveAwareness:0,defensiveAwareness:6,shotBlocking:6,faceoffs:2}},
+    Enforcer:     {name:'Enforcer',    icon:'[X]', desc:'Protector. Fights, hits, intimidates.',               boosts:{physical:20,stamina:8,shooting:-16,passing:-12,stickhandling:-8,offensiveAwareness:-6,defensiveAwareness:2,shotBlocking:3,faceoffs:-4}}
   },
   D: {
-    OffensiveD:   {name:'Offensive D', icon:'[+]', desc:'Offensive defenseman — joins the attack, shoots and passes from the blue line.', boosts:{passing:18,skating:10,defense:-12,shotBlocking:-6,shooting:6,stickhandling:4,stickChecks:-2,faceoffs:-2,anticipation:3}},
-    StayAtHome:   {name:'Stay-at-Home',icon:'[S]', desc:'No offense, all defense. Hard to play against.',      boosts:{defense:16,physical:12,shotBlocking:10,skating:-6,passing:-8,shooting:-6,stickhandling:-8,stickChecks:6,faceoffs:2,anticipation:4}},
-    TwoWayD:      {name:'Two-Way D',   icon:'[=]', desc:'Balanced blueliner — leans defensive without going full lockdown.', boosts:{defense:11,positioning:6,shotBlocking:5,passing:7,skating:5,physical:4,shooting:2,stickhandling:2,stickChecks:5,faceoffs:3,anticipation:4}},
-    ShutdownD:    {name:'Shutdown D',  icon:'[L]', desc:'Assignment: stop the other teams best player.',       boosts:{defense:18,positioning:12,skating:4,shotBlocking:8,passing:-10,shooting:-4,stickhandling:-6,stickChecks:8,faceoffs:2,anticipation:6}}
+    OffensiveD:   {name:'Offensive D', icon:'[+]', desc:'Offensive defenseman — joins the attack, shoots and passes from the blue line.', boosts:{passing:18,skating:10,defensiveAwareness:-8,shotBlocking:-6,shooting:6,stickhandling:4,offensiveAwareness:6,faceoffs:-2}},
+    StayAtHome:   {name:'Stay-at-Home',icon:'[S]', desc:'No offense, all defense. Hard to play against.',      boosts:{defensiveAwareness:16,physical:12,shotBlocking:10,skating:-6,passing:-8,shooting:-6,stickhandling:-8,offensiveAwareness:-4,faceoffs:2}},
+    TwoWayD:      {name:'Two-Way D',   icon:'[=]', desc:'Balanced blueliner — leans defensive without going full lockdown.', boosts:{defensiveAwareness:12,positioning:6,shotBlocking:5,passing:7,skating:5,physical:4,shooting:2,stickhandling:2,offensiveAwareness:6,faceoffs:3}},
+    ShutdownD:    {name:'Shutdown D',  icon:'[L]', desc:'Assignment: stop the other teams best player.',       boosts:{defensiveAwareness:18,positioning:12,skating:4,shotBlocking:8,passing:-10,shooting:-4,stickhandling:-6,offensiveAwareness:-2,faceoffs:2}}
   },
   G: {
     Butterfly:    {name:'Butterfly',   icon:'[B]', desc:'Positioning and post-sealing. Classic modern style.', boosts:{positioning:16,reboundControl:10,glove:-4,stamina:4}},
@@ -514,26 +514,28 @@ function ensureUnifiedSkaterAttrs(G){
   if(typeof a.positioning!=='number'||isNaN(a.positioning)) a.positioning=55;
   if(typeof a.physical!=='number'||isNaN(a.physical)) a.physical=55;
   if(typeof a.stamina!=='number'||isNaN(a.stamina)) a.stamina=55;
-  if(typeof a.defense!=='number'||isNaN(a.defense)){
-    a.defense=blend(r('positioning',60),r('physical',58))+(G.pos==='D'?6:0);
-  }
-  if(typeof a.shotBlocking!=='number'||isNaN(a.shotBlocking)){
-    a.shotBlocking=blend(r('defense',a.defense),r('positioning',60));
-  }
   if(typeof a.shooting!=='number'||isNaN(a.shooting)){
     a.shooting=blend(r('stickhandling',55),r('passing',a.passing));
   }
   if(typeof a.stickhandling!=='number'||isNaN(a.stickhandling)){
     a.stickhandling=blend(r('passing',a.passing),r('shooting',a.shooting));
   }
-  if(typeof a.stickChecks!=='number'||isNaN(a.stickChecks)){
-    a.stickChecks=Math.round(cl(blend(r('defense',a.defense),r('positioning',a.positioning))+(r('physical',a.physical)-60)*0.2,22,96));
+  // New awareness attributes
+  if(typeof a.offensiveAwareness!=='number'||isNaN(a.offensiveAwareness)){
+    a.offensiveAwareness=blend(r('positioning',60),r('passing',a.passing))+(G.pos==='F'?3:0);
+  }
+  if(typeof a.defensiveAwareness!=='number'||isNaN(a.defensiveAwareness)){
+    a.defensiveAwareness=blend(r('positioning',60),r('physical',58))+(G.pos==='D'?6:0);
+  }
+  // Legacy cleanup - map old defense to defensiveAwareness for save compat
+  if(typeof a.defense!=='number'&&typeof a.defensiveAwareness==='number'){
+    a.defense=a.defensiveAwareness;
   }
   if(typeof a.faceoffs!=='number'||isNaN(a.faceoffs)){
-    a.faceoffs=Math.round(cl(blend(r('stickChecks',a.stickChecks),r('positioning',a.positioning))+((G.subPos||'')==='C'?5:0),22,96));
+    a.faceoffs=Math.round(cl(blend(r('positioning',a.positioning),r('offensiveAwareness',a.offensiveAwareness))+((G.subPos||'')==='C'?5:0),22,96));
   }
-  if(typeof a.anticipation!=='number'||isNaN(a.anticipation)){
-    a.anticipation=blend(r('positioning',a.positioning),r('passing',a.passing));
+  if(typeof a.shotBlocking!=='number'||isNaN(a.shotBlocking)){
+    a.shotBlocking=blend(r('defensiveAwareness',a.defensiveAwareness),r('positioning',60));
   }
   if(typeof a.durability!=='number'||isNaN(a.durability)){
     a.durability=blend(typeof G.health==='number'?G.health:88, r('stamina',a.stamina));
@@ -549,20 +551,23 @@ function ensureUnifiedSkaterAttrs(G){
   try{ ensureSecondarySubPos(G); }catch(eSec){}
 }
 
-/** Moment / shootout rolls: faceoffs blend stick checks; centres get a small draw bonus (only position-tied mechanic). */
+/** Moment / shootout rolls: faceoffs uses faceoffs attr + positioning; centres get a draw bonus. stickChecks/anticipation mapped to defensiveAwareness/offensiveAwareness. */
 function getMomentAttrValue(attrName, GG){
   if(!GG) GG=typeof G!=='undefined'?G:null;
   if(!GG||!GG.attrs) return 60;
   var attrs=GG.attrs;
   var t=String(attrName||'');
   if(t==='faceoffs'){
-    return 0.5*(+attrs.faceoffs||60)+0.5*(+attrs.stickChecks||60)+((GG.subPos||'')==='C'?3.5:0);
+    return 0.5*(+attrs.faceoffs||60)+0.5*(+attrs.positioning||60)+((GG.subPos||'')==='C'?3.5:0);
   }
-  if(t==='stickChecks'){
-    return (+attrs.stickChecks||60)+0.2*((+attrs.defense||60)-60);
+  if(t==='stickChecks'||t==='defensiveAwareness'){
+    return (+attrs.defensiveAwareness||60)+0.15*((+attrs.physical||60)-60);
   }
-  if(t==='anticipation'){
-    return (+attrs.anticipation||60)+0.15*((+attrs.positioning||60)-60);
+  if(t==='anticipation'||t==='offensiveAwareness'){
+    return (+attrs.offensiveAwareness||60)+0.15*((+attrs.positioning||60)-60);
+  }
+  if(t==='defense'){
+    return (+attrs.defensiveAwareness||60)+0.1*((+attrs.physical||60)-60);
   }
   return +attrs[t]||60;
 }
@@ -634,16 +639,18 @@ function getLeagueAttrDevMultiplier(leagueKey, teamName, attr){
 }
 var ATTR_LABELS = {
   skating:'SKATING',shooting:'SHOOTING',stickhandling:'STICKHAND',passing:'PASSING',
-  positioning:'POSITIONING',physical:'PHYSICAL',stamina:'STAMINA',defense:'DEFENSE',
-  shotBlocking:'SHOT-BLOCK',stickChecks:'STICK CHECKS',faceoffs:'FACEOFFS',anticipation:'ANTICIPATION',
+  positioning:'POSITIONING',physical:'PHYSICAL',stamina:'STAMINA',
+  offensiveAwareness:'OFF. AWARENESS',defensiveAwareness:'DEF. AWARENESS',
+  faceoffs:'FACEOFFS',shotBlocking:'SHOT-BLOCK',
   durability:'DURABILITY',conditioning:'CONDITIONING',
   reflexes:'REFLEXES',glove:'GLOVE',blocker:'BLOCKER',
   reboundControl:'REBOUNDS',mental:'MENTAL'
 };
 var ATTR_COLORS = {
   skating:'#00d2d3',shooting:'#d63031',stickhandling:'#fd79a8',passing:'#6c5ce7',
-  positioning:'#0984e3',physical:'#e17055',stamina:'#00b894',defense:'#74b9ff',
-  shotBlocking:'#a29bfe',stickChecks:'#a8e6cf',faceoffs:'#fab1a0',anticipation:'#dfe6e9',
+  positioning:'#0984e3',physical:'#e17055',stamina:'#00b894',
+  offensiveAwareness:'#a29bfe',defensiveAwareness:'#74b9ff',
+  faceoffs:'#fab1a0',shotBlocking:'#a8e6cf',
   durability:'#55efc4',conditioning:'#81ecec',
   reflexes:'#ff7675',glove:'#fdcb6e',blocker:'#81ecec',
   reboundControl:'#55efc4',mental:'#dfe6e9'

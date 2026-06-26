@@ -396,7 +396,7 @@ function ovr(attrs, pos){
     }
     return gc?Math.round(gs/gc):60;
   }
-  var keys=typeof SKATER_RATING_ATTR_KEYS!=='undefined'?SKATER_RATING_ATTR_KEYS:['skating','shooting','stickhandling','passing','positioning','physical','stamina'];
+  var keys=typeof SKATER_RATING_ATTR_KEYS!=='undefined'?SKATER_RATING_ATTR_KEYS:['skating','shooting','stickhandling','passing','positioning','physical','stamina','offensiveAwareness','defensiveAwareness'];
   var ss=0,cc=0;
   for(var j=0;j<keys.length;j++){
     var vv=attrs[keys[j]];

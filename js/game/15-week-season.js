@@ -67,10 +67,10 @@ function getPlayoffSimGrindPowerBonus(){
   if(typeof G==='undefined'||!G||!G.attrs) return 0;
   var bon=((G.attrs.physical!=null?G.attrs.physical:60)-60)/50;
   if(G.pos==='D'){
-    bon+=((G.attrs.defense||60)+(G.attrs.shotBlocking||60)+(G.attrs.positioning||60)-180)/110;
+    bon+=((G.attrs.defensiveAwareness||60)+(G.attrs.shotBlocking||60)+(G.attrs.positioning||60)-180)/110;
   }
   if(G.pos==='F'){
-    bon+=((G.attrs.stickChecks||60)+(G.attrs.defense||60)+(G.attrs.anticipation||60)-180)/130;
+    bon+=((G.attrs.defensiveAwareness||60)+(G.attrs.offensiveAwareness||60)+(G.attrs.positioning||60)-180)/130;
   }
   if(G.xFactor==='brat') bon+=0.26;
   if(G.xFactor==='heavy_hitter') bon+=0.2;

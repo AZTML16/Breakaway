@@ -387,7 +387,7 @@ function renderAttrTab(){
   var potK=G.potential&&POTENTIALS[G.potential]?G.potential:'support';
   html+='<div class="vt" style="font-size:13px;color:var(--mut);margin-bottom:10px;line-height:1.45">'+
     '<span style="color:var(--acc)">Projection:</span> '+potentialTierWord(potK)+' — '+POTENTIALS[potK].desc+'</div>';
-  html+='<div class="vt" style="font-size:12px;color:var(--mut);margin-bottom:10px;line-height:1.45">Forwards and D share the same sheet. <b>OVR</b> uses the rating row only. <b>Listed spot</b> ('+String(G.subPos||'—')+') nudges centre faceoff rolls only. <b>Comfort spare</b> is a second natural spot (not everyone has one); moving there is easy — selling coaches on a brand-new spot costs more. <b>Durability / conditioning</b> are tracked but not in OVR.</div>';
+  html+='<div class="vt" style="font-size:12px;color:var(--mut);margin-bottom:10px;line-height:1.45">Forwards and D share the same sheet. <b>OVR</b> uses: Skating, Shooting, Stickhandling, Passing, Positioning, Physical, Stamina, Off. Awareness, Def. Awareness. <b>Faceoffs</b> and <b>Shot-Blocking</b> are tracked but do not affect OVR — faceoffs matter only for centres. <b>Listed spot</b> ('+String(G.subPos||'—')+') nudges centre faceoff rolls only. <b>Comfort spare</b> is a second natural spot (not everyone has one); moving there is easy — selling coaches on a brand-new spot costs more. <b>Durability / conditioning</b> are tracked but not in OVR.</div>';
   if(G.pos==='F'||G.pos==='D'){
     var spare=G.secondarySubPos?String(G.secondarySubPos):'';
     html+='<div class="vt" style="font-size:11px;color:var(--acc);margin-bottom:6px">LISTED: <b>'+String(G.subPos||'—')+'</b> &nbsp;·&nbsp; COMFORT SPARE: <b>'+(spare||'none')+'</b></div>';

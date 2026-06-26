@@ -15,7 +15,7 @@ function selectOption(idx,auto){
   var moraleBonus=(G.morale-60)*0.001;
   var weightDelta=((G.weight||180)-190)/1000;
   var weightImpact=0;
-  if(G.pos==='G' || opt.a==='physical' || opt.a==='positioning' || opt.a==='stickChecks') weightImpact=weightDelta;
+  if(G.pos==='G' || opt.a==='physical' || opt.a==='positioning' || opt.a==='stickChecks' || opt.a==='defensiveAwareness') weightImpact=weightDelta;
   if(opt.a==='skating' || opt.a==='agility') weightImpact=-weightDelta*0.8;
   var leagueDiff=(1.1 - (G.league.dev||1.0))*0.10; // higher league harder, lower league easier
   var mediaStress=(G.morale<45?0.03:0) + (G.league.tier==='pro'?0.02:0);
@@ -29,9 +29,9 @@ function selectOption(idx,auto){
   if(G._playoffCtx&&G._isPlayoffGame){
     var phGr=(G.attrs.physical||60)-60;
     playoffGrindEdge+=phGr/850;
-    if(G.pos==='D') playoffGrindEdge+=((G.attrs.defense||60)+(G.attrs.shotBlocking||60)-120)/720;
+    if(G.pos==='D') playoffGrindEdge+=((G.attrs.defensiveAwareness||60)+(G.attrs.shotBlocking||60)-120)/720;
     if(opt.a==='physical') playoffGrindEdge+=0.044;
-    if(G.pos==='D'&&(opt.a==='defense'||opt.a==='shotBlocking'||opt.a==='positioning')) playoffGrindEdge+=0.036;
+    if(G.pos==='D'&&(opt.a==='defensiveAwareness'||opt.a==='defense'||opt.a==='shotBlocking'||opt.a==='positioning')) playoffGrindEdge+=0.036;
     if(G.xFactor==='brat'){
       if(opt.a==='physical'||opt.reward==='fight'||opt.reward==='scrum') playoffGrindEdge+=0.048;
       if(G.pos==='D') playoffGrindEdge+=0.024;
