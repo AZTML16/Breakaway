@@ -388,11 +388,12 @@ input[type=text],select{background:var(--rink);border:1px solid var(--rl);color:
 input[type=text]:focus,select:focus{border-color:var(--gold)}
 select option{background:var(--rm)}
 input[type=range]{width:100%;accent-color:var(--gold);margin:6px 0}
-.sbar{height:10px;background:var(--rink);border:1px solid var(--rl);overflow:hidden;flex:1}
-.sfill{height:100%;transition:width .4s}
-.srow{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+.sbar{height:10px;background:var(--rink);border:1px solid var(--rl);overflow:hidden;flex:1 1 0;min-width:0;position:relative;box-sizing:border-box;border-radius:1px}
+.sfill{height:100%;min-width:0;max-width:100%;box-sizing:border-box;transition:width .35s ease;display:block;border-radius:1px}
+.sfill[data-pct]{min-width:1px}
+.srow{display:flex;align-items:center;gap:10px;margin-bottom:7px;width:100%;min-width:0}
 .slbl{font-family:'VT323',monospace;font-size:15px;color:var(--mut);width:130px;flex-shrink:0}
-.sval{font-family:'VT323',monospace;font-size:15px;width:28px;text-align:right}
+.sval{font-family:'VT323',monospace;font-size:15px;width:32px;flex-shrink:0;text-align:right}
 .stbox{background:var(--rink);border:1px solid var(--rl);padding:8px 4px;text-align:center}
 .stlbl{font-family:'VT323',monospace;font-size:12px;color:var(--mut);letter-spacing:1px;margin-bottom:2px}
 .stval{font-family:'VT323',monospace;font-size:22px}
@@ -474,7 +475,10 @@ input[type=range]{width:100%;accent-color:var(--gold);margin:6px 0}
 .arch-card.sel{border-color:var(--gold);background:rgba(245,200,66,.1);border-width:2px}
 .arch-name{font-family:'VT323',monospace;font-size:18px;color:var(--gold);margin-bottom:4px}
 .arch-desc{font-family:'VT323',monospace;font-size:13px;color:var(--mut);line-height:1.5}
-.attr-row-d{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.attr-row-d{display:flex;align-items:center;gap:8px;margin-bottom:10px;width:100%}
+.attr-row-d .slbl{width:108px;font-size:14px}
+.attr-row-d .sbar{flex:1 1 0;min-width:56px;max-width:100%}
+.attr-row-d .sval{width:36px;flex-shrink:0}
 .attr-btn{font-family:'VT323',monospace;font-size:18px;border:1px solid var(--rl);background-image:var(--crt-line-h);background-color:transparent;color:var(--wht);cursor:pointer;width:28px;height:28px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .attr-btn:hover{border-color:var(--gold);color:var(--gold)}
 .attr-btn:disabled{opacity:.3;cursor:default}
@@ -608,6 +612,29 @@ input[type=range]{width:100%;accent-color:var(--gold);margin:6px 0}
 /* DRAFT SCREEN STYLES */
 .draft-reveal{background:rgba(245,200,66,.06);border:2px solid var(--gold);padding:18px;text-align:center;margin-bottom:12px}
 .draft-pick-num{font-family:'Press Start 2P',monospace;font-size:9px;color:var(--gold);margin-bottom:8px;letter-spacing:1px}
+/* Pro draft full-screen reveal */
+.pro-draft-screen{
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%,rgba(232,200,92,.12),transparent 55%),
+    linear-gradient(180deg,#0c1a28 0%,#060e16 42%,#0a1420 100%);
+  min-height:100vh;
+  display:none;
+}
+.pro-draft-screen.on{display:flex;align-items:center;justify-content:center;padding:20px 16px 32px}
+.pro-draft-wrap{
+  text-align:center;width:100%;max-width:680px;
+  border:2px solid rgba(232,200,92,.45);
+  background:rgba(8,18,28,.88);
+  padding:28px 20px 24px;
+  box-shadow:0 0 48px rgba(232,200,92,.12),inset 0 0 40px rgba(0,0,0,.35);
+}
+.pro-draft-eyebrow{font-size:13px;color:var(--mut);letter-spacing:4px;margin-bottom:8px}
+.pro-draft-league-hdr{font-size:22px;color:var(--gold);letter-spacing:3px;margin-bottom:4px}
+.pro-draft-team-name{font-size:34px;color:var(--wht);margin:10px 0 6px;line-height:1.15}
+.pro-draft-selects{font-size:15px;color:var(--mut);letter-spacing:2px;margin-bottom:6px}
+.pro-draft-player-line{font-size:20px;color:var(--acc);margin-bottom:14px}
+.pro-draft-rights{font-size:14px;color:var(--mut);line-height:1.55;max-width:520px;margin:0 auto 20px;padding:0 8px}
+.pro-draft-continue{margin-top:8px;min-width:200px}
 .retro-audio-hint{
   font-family:'Silkscreen','VT323',monospace;font-size:10px;color:var(--acc);text-align:center;margin:10px 0 14px;letter-spacing:3px;
   border:2px dashed rgba(0,255,204,.4);padding:8px 12px;background:rgba(0,20,35,.45);text-shadow:0 0 10px var(--glow-acc);

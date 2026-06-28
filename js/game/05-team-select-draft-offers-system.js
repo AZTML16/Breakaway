@@ -26,9 +26,10 @@ function goToTeamSelect(){
     html+='<div class="draft-reveal">';
     html+='<div class="vt" style="font-size:12px;color:var(--mut);letter-spacing:2px;margin-bottom:4px">'+l.name.toUpperCase()+'</div>';
     html+='<div class="retro-puck-graphic lg" style="margin:8px 0"><div class="puck-disc"></div></div>';
-    html+='<div class="draft-pick-num">ROUND '+draftRd+' &mdash; PICK '+pick+'</div>';
+    html+='<div class="draft-pick-num">ROUND '+draftRd+' — PICK '+pick+'</div>';
     html+='<div class="vt" style="font-size:26px;color:var(--wht);margin-bottom:4px">'+draftedTeam.n+'</div>';
     html+='<div class="vt" style="font-size:16px;color:var(--mut)">SELECTS YOU WITH THE '+pick+(pick===1?'ST':pick===2?'ND':pick===3?'RD':'TH')+' PICK</div>';
+    html+='<div class="vt" style="font-size:15px;color:var(--gold);margin-top:6px">'+formatPlayerPositionLabel(selPos, selSubPos)+'</div>';
     html+='</div>';
     html+='<div class="lcard sel" id="tc-0" onclick="pickTeam(0)">';
     html+='<span class="badge gold">DRAFTED</span> <span class="vt" style="font-size:17px">'+draftedTeam.n+'</span>';
@@ -40,6 +41,36 @@ function goToTeamSelect(){
       html+='<span class="badge mut">UNDRAFTED FREE AGENT</span><br>';
       html+='<span class="vt" style="font-size:16px">'+undrafted[i].n+'</span>';
       html+='<div class="vt" style="font-size:13px;color:var(--mut);margin-top:3px">Sign as undrafted -- potentially more ice time</div>';
+      html+='</div>';
+    }
+  } else if(tier==='local'){
+    var nat=safeEl('c-nat')?safeEl('c-nat').value:'Canada';
+    var homeTeam=typeof getLocalTeamForNat==='function'?getLocalTeamForNat(nat, l.gender):teams[0];
+    var madeTeam=typeof qualifiesForLocalTeam==='function'?qualifiesForLocalTeam(nat):true;
+    if(!madeTeam){
+      G._availableTeams=null;
+      G._selTeamIdx=-1;
+      safeEl('team-select-hdr').textContent='TRYOUT DENIED';
+      safeEl('team-select-title').textContent='LHL NOT AVAILABLE';
+      safeEl('team-select-sub').textContent=(homeTeam?homeTeam.n.toUpperCase():nat.toUpperCase())+' — COMMUNITY CIRCUIT';
+      html+='<div class="vt" style="font-size:14px;color:var(--red);margin-bottom:10px;border-left:3px solid var(--red);padding-left:8px">';
+      html+='<b>LHL is for growing hockey markets.</b> From <b>'+nat+'</b>, start in junior or overseas development instead.';
+      if(typeof getLocalBlockedNatHint==='function') html+=' '+getLocalBlockedNatHint(nat);
+      html+='</div>';
+      html+='<button type="button" class="btn bp bw" onclick="goToLeague()">BACK TO LEAGUE SELECT</button>';
+    } else {
+      G._availableTeams=[homeTeam];
+      G._selTeamIdx=0;
+      safeEl('team-select-hdr').textContent='HOME CLUB INVITE';
+      safeEl('team-select-title').textContent='LOCAL COMMUNITY HOCKEY';
+      safeEl('team-select-sub').textContent='YOUR REGIONAL CLUB WANTS YOU ON THE ROSTER:';
+      html+='<div class="vt" style="font-size:14px;color:var(--acc);margin-bottom:10px;border-left:3px solid var(--acc);padding-left:8px">';
+      html+='Lowest level — no tryout bar. <b>12 league games</b> plus community events over 9 weeks — strong development focus.';
+      html+='</div>';
+      html+='<div class="lcard sel" id="tc-0" onclick="pickTeam(0)">';
+      html+='<span class="badge green">HOME CLUB</span><br>';
+      html+='<span class="vt" style="font-size:18px">'+homeTeam.n+'</span>';
+      html+='<div class="vt" style="font-size:13px;color:var(--mut);margin-top:4px">Community program — no salary, all reps</div>';
       html+='</div>';
     }
   } else if(tier==='college'){
@@ -75,7 +106,7 @@ function goToTeamSelect(){
       html+='<div class="lcard'+(i===0?' sel':'')+'" id="tc-'+i+'" onclick="pickTeam('+i+')">';
       html+='<span class="vt" style="font-size:18px">'+t.e+' '+t.n+'</span>';
       if(offerSal>0){
-        html+='<div class="vt" style="font-size:15px;color:var(--green);margin-top:4px">OFFER: '+fmt(offerSal)+'/yr &mdash; '+offerYrs+'-YEAR DEAL</div>';
+        html+='<div class="vt" style="font-size:15px;color:var(--green);margin-top:4px">OFFER: '+fmt(offerSal)+'/yr — '+offerYrs+'-YEAR DEAL</div>';
       }
       html+='</div>';
     }

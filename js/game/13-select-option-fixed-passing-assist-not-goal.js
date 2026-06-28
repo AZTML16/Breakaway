@@ -75,7 +75,8 @@ function selectOption(idx,auto){
         updateScoreboard();
         RetroSound.assist();
       } else if(reward==='fight'){
-        gameStats.pm=(gameStats.pm||0)+5;
+        gameStats.pm=(gameStats.pm||0)+1;
+        gameStats.pim=(gameStats.pim||0)+5;
         resultText='YOU WIN THE GOALIE SCRAP -- ARENA ERUPTS!';
         resultClass='win';
         RetroSound.defensiveStop();
@@ -105,7 +106,8 @@ function selectOption(idx,auto){
       updateScoreboard();
       RetroSound.goal();
     } else if(reward==='fight'){
-      gameStats.pm=(gameStats.pm||0)+2;
+      gameStats.pm=(gameStats.pm||0)+1;
+      gameStats.pim=(gameStats.pim||0)+5;
       resultText='YOU WIN THE TILT -- BENCH LOSES IT!';
       resultClass='win';
       RetroSound.defensiveStop();
@@ -125,6 +127,9 @@ function selectOption(idx,auto){
       RetroSound.puck();
     }
     G.morale=cl(G.morale+2,0,100);
+    if(opt.a==='physical'&&opt.risk==='HIGH'&&G.pos!=='G'&&reward!=='fight'){
+      gameStats.pim=(gameStats.pim||0)+2;
+    }
   } else if(outcome==='partial'){
     if(G.pos==='G'){
       if(reward==='goal'||reward==='assist'){
@@ -132,7 +137,8 @@ function selectOption(idx,auto){
         resultClass='partial';
         RetroSound.partialSave();
       } else if(reward==='fight'){
-        gameStats.pm=(gameStats.pm||0)+2;
+        gameStats.pm=(gameStats.pm||0)+0;
+        gameStats.pim=(gameStats.pim||0)+2;
         resultText='REF STEPS IN -- BOTH GET ROUGHING.';
         resultClass='partial';
         RetroSound.partial();
@@ -142,12 +148,20 @@ function selectOption(idx,auto){
         RetroSound.partialSave();
       }
     } else if(reward==='assist'){
-      gameStats.sog++;
-      resultText='PASS SLIGHTLY OFF -- SHOT ON GOAL CREATED.';
-      resultClass='partial';
-      RetroSound.partial();
+      if(Math.random()<0.44){
+        gameStats.a++;
+        resultText='SECONDARY ASSIST -- PLAY KEPT ALIVE!';
+        resultClass='partial';
+        RetroSound.assist();
+      } else {
+        gameStats.sog++;
+        resultText='PASS SLIGHTLY OFF -- SHOT ON GOAL CREATED.';
+        resultClass='partial';
+        RetroSound.partial();
+      }
     } else if(reward==='fight'||reward==='scrum'){
-      gameStats.pm=(gameStats.pm||0)+2;
+      gameStats.pm=(gameStats.pm||0)+0;
+      if(reward==='fight') gameStats.pim=(gameStats.pim||0)+2;
       resultText='MESSY -- NO CLEAR WIN ON EITHER SIDE.';
       resultClass='partial';
       RetroSound.partial();
@@ -172,13 +186,17 @@ function selectOption(idx,auto){
       else resultText='BEAT CLEAN -- PUCK IN!';
     } else {
       if(reward==='fight'){
-        gameStats.pm=(gameStats.pm||0)+5;
+        gameStats.pm=(gameStats.pm||0)-1;
+        gameStats.pim=(gameStats.pim||0)+5;
         resultText='YOU EAT THE DECISION -- LONG WALK.';
       } else {
         resultText='DID NOT WORK -- TURNOVER!';
       }
     }
     G.morale=cl(G.morale-(reward==='fight'&&G.pos!=='G'?5:3),0,100);
+    if(opt.a==='physical'&&G.pos!=='G'){
+      gameStats.pim=(gameStats.pim||0)+(opt.risk==='HIGH'?4:2);
+    }
     resultClass='lose';
     if(G.pos==='G') RetroSound.goalAgainst(); else RetroSound.turnover();
   }

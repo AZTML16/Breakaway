@@ -18,7 +18,7 @@ function renderRetire(){
   statHtml+='<div class="stbox"><div class="stlbl">SEASONS</div><div class="stval">'+(G.season-1)+'</div></div>';
   statHtml+='<div class="stbox"><div class="stlbl">GP</div><div class="stval">'+G.cGP+'</div></div>';
   if(isGoalie){
-    var rSvPct=G.cSaves+(G.cGoalsAgainst||0)>0?(Math.round(G.cSaves/(G.cSaves+(G.cGoalsAgainst||0))*1000)/10)+'%':'--';
+    var rSvPct=formatSvPctFromCounts(G.cSaves,G.cGoalsAgainst||0);
     var rGAA=G.cGP>0?Math.round(((G.cGoalsAgainst||0)/G.cGP)*100)/100:'--';
     statHtml+='<div class="stbox"><div class="stlbl">SV</div><div class="stval" style="color:var(--green)">'+G.cSaves+'</div></div>';
     statHtml+='<div class="stbox"><div class="stlbl">GA</div><div class="stval" style="color:var(--red)">'+(G.cGoalsAgainst||0)+'</div></div>';

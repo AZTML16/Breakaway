@@ -2,57 +2,71 @@
 // ============================================================
 // DATA
 // ============================================================
+// NATS — see country-list.js (195 countries, A–Z)
 
-var NATS = [
-  {c:'CA',n:'Canada'},{c:'US',n:'United States'},{c:'SE',n:'Swedish'},
-  {c:'FI',n:'Finnish'},{c:'RU',n:'Russian'},{c:'CZ',n:'Czech'},
-  {c:'SK',n:'Slovak'},{c:'CH',n:'Swiss'},{c:'DE',n:'German'},
-  {c:'AT',n:'Austrian'},{c:'LV',n:'Latvian'},{c:'BY',n:'Belarusian'},
-  {c:'SI',n:'Slovenian'},{c:'DK',n:'Danish'},{c:'NO',n:'Norwegian'},
-  {c:'FR',n:'French'},{c:'JP',n:'Japanese'},{c:'KR',n:'South Korean'},
-  {c:'CN',n:'Chinese'},{c:'AU',n:'Australian'},{c:'HU',n:'Hungarian'},
-  {c:'PL',n:'Polish'},{c:'IT',n:'Italian'},{c:'KZ',n:'Kazakhstani'},
-  {c:'UA',n:'Ukrainian'},{c:'NL',n:'Dutch'},{c:'BE',n:'Belgian'},
-  {c:'GB',n:'British'},{c:'IE',n:'Irish'},{c:'BR',n:'Brazilian'},
-  {c:'MX',n:'Mexican'},{c:'ZA',n:'South African'},{c:'NG',n:'Nigerian'},
-  {c:'GH',n:'Ghanaian'},{c:'IN',n:'Indian'},{c:'TR',n:'Turkish'},
-  {c:'SA',n:'Saudi Arabian'},{c:'EE',n:'Estonian'},{c:'LT',n:'Lithuanian'},
-  {c:'RO',n:'Romanian'},{c:'HR',n:'Croatian'},{c:'RS',n:'Serbian'},
-  {c:'NZ',n:'New Zealander'},{c:'AR',n:'Argentinian'},{c:'CO',n:'Colombian'},
-  {c:'PT',n:'Portuguese'},{c:'ES',n:'Spanish'},{c:'GR',n:'Greek'},
-  {c:'MA',n:'Moroccan'},{c:'IR',n:'Iranian'},{c:'MN',n:'Mongolian'},
-  {c:'EG',n:'Egyptian'},{c:'TN',n:'Tunisian'},{c:'DZ',n:'Algerian'},
-  {c:'KE',n:'Kenyan'},{c:'ET',n:'Ethiopian'},{c:'PK',n:'Pakistani'},
-  {c:'BD',n:'Bangladeshi'},{c:'LK',n:'Sri Lankan'},{c:'PH',n:'Filipino'},
-  {c:'TH',n:'Thai'},{c:'ID',n:'Indonesian'},{c:'MY',n:'Malaysian'},
-  {c:'CL',n:'Chilean'},{c:'PE',n:'Peruvian'},{c:'VE',n:'Venezuelan'},
-  {c:'UY',n:'Uruguayan'},{c:'CR',n:'Costa Rican'},{c:'DO',n:'Dominican'}
-];
+/** Canonical country labels (migrates legacy demonym strings from older saves). */
+function normalizePlayerNat(nat){
+  var n=String(nat||'').trim();
+  var demonymMap={
+    'Canadian':'Canada','American':'United States','Swedish':'Sweden','Finnish':'Finland',
+    'Russian':'Russia','Czech':'Czech Republic','Slovak':'Slovakia','Swiss':'Switzerland',
+    'German':'Germany','Austrian':'Austria','Latvian':'Latvia','Belarusian':'Belarus',
+    'Slovenian':'Slovenia','Danish':'Denmark','Norwegian':'Norway','French':'France',
+    'Japanese':'Japan','South Korean':'South Korea','Chinese':'China','Australian':'Australia',
+    'Hungarian':'Hungary','Polish':'Poland','Italian':'Italy','Kazakhstani':'Kazakhstan',
+    'Ukrainian':'Ukraine','Dutch':'Netherlands','Belgian':'Belgium','British':'United Kingdom',
+    'Irish':'Ireland','Brazilian':'Brazil','Mexican':'Mexico','South African':'South Africa',
+    'Nigerian':'Nigeria','Ghanaian':'Ghana','Indian':'India','Turkish':'Turkey',
+    'Saudi Arabian':'Saudi Arabia','Estonian':'Estonia','Lithuanian':'Lithuania',
+    'Romanian':'Romania','Croatian':'Croatia','Serbian':'Serbia','New Zealander':'New Zealand',
+    'Argentinian':'Argentina','Colombian':'Colombia','Portuguese':'Portugal','Spanish':'Spain',
+    'Greek':'Greece','Moroccan':'Morocco','Iranian':'Iran','Mongolian':'Mongolia',
+    'Egyptian':'Egypt','Tunisian':'Tunisia','Algerian':'Algeria','Kenyan':'Kenya',
+    'Ethiopian':'Ethiopia','Pakistani':'Pakistan','Bangladeshi':'Bangladesh',
+    'Sri Lankan':'Sri Lanka','Filipino':'Philippines','Thai':'Thailand',
+    'Indonesian':'Indonesia','Malaysian':'Malaysia','Chilean':'Chile','Peruvian':'Peru',
+    'Venezuelan':'Venezuela','Uruguayan':'Uruguay','Costa Rican':'Costa Rica',
+    'Dominican':'Dominican Republic'
+  };
+  if(demonymMap[n]) return demonymMap[n];
+  return n;
+}
 
-/** Schedule / team counts mirror real circuits (fictional names): PHL≈NHL, NAML≈AHL, OJL≈OHL, QMJL≈QMJHL, WJL≈WHL, NCHA≈NCAA D-I men, USJL≈USHL, NEJC/CEJC/ARJC≈overseas junior pipelines, NEHL≈SHL, CEHL≈Liiga, ARHL≈KHL, PWL≈PWHL, PWDL≈minor pro women, EWJC/AWJC≈women overseas junior, etc. */
+function formatPlayerPositionLabel(pos, subPos){
+  var p=subPos||(pos||'');
+  var m={
+    C:'CENTRE',LW:'LEFT WING',RW:'RIGHT WING',
+    LD:'LEFT DEFENSE',RD:'RIGHT DEFENSE',
+    G:'GOALIE',F:'FORWARD',D:'DEFENSE'
+  };
+  return m[p]||m[pos]||String(p||pos||'').toUpperCase();
+}
+
+/** Schedule / team counts mirror real circuits (fictional names): PHL≈NHL, NAML≈AHL, OJL≈OHL, NEHL≈SHL, FHL≈Liiga, CEHL≈DEL/extra league, ARHL≈KHL, etc. */
 var LEAGUES = {
-  PHL:  {name:'Pro Hockey League',short:'PHL',tier:'pro',gender:'M',games:82,gamesPerWeek:4,dev:0.7,salBase:750000,desc:'Top mens pro — 32 clubs, 82-game schedule (NHL-style).'},
-  NAML: {name:'North American Minors League',short:'NAML',tier:'minor',gender:'M',games:72,gamesPerWeek:3,dev:0.9,salBase:60000,desc:'PHL farm system — 32 teams, 72 games (AHL-style); clubs that share a PHL nickname use the same crest colours as the parent club.'},
-  OJL:  {name:'Ontario Junior League',short:'OJL',tier:'junior',gender:'M',games:68,dev:1.4,salBase:0,desc:'Ontario major junior — 20 teams, 68 games (OHL-style).'},
-  QMJL: {name:'Quebec-Maritimes Junior League',short:'QMJL',tier:'junior',gender:'M',games:68,dev:1.3,salBase:0,desc:'Quebec & Maritimes juniors — 18 teams, 68 games (QMJHL-style).'},
-  WJL:  {name:'Western Junior League',short:'WJL',tier:'junior',gender:'M',games:68,dev:1.3,salBase:0,desc:'Western major junior — 22 teams, 68 games (WHL-style).'},
-  NCHA: {name:"Nat'l Collegiate Hockey Assoc.",short:'NCHA',tier:'college',gender:'M',games:34,dev:1.2,salBase:0,desc:'U.S. Division I only — 50 programs, ~34-game regular season (NCAA-style).'},
-  USJL: {name:'US Junior League',short:'USJL',tier:'junior',gender:'M',games:62,dev:1.2,salBase:0,desc:'Premier US junior — 16 teams, 62 games (USHL-style).'},
-  NEJC: {name:'Northern European Junior Circuit',short:'NEJC',tier:'junior',gender:'M',games:44,dev:1.35,salBase:0,desc:'Nordic development — same hockey culture as NEHL but lighter pace and competition until you are ready.'},
-  CEJC: {name:'Central European Junior Circuit',short:'CEJC',tier:'junior',gender:'M',games:46,dev:1.32,salBase:0,desc:'Continental feeder — CEHL-style structure, easier nights than the paid league.'},
-  ARJC: {name:'Eurasian Junior Circuit',short:'ARJC',tier:'junior',gender:'M',games:48,dev:1.28,salBase:0,desc:'Russia & Asia-Pacific program hockey — developmental step before ARHL money and travel.'},
-  NEHL: {name:'Northern European Hockey League',short:'NEHL',tier:'euro',gender:'M',games:52,dev:1.1,salBase:55000,desc:'Swedish top tier — 14 teams, 52 games (SHL-style).'},
-  CEHL: {name:'Central European Hockey League',short:'CEHL',tier:'euro',gender:'M',games:60,dev:1.1,salBase:50000,desc:'Finnish elite league — 15 teams, 60 games (Liiga-style).'},
-  ARHL: {name:'Asian-Russian Hockey League',short:'ARHL',tier:'asia',gender:'M',games:68,dev:1.0,salBase:120000,desc:'Eurasian mega-league — 24 teams, 68 games (KHL-style).'},
-  PWL:  {name:"Pro Women's League",short:'PWL',tier:'pro',gender:'F',games:24,dev:0.7,salBase:75000,desc:"Elite women's pro — 6 teams, 24-game season (PWHL-style length)."},
-  PWDL: {name:"Pro Women's Development League",short:'PWDL',tier:'minor',gender:'F',games:56,dev:0.9,salBase:28000,desc:"Pro farm league — 12 teams, 56 games (AHL-style women's dev)."},
-  CWHL: {name:"Canadian Women's Hockey League",short:'CWHL',tier:'junior',gender:'F',games:38,dev:1.3,salBase:0,desc:"Canadian junior women's loop — 10 teams, 38-game slate (major junior women's style)."},
-  NWCHA:{name:"Nat'l Women's Collegiate Hockey Assoc.",short:'NWCHA',tier:'college',gender:'F',games:34,dev:1.1,salBase:0,desc:"U.S. Division I women — 14 programs, ~34 games (all schools U.S.-based)."},
-  USWDL:{name:"US Women's Development League",short:'USWDL',tier:'junior',gender:'F',games:52,dev:1.2,salBase:0,desc:"US junior development — 16 teams (USHL-style footprint)."},
-  EWJC:{name:"European Women's Junior Circuit",short:'EWJC',tier:'junior',gender:'F',games:36,dev:1.22,salBase:0,desc:"European women's program loop — same road as SDHL/FWHL but softer competition while you develop."},
-  AWJC:{name:"Asian Women's Junior Circuit",short:'AWJC',tier:'junior',gender:'F',games:34,dev:1.2,salBase:0,desc:"Asian women's program hockey — feeder path into AWHL contracts."},
-  SDHL: {name:"Swedish Development Hockey League",short:'SDHL',tier:'euro',gender:'F',games:36,dev:1.1,salBase:18000,desc:"Sweden women's SDHL — 10 teams, 36 games."},
-  FWHL: {name:"Finnish Women's Hockey League",short:'FWHL',tier:'euro',gender:'F',games:36,dev:1.1,salBase:16000,desc:"Finland women's top loop — 10 teams, 36 games."},
+  PHL:  {name:'Pro Hockey League',short:'PHL',tier:'pro',gender:'M',games:82,gamesPerWeek:4,dev:0.7,salBase:750000,desc:'Top men\'s pro circuit — 32 clubs, 82-game schedule.'},
+  NAML: {name:'North American Minors League',short:'NAML',tier:'minor',gender:'M',games:72,gamesPerWeek:3,dev:0.9,salBase:60000,desc:'PHL affiliate loop — 32 teams, 72 games. Shared nicknames mirror parent clubs.'},
+  OJL:  {name:'Ontario Junior League',short:'OJL',tier:'junior',gender:'M',games:68,dev:1.4,salBase:0,desc:'Ontario major junior — 20 teams, 68 games.'},
+  QMJL: {name:'Quebec-Maritimes Junior League',short:'QMJL',tier:'junior',gender:'M',games:68,dev:1.3,salBase:0,desc:'Quebec & Maritimes juniors — 18 teams, 68 games.'},
+  WJL:  {name:'Western Junior League',short:'WJL',tier:'junior',gender:'M',games:68,dev:1.3,salBase:0,desc:'Western major junior — 22 teams, 68 games.'},
+  NCHA: {name:"Nat'l Collegiate Hockey Assoc.",short:'NCHA',tier:'college',gender:'M',games:34,dev:1.2,salBase:0,desc:'U.S. Division I men — 50 programs, ~34-game season.'},
+  USJL: {name:'US Junior League',short:'USJL',tier:'junior',gender:'M',games:62,dev:1.2,salBase:0,desc:'Premier U.S. junior — 16 teams, 62 games.'},
+  NEJC: {name:'Northern European Junior Circuit',short:'NEJC',tier:'junior',gender:'M',games:44,dev:1.35,salBase:0,desc:'Nordic development circuit — feeder path into NEHL.'},
+  CEJC: {name:'Central European Junior Circuit',short:'CEJC',tier:'junior',gender:'M',games:46,dev:1.32,salBase:0,desc:'Weakest major junior pipeline in Europe — depth and structure lag OJL/WJL/NEJC. Feeder into CEHL.'},
+  ARJC: {name:'Eurasian Junior Circuit',short:'ARJC',tier:'junior',gender:'M',games:48,dev:1.28,salBase:0,desc:'Russian, Central Asian & Asia-Pacific junior programs — path to ARHL.'},
+  NEHL: {name:'Northern European Hockey League',short:'NEHL',tier:'euro',gender:'M',games:52,dev:1.1,salBase:55000,desc:'Nordic top tier — 14 teams, 52 games.'},
+  FHL:  {name:'Finnish Hockey League',short:'FHL',tier:'euro',gender:'M',games:60,dev:1.1,salBase:32000,desc:"Finland's top men's pro circuit — 15 clubs, 60-game Liiga-style season. Feeder from NEJC; a clear step above CEHL."},
+  CEHL: {name:'Central European Hockey League',short:'CEHL',tier:'euro',gender:'M',games:60,dev:1.02,salBase:16000,desc:'Weakest paid euro men\'s loop — Germany, Poland, Czechia & neighbors. Talent barely above LHL community hockey; feeder from CEJC.'},
+  ARHL: {name:'Asian-Russian Hockey League',short:'ARHL',tier:'asia',gender:'M',games:68,dev:1.0,salBase:120000,desc:'Eurasian pro mega-league — 29 teams: Russian powers, a strong Central Asian tier, and East Asian entries. 68 games.'},
+  PWL:  {name:"Pro Women's League",short:'PWL',tier:'pro',gender:'F',games:24,dev:0.7,salBase:75000,desc:"Elite women's pro — six clubs, 24-game season."},
+  PWDL: {name:"Pro Women's Development League",short:'PWDL',tier:'minor',gender:'F',games:56,dev:0.9,salBase:28000,desc:"Women's pro farm loop — 12 teams, 56 games."},
+  CWHL: {name:"Canadian Women's Junior League",short:'CWHL',tier:'junior',gender:'F',games:38,dev:1.3,salBase:0,desc:"Canadian women's major junior — 10 teams, 38 games."},
+  NWCHA:{name:"Nat'l Women's Collegiate Hockey Assoc.",short:'NWCHA',tier:'college',gender:'F',games:34,dev:1.1,salBase:0,desc:"U.S. Division I women — 14 programs, ~34 games."},
+  USWDL:{name:"US Women's Development League",short:'USWDL',tier:'junior',gender:'F',games:52,dev:1.2,salBase:0,desc:"U.S. women's junior dev — 16 teams, 52 games."},
+  EWJC:{name:"European Women's Junior Circuit",short:'EWJC',tier:'junior',gender:'F',games:36,dev:1.22,salBase:0,desc:"European women's programs — feeder into SDHL/FWHL."},
+  AWJC:{name:"Asian Women's Junior Circuit",short:'AWJC',tier:'junior',gender:'F',games:34,dev:1.2,salBase:0,desc:"Asian women's programs — feeder into AWHL."},
+  SDHL: {name:"Swedish Women's Hockey League",short:'SDHL',tier:'euro',gender:'F',games:36,dev:1.1,salBase:18000,desc:"Sweden women's top tier — 10 teams, 36 games."},
+  FWHL: {name:"Finnish Women's Hockey League",short:'FWHL',tier:'euro',gender:'F',games:36,dev:1.1,salBase:16000,desc:"Finland women's top tier — 10 teams, 36 games."},
   AWHL: {name:"Asian Women's Hockey League",short:'AWHL',tier:'asia',gender:'F',games:36,dev:1.0,salBase:20000,desc:"Asia women's pro — 8 teams, 36 games."}
 };
 
@@ -68,7 +82,7 @@ var TEAMS = {
     {n:'Vancouver Mountaineers',e:'[V]'},{n:'Calgary Roughnecks',e:'[C]'},{n:'Edmonton Drillers',e:'[E]'},
     {n:'Seattle Rainmakers',e:'[S]'},{n:'San Jose Tidal',e:'[S]'},{n:'Denver Altitude',e:'[D]'},
     {n:'St. Louis Archers',e:'[S]'},{n:'Las Vegas Neon',e:'[L]'},{n:'Tampa Bay Storm',e:'[T]'},
-    {n:'Miami Tide',e:'[M]'},{n:'Raleigh Storm',e:'[R]'},{n:'Anaheim Surf',e:'[A]'},
+    {n:'Miami Tide',e:'[M]'},{n:'Carolina Surge',e:'[R]'},{n:'Anaheim Surf',e:'[A]'},
     {n:'Newark Rail',e:'[N]'},{n:'Phoenix Scorch',e:'[P]'}
   ],
   NAML: [
@@ -80,7 +94,7 @@ var TEAMS = {
     {n:'Charlotte Copperheads',e:'[-]'},{n:'Milwaukee Lakeshore',e:'[-]'},{n:'Grand Rapids Furnace',e:'[-]'},
     {n:'Rockford Rivets',e:'[-]'},{n:'Iowa Threshers',e:'[-]'},
     {n:'Bakersfield Blaze',e:'[-]'},{n:'Coachella Sun',e:'[-]'},{n:'Henderson Silver',e:'[-]'},
-    {n:'Hershey Forge',e:'[-]'},{n:'Lehigh Valley Ghosts',e:'[-]'},{n:'Ontario Regals',e:'[-]'},
+    {n:'Hershey Forge',e:'[-]'},{n:'Lehigh Valley Ghosts',e:'[-]'},{n:'Inland Empire Regals',e:'[-]'},
     {n:'San Diego Surf',e:'[-]'},{n:'Tucson Dust',e:'[-]'},{n:'Utica Ice',e:'[-]'},
     {n:'Cleveland Rock',e:'[-]'},{n:'Wilkes-Barre Steel',e:'[-]'},{n:'Belleville Runners',e:'[-]'}
   ],
@@ -105,29 +119,29 @@ var TEAMS = {
   WJL: [
     {n:'Calgary Wranglers',e:'[W]'},{n:'Lethbridge Cyclones',e:'[W]'},{n:'Red Deer Stags',e:'[W]'},
     {n:'Kelowna Sunblazers',e:'[W]'},{n:'Vancouver Northmen',e:'[W]'},{n:'Victoria Islanders',e:'[W]'},
-    {n:'Kamloops Blazers',e:'[W]'},{n:'Prince George Roughriders',e:'[W]'},{n:'Saskatoon Plainsmen',e:'[W]'},
+    {n:'Kamloops Castles',e:'[W]'},{n:'Prince George Roughriders',e:'[W]'},{n:'Saskatoon Plainsmen',e:'[W]'},
     {n:'Regina Pronghorns',e:'[W]'},{n:'Edmonton Forge',e:'[W]'},{n:'Medicine Hat Suns',e:'[W]'},
     {n:'Moose Jaw Steel',e:'[W]'},{n:'Brandon Wheatmen',e:'[W]'},{n:'Swift Current Stampede',e:'[W]'},
-    {n:'Portland Winter',e:'[W]'},{n:'Tri-City Outlaws',e:'[W]'},{n:'Spokane Chiefs',e:'[W]'},
-    {n:'Everett Silvertips',e:'[W]'},{n:'Wenatchee Wild',e:'[W]'},{n:'Prince Albert Raiders',e:'[W]'},
+    {n:'Portland Winter',e:'[W]'},{n:'Tri-City Outlaws',e:'[W]'},{n:'Spokane Command',e:'[W]'},
+    {n:'Everett Silverbacks',e:'[W]'},{n:'Wenatchee Wolves',e:'[W]'},{n:'Prince Albert Regals',e:'[W]'},
     {n:'Winnipeg Icehawks',e:'[W]'}
   ],
   NCHA: [
-    {n:'Minnesota State Grizzlies',e:'[U]'},{n:'Wisconsin Badgers',e:'[U]'},{n:'Ohio Rivermen',e:'[U]'},
+    {n:'Minnesota State Grizzlies',e:'[U]'},{n:'Wisconsin Red Wolves',e:'[U]'},{n:'Ohio Rivermen',e:'[U]'},
     {n:'Michigan Stags',e:'[U]'},{n:'Western Michigan Rivermen',e:'[U]'},{n:'Ferris State Forge',e:'[U]'},
-    {n:'Bowling Green Falcons',e:'[U]'},{n:'Miami Ohio Redhawks',e:'[U]'},{n:'Bemidji State Lumberjacks',e:'[U]'},
-    {n:'Penn Ridge',e:'[U]'},{n:'Boston Univ Renegades',e:'[U]'},{n:'Maine Lumbermen',e:'[U]'},
+    {n:'Bowling Green Falcons',e:'[U]'},{n:'Miami Valley Redhawks',e:'[U]'},{n:'Bemidji State Lumberjacks',e:'[U]'},
+    {n:'Penn State Nittany',e:'[U]'},{n:'Boston Univ Renegades',e:'[U]'},{n:'Maine Lumbermen',e:'[U]'},
     {n:'Vermont Mountainmen',e:'[U]'},{n:'Northeastern Wolves',e:'[U]'},{n:'Providence Pilots',e:'[U]'},
     {n:'UMass Rail',e:'[U]'},{n:'Quinnipiac Stags',e:'[U]'},{n:'Sacred Heart Saints',e:'[U]'},
-    {n:'Harvard Pilgrims',e:'[U]'},{n:'Dartmouth Pines',e:'[U]'},{n:'North Dakota Frost',e:'[U]'},
+    {n:'Harvard Pilgrims',e:'[U]'},{n:'Dartmouth Pines',e:'[U]'},{n:'North Dakota Northstars',e:'[U]'},
     {n:'Denver Snowhawks',e:'[U]'},{n:'St Cloud Storm',e:'[U]'},{n:'Omaha Mavericks',e:'[U]'},
-    {n:'Colorado College Northmen',e:'[U]'},{n:'Minnesota Duluth Tide',e:'[U]'},{n:'Northern Michigan Frost',e:'[U]'},
+    {n:'Colorado College Northmen',e:'[U]'},{n:'Minnesota Duluth Tide',e:'[U]'},{n:'Northern Michigan Wildcats',e:'[U]'},
     {n:'Lake Superior Lakers',e:'[U]'},{n:'Alaska Ice',e:'[U]'},{n:'Arizona Scorch',e:'[U]'},
-    {n:'Cornell Ironclad',e:'[U]'},{n:'Yale Scholars',e:'[U]'},{n:'Princeton Ivy',e:'[U]'},
+    {n:'Cornell Ironclad',e:'[U]'},{n:'Yale Scholars',e:'[U]'},{n:'Princeton Cardinals',e:'[U]'},
     {n:'St Lawrence Skiffs',e:'[U]'},{n:'Clarkson Sentinels',e:'[U]'},{n:'RIT Forge',e:'[U]'},
-    {n:'Notre Dame Saints',e:'[U]'},{n:'Lindenwood Lions',e:'[U]'},{n:'Michigan Tech Huskies',e:'[U]'},
+    {n:'South Bend Shamrocks',e:'[U]'},{n:'Lindenwood Lions',e:'[U]'},{n:'Michigan Tech Huskies',e:'[U]'},
     {n:'Air Force Jets',e:'[U]'},{n:'Army Cadets',e:'[U]'},{n:'Gulf Coast Gators',e:'[U]'},
-    {n:'Ridge State Mountaineers',e:'[U]'},{n:'Bay State Breakers',e:'[U]'},{n:'Pacific Northwest Eagles',e:'[U]'},
+    {n:'Ridge State Mountaineers',e:'[U]'},{n:'Bay State Bears',e:'[U]'},{n:'Pacific Northwest Eagles',e:'[U]'},
     {n:'Urban State Roadrunners',e:'[U]'},{n:'Atlantic College Seahawks',e:'[U]'},{n:'Keystone Commonwealth Pride',e:'[U]'},
     {n:'Great Plains Bison',e:'[U]'},{n:'Desert State Scorpions',e:'[U]'}
   ],
@@ -155,11 +169,12 @@ var TEAMS = {
     {n:'Moscow Dynamo Program',e:'[J]'},{n:'St. Petersburg Skater Track',e:'[J]'},{n:'Kazan Bison Program',e:'[J]'},
     {n:'Novosibirsk Sibir Circuit',e:'[J]'},{n:'Yokohama Freeze Academy',e:'[J]'},{n:'Seoul Icehawk Program',e:'[J]'},
     {n:'Beijing Dragon Track',e:'[J]'},{n:'Riga Tide Program',e:'[J]'},{n:'Sochi Shore Circuit',e:'[J]'},
-    {n:'Vladivostok Tide Program',e:'[J]'},{n:'Astana Nomad Track',e:'[J]'},{n:'Harbin Ice Program',e:'[J]'}
+    {n:'Vladivostok Tide Program',e:'[J]'},{n:'Astana Nomad Track',e:'[J]'},{n:'Harbin Ice Program',e:'[J]'},
+    {n:'Almaty Snowleopard Program',e:'[J]'},{n:'Tashkent Steppe Track',e:'[J]'},{n:'Bishkek Pamir Circuit',e:'[J]'}
   ],
   NEHL: [
     {n:'Stockholm Crowns',e:'[N]'},{n:'Göteborg Ironmen',e:'[N]'},{n:'Helsinki Lynx',e:'[N]'},
-    {n:'Tampere Ironmen',e:'[N]'},{n:'Oslo Valkyries',e:'[N]'},{n:'København Cannons',e:'[N]'},
+    {n:'Tampere Ironmen',e:'[N]'},{n:'Oslo Cannons',e:'[N]'},{n:'København Cannons',e:'[N]'},
     {n:'Luleå Polarbears',e:'[N]'},{n:'Turku Timberwolves',e:'[N]'},
     {n:'Malmö Tide',e:'[N]'},{n:'Karlstad Crowns',e:'[N]'},{n:'Jönköping Jets',e:'[N]'},
     {n:'Linköping Storm',e:'[N]'},{n:'Örebro Steel',e:'[N]'},{n:'Skellefteå Wolves',e:'[N]'}
@@ -168,49 +183,57 @@ var TEAMS = {
     {n:'Praha Ironspire',e:'[C]'},{n:'Brno Thundercats',e:'[C]'},{n:'Zürich Snowlions',e:'[C]'},
     {n:'Bern Avalanche',e:'[C]'},{n:'Berlin Polarbears',e:'[C]'},{n:'München Stormcrows',e:'[C]'},
     {n:'Bratislava Vipers',e:'[C]'},{n:'Wien Wolfpack',e:'[C]'},
-    {n:'Turku Blaze',e:'[C]'},{n:'Tampere Force',e:'[C]'},{n:'Oulu North',e:'[C]'},
-    {n:'Helsinki Ice',e:'[C]'},{n:'Jyvaskyla Storm',e:'[C]'},{n:'Rauma Dockers',e:'[C]'},
-    {n:'Lappeenranta Spark',e:'[C]'}
+    {n:'Warsaw Vistula',e:'[C]'},{n:'Krakow Eagles',e:'[C]'},{n:'Budapest Danube',e:'[C]'},
+    {n:'Hamburg Tide',e:'[C]'},{n:'Köln Rhiners',e:'[C]'},{n:'Ljubljana Alpine',e:'[C]'},{n:'Zagreb Union',e:'[C]'}
+  ],
+  FHL: [
+    {n:'Helsinki Ice',e:'[F]'},{n:'Tampere Force',e:'[F]'},{n:'Turku Blaze',e:'[F]'},
+    {n:'Oulu North',e:'[F]'},{n:'Jyvaskyla Storm',e:'[F]'},{n:'Rauma Dockers',e:'[F]'},
+    {n:'Lappeenranta Spark',e:'[F]'},{n:'Espoo Metro',e:'[F]'},{n:'Lahti Lightning',e:'[F]'},
+    {n:'Kouvola Steel',e:'[F]'},{n:'Joensuu Forest',e:'[F]'},{n:'Mikkeli Rapids',e:'[F]'},
+    {n:'Hameenlinna Forge',e:'[F]'},{n:'Porin Tide',e:'[F]'},{n:'Vaasa Breeze',e:'[F]'}
   ],
   ARHL: [
     {n:'Moscow Dynamo',e:'[R]'},{n:'St. Petersburg Skaters',e:'[R]'},{n:'Kazan Bisons',e:'[R]'},
-    {n:'Novosibirsk Sibirs',e:'[R]'},{n:'Yokohama Freeze',e:'[R]'},{n:'Sapporo Polarbears',e:'[R]'},
-    {n:'Seoul Icehawks',e:'[R]'},{n:'Beijing Dragoons',e:'[R]'},
-    {n:'Yaroslavl Express',e:'[R]'},{n:'Nizhny Torpedoes',e:'[R]'},{n:'Riga Tide',e:'[R]'},
-    {n:'Sochi Shore',e:'[R]'},{n:'Vladivostok Tide',e:'[R]'},{n:'Kunlun Dragons',e:'[R]'},
-    {n:'Minsk Wolves',e:'[R]'},{n:'Moscow Centurions',e:'[R]'},{n:'Omsk Outlaws',e:'[R]'},
-    {n:'Ufa Bolts',e:'[R]'},{n:'Magnitogorsk Steel',e:'[R]'},{n:'Chelyabinsk Forge',e:'[R]'},
-    {n:'Astana Nomads',e:'[R]'},{n:'Ekaterinburg Motors',e:'[R]'},{n:'Cherepovets Steel',e:'[R]'}
+    {n:'Novosibirsk Sibirs',e:'[R]'},{n:'Yaroslavl Express',e:'[R]'},{n:'Nizhny Torpedoes',e:'[R]'},
+    {n:'Sochi Shore',e:'[R]'},{n:'Vladivostok Tide',e:'[R]'},{n:'Moscow Centurions',e:'[R]'},
+    {n:'Omsk Outlaws',e:'[R]'},{n:'Ufa Bolts',e:'[R]'},{n:'Magnitogorsk Steel',e:'[R]'},
+    {n:'Chelyabinsk Forge',e:'[R]'},{n:'Ekaterinburg Motors',e:'[R]'},{n:'Cherepovets Steel',e:'[R]'},
+    {n:'Astana Nomads',e:'[R]'},{n:'Almaty Snowleopards',e:'[R]'},{n:'Tashkent Steppe Hawks',e:'[R]'},
+    {n:'Bishkek Mountain Kings',e:'[R]'},{n:'Ashgabat Sandstorms',e:'[R]'},{n:'Dushanbe Pamir',e:'[R]'},
+    {n:'Samarkand Silk Route',e:'[R]'},{n:'Riga Tide',e:'[R]'},{n:'Minsk Wolves',e:'[R]'},
+    {n:'Yokohama Freeze',e:'[R]'},{n:'Sapporo Polarbears',e:'[R]'},{n:'Seoul Icehawks',e:'[R]'},
+    {n:'Beijing Dragoons',e:'[R]'},{n:'Kunlun Dragons',e:'[R]'}
   ],
   PWL: [
-    {n:'Toronto Furies',e:'[P]'},{n:'Montreal Carabins',e:'[P]'},{n:'Boston Pride',e:'[P]'},
-    {n:'New York Riveters',e:'[P]'},{n:'Minneapolis Whitecaps',e:'[P]'},{n:'Vancouver Amazons',e:'[P]'}
+    {n:'Toronto Tempest',e:'[P]'},{n:'Montreal Royale',e:'[P]'},{n:'Boston Torch',e:'[P]'},
+    {n:'New York Voltage',e:'[P]'},{n:'Minneapolis Aurora',e:'[P]'},{n:'Vancouver Summit',e:'[P]'}
   ],
   PWDL: [
     {n:'Sudbury Copperheads',e:'[D]'},{n:'Thunder Bay Frost',e:'[D]'},{n:'Moncton Tides',e:'[D]'},
     {n:'Rochester Ironhorses',e:'[D]'},{n:'Hartford Whalemen',e:'[D]'},{n:'Providence Seafarers',e:'[D]'},
     {n:'Kelowna Sunblazers',e:'[D]'},{n:'Brandon Plainswomen',e:'[D]'},{n:'Milwaukee Lakeshore',e:'[D]'},
-    {n:'Grand Rapids Furnace',e:'[D]'},{n:'Iowa Threshers',e:'[D]'},{n:'Charlotte Copperheads W',e:'[D]'}
+    {n:'Grand Rapids Furnace',e:'[D]'},{n:'Iowa Threshers',e:'[D]'},{n:'Charlotte Copperheads',e:'[D]'}
   ],
   CWHL: [
-    {n:'Toronto Furies Select',e:'[C]'},{n:'Montreal Carabins Premier',e:'[C]'},{n:'Calgary Inferno Reserve',e:'[C]'},
-    {n:'Vancouver Amazons Academy',e:'[C]'},{n:'Ottawa Charge Alliance',e:'[C]'},{n:'Winnipeg Tundra',e:'[C]'},
+    {n:'Toronto Tempest Academy',e:'[C]'},{n:'Montreal Royale Academy',e:'[C]'},{n:'Calgary Blaze Academy',e:'[C]'},
+    {n:'Vancouver Summit Academy',e:'[C]'},{n:'Ottawa Charge Academy',e:'[C]'},{n:'Winnipeg Tundra',e:'[C]'},
     {n:'Halifax Mariners',e:'[C]'},{n:'Edmonton Northwomen',e:'[C]'},{n:'Québec Heritage',e:'[C]'},
     {n:'Saskatoon Starlight',e:'[C]'}
   ],
   NWCHA: [
-    {n:'Minnesota State Bears',e:'[U]'},{n:'Wisconsin Badgers',e:'[U]'},{n:'Michigan Tech Huskies',e:'[U]'},
-    {n:'Denver Snowhawks',e:'[U]'},{n:'Minnesota Golden',e:'[U]'},{n:'Ohio State Buckeyes',e:'[U]'},
+    {n:'Minnesota State Bears',e:'[U]'},{n:'Wisconsin Red Wolves',e:'[U]'},{n:'Michigan Tech Huskies',e:'[U]'},
+    {n:'Denver Snowhawks',e:'[U]'},{n:'Minnesota Golden Gophers',e:'[U]'},{n:'Ohio State Bucks',e:'[U]'},
     {n:'Colgate Raiders',e:'[U]'},{n:'Cornell Ironclad',e:'[U]'},{n:'Boston Univ Renegades',e:'[U]'},
     {n:'Vermont Mountainmen',e:'[U]'},{n:'Clarkson Sentinels',e:'[U]'},{n:'Connecticut Shore Whales',e:'[U]'},
     {n:'Granite State Wildcats',e:'[U]'},{n:'Empire State Lions W',e:'[U]'}
   ],
   USWDL: [
     {n:'Boston Blades',e:'[U]'},{n:'Providence Seafarers',e:'[U]'},{n:'Rochester Ironhorses',e:'[U]'},
-    {n:'Hartford Whalemen',e:'[U]'},{n:'Detroit Valkyries Summit',e:'[U]'},{n:'Minneapolis Tempest',e:'[U]'},
-    {n:'Chicago Sirens Pulse',e:'[U]'},{n:'Milwaukee Lakeshore',e:'[U]'},{n:'Cleveland Comets',e:'[U]'},
-    {n:'Buffalo Beauts Beacon',e:'[U]'},{n:'Pittsburgh Forge',e:'[U]'},{n:'New Jersey Tide',e:'[U]'},
-    {n:'Philadelphia Liberty',e:'[U]'},{n:'Washington Pride Crest',e:'[U]'},{n:'Nashville Ice',e:'[U]'},
+    {n:'Hartford Whalemen',e:'[U]'},{n:'Detroit Valkyries',e:'[U]'},{n:'Minneapolis Tempest',e:'[U]'},
+    {n:'Chicago Sirens',e:'[U]'},{n:'Milwaukee Lakeshore',e:'[U]'},{n:'Cleveland Comets',e:'[U]'},
+    {n:'Buffalo Beacons',e:'[U]'},{n:'Pittsburgh Forge',e:'[U]'},{n:'New Jersey Tide',e:'[U]'},
+    {n:'Philadelphia Liberty',e:'[U]'},{n:'Washington Monarchs',e:'[U]'},{n:'Nashville Ice',e:'[U]'},
     {n:'Dallas Meridian',e:'[U]'}
   ],
   EWJC: [
@@ -226,12 +249,12 @@ var TEAMS = {
   SDHL: [
     {n:'Stockholm Crowns',e:'[S]'},{n:'Göteborg Ironwomen',e:'[S]'},{n:'Malmö Northwomen',e:'[S]'},
     {n:'Luleå Polarbears',e:'[S]'},{n:'Linköping Lightning',e:'[S]'},{n:'Skellefteå Timberwolves',e:'[S]'},
-    {n:'Brynas',e:'[S]'},{n:'HV71',e:'[S]'},{n:'Djurgården',e:'[S]'},{n:'Örebro HK W',e:'[S]'}
+    {n:'Gävle Embers',e:'[S]'},{n:'Växjö Hawks',e:'[S]'},{n:'Stockholm Royals W',e:'[S]'},{n:'Örebro Owls',e:'[S]'}
   ],
   FWHL: [
     {n:'Helsinki Lynx',e:'[F]'},{n:'Turku Timberwolves',e:'[F]'},{n:'Tampere Ironwomen',e:'[F]'},
     {n:'Espoo Northwomen',e:'[F]'},{n:'Lahti Snowlions',e:'[F]'},{n:'Oulu Polarbears',e:'[F]'},
-    {n:'Karpat',e:'[F]'},{n:'HIFK',e:'[F]'},{n:'Ilves',e:'[F]'},{n:'TPS',e:'[F]'}
+    {n:'Oulu Caribou',e:'[F]'},{n:'Helsinki Crown',e:'[F]'},{n:'Tampere Lynx',e:'[F]'},{n:'Turku Sailors',e:'[F]'}
   ],
   AWHL: [
     {n:'Sapporo Polarbears',e:'[A]'},{n:'Tōkyō Icehawks',e:'[A]'},{n:'Seoul Comets',e:'[A]'},
@@ -240,12 +263,40 @@ var TEAMS = {
   ]
 };
 
+/** ARHL club region — Russian elite > Central Asia > Baltic > East Asia for roster strength. */
+var ARHL_TEAM_REGION={
+  'Moscow Dynamo':'russia','St. Petersburg Skaters':'russia','Kazan Bisons':'russia',
+  'Novosibirsk Sibirs':'russia','Yaroslavl Express':'russia','Nizhny Torpedoes':'russia',
+  'Sochi Shore':'russia','Vladivostok Tide':'russia','Moscow Centurions':'russia',
+  'Omsk Outlaws':'russia','Ufa Bolts':'russia','Magnitogorsk Steel':'russia',
+  'Chelyabinsk Forge':'russia','Ekaterinburg Motors':'russia','Cherepovets Steel':'russia',
+  'Astana Nomads':'central_asia','Almaty Snowleopards':'central_asia','Tashkent Steppe Hawks':'central_asia',
+  'Bishkek Mountain Kings':'central_asia','Ashgabat Sandstorms':'central_asia','Dushanbe Pamir':'central_asia',
+  'Samarkand Silk Route':'central_asia',
+  'Riga Tide':'baltic','Minsk Wolves':'baltic',
+  'Yokohama Freeze':'east_asia','Sapporo Polarbears':'east_asia','Seoul Icehawks':'east_asia',
+  'Beijing Dragoons':'east_asia','Kunlun Dragons':'east_asia'
+};
+
+function getArhlTeamRegion(teamName){
+  if(typeof ARHL_TEAM_REGION!=='undefined'&&ARHL_TEAM_REGION[teamName]) return ARHL_TEAM_REGION[teamName];
+  return 'russia';
+}
+
+function getArhlTeamSkillBonus(region){
+  if(region==='russia') return rd(1.5, 3.5);
+  if(region==='central_asia') return rd(0, 2.2);
+  if(region==='baltic') return rd(-0.5, 1.2);
+  if(region==='east_asia') return rd(-4.5, -1.5);
+  return 0;
+}
+
 /** Conferences / divisions for standings UI (team full names must match TEAMS). */
 var LEAGUE_STANDINGS_LAYOUT={
   PHL:{mode:'nested',conferences:[
     {name:'EASTERN CONFERENCE',divisions:[
       {name:'ATLANTIC DIVISION',teams:['Toronto Monarchs','Montreal Voyageurs','Ottawa Sentinels','Boston Colonials','Buffalo Snowhawks','Detroit Rivermen','Tampa Bay Storm','Miami Tide']},
-      {name:'METROPOLITAN DIVISION',teams:['Quebec City Ramparts','New York Ironclad','Philadelphia Founders','Pittsburgh Smelters','Washington Diplomats','Columbus Sentinels','Raleigh Storm','Newark Rail']}
+      {name:'METROPOLITAN DIVISION',teams:['Quebec City Ramparts','New York Ironclad','Philadelphia Founders','Pittsburgh Smelters','Washington Diplomats','Columbus Sentinels','Carolina Surge','Newark Rail']}
     ]},
     {name:'WESTERN CONFERENCE',divisions:[
       {name:'CENTRAL DIVISION',teams:['Winnipeg Tundra','Minneapolis Blizzard','Chicago Tempest','Dallas Outlaws','Nashville Troubadours','St. Louis Archers','Denver Altitude','Las Vegas Neon']},
@@ -254,12 +305,12 @@ var LEAGUE_STANDINGS_LAYOUT={
   ]},
   NAML:{mode:'nested',conferences:[
     {name:'EASTERN CONFERENCE',divisions:[
-      {name:'NORTHEAST DIVISION',teams:['Sudbury Copperheads','Sault Ste. Marie Norwesters','Thunder Bay Voyageurs','Moncton Harbourmen','Charlottetown Privateers','Fredericton Fogcutters','Kelowna Sunblazers','Lethbridge Chinooks']},
-      {name:'ATLANTIC DIVISION',teams:['Red Deer Renegades','Brandon Plainsmen','Saskatoon Wheatmen','Rochester Ironhorses','Hartford Whalemen','Springfield Armory','Providence Seafarers','Charlotte Copperheads']}
+      {name:'NORTH DIVISION',teams:['Sudbury Copperheads','Sault Ste. Marie Norwesters','Thunder Bay Voyageurs','Belleville Runners','Rochester Ironhorses','Utica Ice','Cleveland Rock','Wilkes-Barre Steel']},
+      {name:'ATLANTIC DIVISION',teams:['Moncton Harbourmen','Charlottetown Privateers','Fredericton Fogcutters','Hartford Whalemen','Springfield Armory','Providence Seafarers','Hershey Forge','Lehigh Valley Ghosts']}
     ]},
     {name:'WESTERN CONFERENCE',divisions:[
-      {name:'CENTRAL DIVISION',teams:['Milwaukee Lakeshore','Grand Rapids Furnace','Rockford Rivets','Iowa Threshers','Bakersfield Blaze','Coachella Sun','Henderson Silver','Hershey Forge']},
-      {name:'PACIFIC DIVISION',teams:['Lehigh Valley Ghosts','Ontario Regals','San Diego Surf','Tucson Dust','Utica Ice','Cleveland Rock','Wilkes-Barre Steel','Belleville Runners']}
+      {name:'CENTRAL DIVISION',teams:['Milwaukee Lakeshore','Grand Rapids Furnace','Rockford Rivets','Iowa Threshers','Red Deer Renegades','Brandon Plainsmen','Saskatoon Wheatmen','Lethbridge Chinooks']},
+      {name:'PACIFIC DIVISION',teams:['Kelowna Sunblazers','Bakersfield Blaze','Coachella Sun','Henderson Silver','Inland Empire Regals','San Diego Surf','Tucson Dust','Charlotte Copperheads']}
     ]}
   ]},
   OJL:{mode:'divisions',divisions:[
@@ -278,19 +329,25 @@ var LEAGUE_STANDINGS_LAYOUT={
       {name:'EAST DIVISION',teams:['Winnipeg Icehawks','Brandon Wheatmen','Regina Pronghorns','Saskatoon Plainsmen','Moose Jaw Steel','Swift Current Stampede','Prince Albert Raiders','Medicine Hat Suns','Lethbridge Cyclones','Red Deer Stags','Calgary Wranglers']}
     ]},
     {name:'WESTERN CONFERENCE',divisions:[
-      {name:'WEST DIVISION',teams:['Edmonton Forge','Kelowna Sunblazers','Vancouver Northmen','Victoria Islanders','Kamloops Blazers','Prince George Roughriders','Portland Winter','Tri-City Outlaws','Spokane Chiefs','Everett Silvertips','Wenatchee Wild']}
+      {name:'WEST DIVISION',teams:['Edmonton Forge','Kelowna Sunblazers','Vancouver Northmen','Victoria Islanders','Kamloops Castles','Prince George Roughriders','Portland Winter','Tri-City Outlaws','Spokane Command','Everett Silverbacks','Wenatchee Wolves']}
     ]}
   ]},
   NCHA:{mode:'nested',conferences:[
-    {name:'BIG TEN ICE',divisions:[{name:'BIG TEN ICE',teams:['Minnesota State Grizzlies','Wisconsin Badgers','Ohio Rivermen','Michigan Stags','Western Michigan Rivermen','Ferris State Forge','Bowling Green Falcons','Miami Ohio Redhawks','Bemidji State Lumberjacks','Penn Ridge']}]},
-    {name:'HOCKEY EASTERN',divisions:[{name:'HOCKEY EASTERN',teams:['Boston Univ Renegades','Maine Lumbermen','Vermont Mountainmen','Northeastern Wolves','Providence Pilots','UMass Rail','Quinnipiac Stags','Sacred Heart Saints','Harvard Pilgrims','Dartmouth Pines']}]},
-    {name:'CENTRAL COLLEGIATE',divisions:[{name:'CENTRAL COLLEGIATE',teams:['North Dakota Frost','Denver Snowhawks','St Cloud Storm','Omaha Mavericks','Colorado College Northmen','Minnesota Duluth Tide','Northern Michigan Frost','Lake Superior Lakers','Alaska Ice','Arizona Scorch']}]},
-    {name:'IVY-ECAC',divisions:[{name:'IVY-ECAC',teams:['Cornell Ironclad','Yale Scholars','Princeton Ivy','St Lawrence Skiffs','Clarkson Sentinels','RIT Forge','Notre Dame Saints','Lindenwood Lions','Michigan Tech Huskies','Air Force Jets']}]},
-    {name:'ATLANTIC & INDEPENDENT',divisions:[{name:'ATLANTIC & INDEPENDENT',teams:['Army Cadets','Gulf Coast Gators','Ridge State Mountaineers','Bay State Breakers','Pacific Northwest Eagles','Urban State Roadrunners','Atlantic College Seahawks','Keystone Commonwealth Pride','Great Plains Bison','Desert State Scorpions']}]}
+    {name:'BIG TEN ICE',divisions:[{name:'BIG TEN ICE',teams:['Minnesota State Grizzlies','Wisconsin Red Wolves','Ohio Rivermen','Michigan Stags','Western Michigan Rivermen','Ferris State Forge','Bowling Green Falcons','Miami Valley Redhawks','Bemidji State Lumberjacks','Penn State Nittany']}]},
+    {name:'HOCKEY EAST',divisions:[{name:'HOCKEY EAST',teams:['Boston Univ Renegades','Maine Lumbermen','Vermont Mountainmen','Northeastern Wolves','Providence Pilots','UMass Rail','Quinnipiac Stags','Sacred Heart Saints','Harvard Pilgrims','Dartmouth Pines']}]},
+    {name:'NCHC',divisions:[{name:'NCHC',teams:['North Dakota Northstars','Denver Snowhawks','St Cloud Storm','Omaha Mavericks','Colorado College Northmen','Minnesota Duluth Tide','Northern Michigan Wildcats','Lake Superior Lakers','Alaska Ice','Arizona Scorch']}]},
+    {name:'ECAC',divisions:[{name:'ECAC',teams:['Cornell Ironclad','Yale Scholars','Princeton Cardinals','St Lawrence Skiffs','Clarkson Sentinels','RIT Forge','South Bend Shamrocks','Lindenwood Lions','Michigan Tech Huskies','Air Force Jets']}]},
+    {name:'ATLANTIC & INDEPENDENT',divisions:[{name:'ATLANTIC & INDEPENDENT',teams:['Army Cadets','Gulf Coast Gators','Ridge State Mountaineers','Bay State Bears','Pacific Northwest Eagles','Urban State Roadrunners','Atlantic College Seahawks','Keystone Commonwealth Pride','Great Plains Bison','Desert State Scorpions']}]}
   ]},
   NWCHA:{mode:'nested',conferences:[
-    {name:'WEST COLLEGIATE',divisions:[{name:'WEST COLLEGIATE',teams:['Minnesota State Bears','Wisconsin Badgers','Michigan Tech Huskies','Denver Snowhawks','Minnesota Golden','Ohio State Buckeyes','Colgate Raiders']}]},
+    {name:'WEST COLLEGIATE',divisions:[{name:'WEST COLLEGIATE',teams:['Minnesota State Bears','Wisconsin Red Wolves','Michigan Tech Huskies','Denver Snowhawks','Minnesota Golden Gophers','Ohio State Bucks','Colgate Raiders']}]},
     {name:'EAST COLLEGIATE',divisions:[{name:'EAST COLLEGIATE',teams:['Cornell Ironclad','Boston Univ Renegades','Vermont Mountainmen','Clarkson Sentinels','Connecticut Shore Whales','Granite State Wildcats','Empire State Lions W']}]}
+  ]},
+  ARHL:{mode:'divisions',divisions:[
+    {name:'RUSSIAN DIVISION',teams:['Moscow Dynamo','St. Petersburg Skaters','Kazan Bisons','Novosibirsk Sibirs','Yaroslavl Express','Nizhny Torpedoes','Sochi Shore','Vladivostok Tide','Moscow Centurions','Omsk Outlaws','Ufa Bolts','Magnitogorsk Steel','Chelyabinsk Forge','Ekaterinburg Motors','Cherepovets Steel']},
+    {name:'CENTRAL ASIA DIVISION',teams:['Astana Nomads','Almaty Snowleopards','Tashkent Steppe Hawks','Bishkek Mountain Kings','Ashgabat Sandstorms','Dushanbe Pamir','Samarkand Silk Route']},
+    {name:'BALTIC DIVISION',teams:['Riga Tide','Minsk Wolves']},
+    {name:'EAST ASIA DIVISION',teams:['Yokohama Freeze','Sapporo Polarbears','Seoul Icehawks','Beijing Dragoons','Kunlun Dragons']}
   ]}
 };
 
@@ -314,13 +371,151 @@ function buildAutoStandingsLayout(lk,numDiv){
 
 function getStandingsLayoutForLeague(lk){
   if(LEAGUE_STANDINGS_LAYOUT[lk]) return LEAGUE_STANDINGS_LAYOUT[lk];
-  var autoKeys={ARHL:4,USJL:4,NEHL:2,CEHL:2,PWDL:3,CWHL:2,USWDL:4,SDHL:2,FWHL:2,AWHL:2,NEJC:2,CEJC:2,ARJC:2,EWJC:2,AWJC:2};
+  var autoKeys={ARHL:4,USJL:4,NEHL:2,FHL:2,CEHL:2,PWDL:3,CWHL:2,USWDL:4,SDHL:2,FWHL:2,AWHL:2,NEJC:2,CEJC:2,ARJC:2,EWJC:2,AWJC:2};
   if(autoKeys[lk]) return buildAutoStandingsLayout(lk,autoKeys[lk]);
   return null;
 }
 
+/** Division / conference label for a team (standings UI names). */
+function getTeamDivisionName(lk, teamName){
+  if(!lk||!teamName) return '';
+  var L=getStandingsLayoutForLeague(lk);
+  if(!L) return '';
+  var lists=[];
+  if(L.mode==='divisions'&&L.divisions){
+    for(var i=0;i<L.divisions.length;i++) lists.push({label:L.divisions[i].name,teams:L.divisions[i].teams});
+  } else if(L.mode==='nested'&&L.conferences){
+    for(var c=0;c<L.conferences.length;c++){
+      var conf=L.conferences[c];
+      for(var d=0;d<conf.divisions.length;d++){
+        lists.push({label:conf.divisions[d].name,teams:conf.divisions[d].teams});
+      }
+    }
+  }
+  for(var li=0;li<lists.length;li++){
+    if(lists[li].teams.indexOf(teamName)>=0) return lists[li].label;
+  }
+  return '';
+}
+
+var RENAMED_TEAMS={
+  'Ontario Regals':'Inland Empire Regals',
+  'Miami Ohio Redhawks':'Miami Valley Redhawks',
+  'North Dakota Frost':'North Dakota Northstars',
+  'Northern Michigan Frost':'Northern Michigan Wildcats',
+  'Penn Ridge':'Penn State Nittany',
+  'Minnesota Golden':'Minnesota Golden Gophers',
+  'Princeton Ivy':'Princeton Cardinals',
+  'Notre Dame Saints':'South Bend Shamrocks',
+  'Bay State Breakers':'Bay State Bears',
+  'Toronto Furies':'Toronto Tempest',
+  'Montreal Carabins':'Montreal Royale',
+  'Boston Pride':'Boston Torch',
+  'New York Riveters':'New York Voltage',
+  'Minneapolis Whitecaps':'Minneapolis Aurora',
+  'Vancouver Amazons':'Vancouver Summit',
+  'Toronto Furies Select':'Toronto Tempest Academy',
+  'Montreal Carabins Premier':'Montreal Royale Academy',
+  'Calgary Inferno Reserve':'Calgary Blaze Academy',
+  'Vancouver Amazons Academy':'Vancouver Summit Academy',
+  'Ottawa Charge Alliance':'Ottawa Charge Academy',
+  'Charlotte Copperheads W':'Charlotte Copperheads',
+  'Detroit Valkyries Summit':'Detroit Valkyries',
+  'Chicago Sirens Pulse':'Chicago Sirens',
+  'Buffalo Beauts Beacon':'Buffalo Beacons',
+  'Washington Pride Crest':'Washington Monarchs',
+  'Oslo Valkyries':'Oslo Cannons',
+  'Raleigh Storm':'Carolina Surge',
+  'Brynas':'Gävle Embers',
+  'HV71':'Växjö Hawks',
+  'Djurgården':'Stockholm Royals W',
+  'Örebro HK W':'Örebro Owls',
+  'Karpat':'Oulu Caribou',
+  'HIFK':'Helsinki Crown',
+  'Ilves':'Tampere Lynx',
+  'TPS':'Turku Sailors',
+  'Kamloops Blazers':'Kamloops Castles',
+  'Spokane Chiefs':'Spokane Command',
+  'Everett Silvertips':'Everett Silverbacks',
+  'Wenatchee Wild':'Wenatchee Wolves',
+  'Prince Albert Raiders':'Prince Albert Regals',
+  'Wisconsin Badgers':'Wisconsin Red Wolves',
+  'Ohio State Buckeyes':'Ohio State Bucks'
+};
+function migrateRenamedTeamName(name){
+  return RENAMED_TEAMS[name]||name;
+}
+
+/** Old saves: CEHL was briefly the Finnish league — move those clubs to FHL. */
+function migrateFinnishLeagueKeySplit(){
+  if(typeof G==='undefined'||!G||G.leagueKey!=='CEHL') return;
+  var finnishTeams={
+    'Helsinki Ice':1,'Tampere Force':1,'Turku Blaze':1,'Oulu North':1,'Jyvaskyla Storm':1,
+    'Rauma Dockers':1,'Lappeenranta Spark':1,'Espoo Metro':1,'Lahti Lightning':1,'Kouvola Steel':1,
+    'Joensuu Forest':1,'Mikkeli Rapids':1,'Hameenlinna Forge':1,'Porin Tide':1,'Vaasa Breeze':1
+  };
+  var tn=G.team&&G.team.n;
+  if(!tn||!finnishTeams[tn]) return;
+  G.leagueKey='FHL';
+  if(typeof LEAGUES!=='undefined'&&LEAGUES.FHL) G.league=LEAGUES.FHL;
+  if(G.standings&&G.standings.length&&G.standings[0].leagueKey==='CEHL'){
+    for(var i=0;i<G.standings.length;i++) G.standings[i].leagueKey='FHL';
+  }
+}
+
+/** Apply team renames across a loaded save (roster, schedule, logs). */
+function migrateSaveBranding(){
+  if(typeof migrateRenamedTeamName!=='function'||typeof G==='undefined'||!G) return;
+  var m=migrateRenamedTeamName;
+  if(G.team&&G.team.n) G.team.n=m(G.team.n);
+  var i, row, opp;
+  if(G.allOpponents) for(i=0;i<G.allOpponents.length;i++){
+    opp=G.allOpponents[i];
+    if(opp&&opp.n) opp.n=m(opp.n);
+  }
+  if(G.standings) for(i=0;i<G.standings.length;i++){
+    row=G.standings[i];
+    if(row&&row.team&&row.team.n) row.team.n=m(row.team.n);
+  }
+  if(G.seasonLog) for(i=0;i<G.seasonLog.length;i++){
+    if(G.seasonLog[i]&&G.seasonLog[i].team) G.seasonLog[i].team=m(G.seasonLog[i].team);
+  }
+  if(G.playoffLog) for(i=0;i<G.playoffLog.length;i++){
+    if(G.playoffLog[i]&&G.playoffLog[i].team) G.playoffLog[i].team=m(G.playoffLog[i].team);
+  }
+  if(G.favoriteTeam&&G.favoriteTeam.n) G.favoriteTeam.n=m(G.favoriteTeam.n);
+  if(G.leagueAlumni) for(i=0;i<G.leagueAlumni.length;i++){
+    if(G.leagueAlumni[i]&&G.leagueAlumni[i].team) G.leagueAlumni[i].team=m(G.leagueAlumni[i].team);
+  }
+  if(G.draftRights&&G.draftRights.team) G.draftRights.team=m(G.draftRights.team);
+  if(G._formerDraftClubName) G._formerDraftClubName=m(G._formerDraftClubName);
+  migrateFinnishLeagueKeySplit();
+  if(typeof pendingTrade!=='undefined'&&pendingTrade&&pendingTrade.team&&pendingTrade.team.n)
+    pendingTrade.team.n=m(pendingTrade.team.n);
+  if(typeof curOpponent!=='undefined'&&curOpponent&&curOpponent.n) curOpponent.n=m(curOpponent.n);
+  if(G.leagueRostersCache){
+    var cache=G.leagueRostersCache, next={}, keys=Object.keys(cache), ki, parts, oldTn, newTn, nkey;
+    for(ki=0;ki<keys.length;ki++){
+      parts=keys[ki].split('|');
+      if(parts.length>=3){
+        oldTn=parts.slice(2).join('|');
+        newTn=m(oldTn);
+        nkey=parts[0]+'|'+parts[1]+'|'+newTn;
+        next[nkey]=cache[keys[ki]];
+      } else next[keys[ki]]=cache[keys[ki]];
+    }
+    G.leagueRostersCache=next;
+  }
+  if(G._teamRosterKey){
+    var trp=G._teamRosterKey.split('|');
+    if(trp.length>=2) trp[1]=m(trp[1]);
+    G._teamRosterKey=trp.join('|');
+  }
+}
+
 function standingsRowHtml(s,rank){
-  var name=s.team.n.split(' ').slice(-1)[0];
+  var parts=String(s.team.n||'').trim().split(/\s+/);
+  var name=parts.length>2?parts.slice(-2).join(' '):(parts[parts.length-1]||'TEAM');
   var lk=s.leagueKey||(typeof G!=='undefined'&&G&&G.leagueKey?G.leagueKey:'');
   return '<div class="srow2'+(s.isMe?' me':'')+'"><div>'+rank+'</div><div>'+teamLogoChip(s.team.n,18,lk)+' '+stripBracketIcons(s.team.e)+' '+name+'</div><div>'+s.w+'</div><div>'+s.l+'</div><div>'+s.otl+'</div><div>'+s.pts+'</div></div>';
 }
@@ -368,7 +563,8 @@ function getPlayoffDivisionTeamLists(lk){
   return [];
 }
 
-function playoffTargetFieldSize(n){
+function playoffTargetFieldSize(n, leagueKey){
+  if(typeof isLocalLeague==='function'&&isLocalLeague(leagueKey)) return Math.min(8, n>=8?8:(n>=4?4:(n>=2?2:0)));
   if(n<2) return 0;
   var evenMax=n%2===0?n:n-1;
   var want;
@@ -390,7 +586,7 @@ function buildPlayoffBracketFromStandings(sorted, leagueKey){
   var n=sorted.length;
   if(n<2) return null;
   var divLists=getPlayoffDivisionTeamLists(lk);
-  var targetSize=playoffTargetFieldSize(n);
+  var targetSize=playoffTargetFieldSize(n, lk);
   if(targetSize<2) return null;
   var used={}, winners=[], i, divRows, w;
   for(i=0;i<divLists.length;i++){
@@ -430,28 +626,55 @@ var START_LEAGUES_M = ['OJL','QMJL','WJL','NCHA','USJL','NEJC','CEJC','ARJC'];
 var START_LEAGUES_F = ['CWHL','NWCHA','USWDL','EWJC','AWJC'];
 /** At career start (age 16), college and paid overseas semi-pro need 17+ or preview OVR at/above this bar. */
 var START_LEAGUE_BYPASS_OVR_M=72;
-var START_LEAGUE_BYPASS_OVR_F=50;
+var START_LEAGUE_BYPASS_OVR_F=72;
 
-/** All skaters (F/D) share this rating set for OVR + moments. */
-var SKATER_RATING_ATTR_KEYS=['skating','shooting','stickhandling','passing','physical','defense','stickChecks','anticipation','conditioning'];
+/** All skaters (F/D) share this rating set for OVR + moments (legacy rollups synced from categories). */
+var SKATER_RATING_ATTR_KEYS=['skating','shooting','stickhandling','passing','physical','defense','hockeyIQ','conditioning'];
 /** Tracked on sheet but excluded from OVR (injury/load style). */
 var SKATER_BASE_ATTR_KEYS=['durability'];
-var SKATER_ATTRS_LIST=SKATER_RATING_ATTR_KEYS.concat(SKATER_BASE_ATTR_KEYS);
+
+/** Category sub-attributes — each group rolls up to a legacy key used by moments/OVR. */
+var SKATER_ATTR_CATEGORIES={
+  skating:{label:'SKATING',legacy:'skating',color:'#00d2d3',keys:['speed','technique','agility']},
+  shooting:{label:'SHOOTING',legacy:'shooting',color:'#d63031',keys:['release','accuracy','power']},
+  control:{label:'CONTROL',legacy:'stickhandling',color:'#fd79a8',keys:['deking','puckControl','handSpeed']},
+  passing:{label:'PASSING',legacy:'passing',color:'#6c5ce7',keys:['passVision','passAccuracy','passTouch']},
+  physical:{label:'PHYSICAL',legacy:'physical',color:'#e17055',keys:['strength','balance','bodyChecking']},
+  defense:{label:'DEFENSE',legacy:'defense',color:'#74b9ff',keys:['gapControl','stickChecks','slotDefense']},
+  hockeyIQ:{label:'HOCKEY IQ',legacy:'hockeyIQ',color:'#ffeaa7',keys:['offensiveAwareness','defensiveAwareness','agitation']}
+};
+
+var LEGACY_BOOST_CATEGORY={
+  skating:'skating', shooting:'shooting', stickhandling:'control', passing:'passing',
+  physical:'physical', defense:'defense'
+};
+
+var SKATER_SUB_ATTR_KEYS=[];
+(function(){
+  var ck, cd, i;
+  for(ck in SKATER_ATTR_CATEGORIES){
+    if(!SKATER_ATTR_CATEGORIES.hasOwnProperty(ck)) continue;
+    cd=SKATER_ATTR_CATEGORIES[ck];
+    for(i=0;i<cd.keys.length;i++) SKATER_SUB_ATTR_KEYS.push(cd.keys[i]);
+  }
+})();
+
+var SKATER_ATTRS_LIST=SKATER_SUB_ATTR_KEYS.concat(SKATER_BASE_ATTR_KEYS);
 
 var ARCHETYPES = {
   F: {
-    Sniper:       {name:'Sniper',      icon:'[*]', desc:'Pure goal scorer. Deadly accuracy, elite shot.',      boosts:{shooting:15,stickhandling:5,physical:-8,passing:-3,defense:-5,stickChecks:-2,anticipation:4}},
-    Playmaker:    {name:'Playmaker',   icon:'[~]', desc:'Elite vision and distribution. Creates for others.',  boosts:{passing:16,stickhandling:12,skating:5,physical:-8,shooting:-5,defense:-3,stickChecks:2,anticipation:6}},
-    PowerForward: {name:'Power Fwd',   icon:'[!]', desc:'Big body scorer. Dominates corners and crease.',      boosts:{physical:19,shooting:8,skating:-5,stickhandling:-4,defense:2,stickChecks:2,anticipation:-2}},
-    TwoWay:       {name:'Two-Way',     icon:'[=]', desc:'Trust-first forward: details, sticks, and lane reads before flash.', boosts:{anticipation:23,passing:6,physical:13,shooting:-4,stickhandling:-3,defense:11,stickChecks:7}},
-    Grinder:      {name:'Grinder',     icon:'[G]', desc:'Outworks everyone. Low skill ceiling, high motor.',   boosts:{physical:30,shooting:-12,stickhandling:-10,passing:-4,defense:10,stickChecks:8,anticipation:0}},
-    Enforcer:     {name:'Enforcer',    icon:'[X]', desc:'Protector. Fights, hits, intimidates.',               boosts:{physical:28,shooting:-16,passing:-12,stickhandling:-8,defense:2,stickChecks:4,anticipation:-6}}
+    Sniper:       {name:'Sniper',      icon:'[*]', desc:'Pure goal scorer. Deadly accuracy, elite shot.',      boosts:{shooting:15,stickhandling:5,physical:-8,passing:-3,defense:-5,anticipation:4,agitation:-5}},
+    Playmaker:    {name:'Playmaker',   icon:'[~]', desc:'Elite vision and distribution. Creates for others.',  boosts:{passing:16,stickhandling:12,skating:5,physical:-8,shooting:-5,defense:-3,anticipation:6,agitation:-4}},
+    PowerForward: {name:'Power Fwd',   icon:'[!]', desc:'Big body scorer. Dominates corners and crease.',      boosts:{physical:19,shooting:8,skating:-5,stickhandling:-4,defense:2,anticipation:-2,agitation:6}},
+    TwoWay:       {name:'Two-Way',     icon:'[=]', desc:'Trust-first forward: details, sticks, and lane reads before flash.', boosts:{anticipation:23,passing:6,physical:13,shooting:-4,stickhandling:-3,defense:11}},
+    Grinder:      {name:'Grinder',     icon:'[G]', desc:'Outworks everyone. Low skill ceiling, high motor.',   boosts:{physical:30,shooting:-12,stickhandling:-10,passing:-4,defense:10,anticipation:0,agitation:8}},
+    Enforcer:     {name:'Enforcer',    icon:'[X]', desc:'Protector. Fights, hits, intimidates.',               boosts:{physical:28,shooting:-16,passing:-12,stickhandling:-8,defense:2,anticipation:-6,agitation:18}}
   },
   D: {
-    OffensiveD:   {name:'Offensive D', icon:'[+]', desc:'Offensive defenseman — joins the attack, shoots and passes from the blue line.', boosts:{passing:18,skating:10,defense:-18,shooting:6,stickhandling:6,stickChecks:-2,anticipation:3}},
-    StayAtHome:   {name:'Stay-at-Home',icon:'[S]', desc:'No offense, all defense. Hard to play against.',      boosts:{defense:26,physical:12,skating:-6,passing:-8,shooting:-6,stickhandling:-8,stickChecks:6,anticipation:4}},
-    TwoWayD:      {name:'Two-Way D',   icon:'[=]', desc:'Balanced blueliner — leans defensive without going full lockdown.', boosts:{defense:16,anticipation:10,passing:7,skating:5,physical:4,shooting:2,stickhandling:5,stickChecks:5}},
-    ShutdownD:    {name:'Shutdown D',  icon:'[L]', desc:'Assignment: stop the other teams best player.',       boosts:{defense:26,anticipation:18,skating:4,passing:-10,shooting:-4,stickhandling:-6,stickChecks:8}}
+    OffensiveD:   {name:'Offensive D', icon:'[+]', desc:'Offensive defenseman — joins the attack, shoots and passes from the blue line.', boosts:{passing:18,skating:10,defense:-18,shooting:6,stickhandling:6,anticipation:3}},
+    StayAtHome:   {name:'Stay-at-Home',icon:'[S]', desc:'No offense, all defense. Hard to play against.',      boosts:{defense:26,physical:12,skating:-6,passing:-8,shooting:-6,stickhandling:-8,anticipation:4}},
+    TwoWayD:      {name:'Two-Way D',   icon:'[=]', desc:'Balanced blueliner — leans defensive without going full lockdown.', boosts:{defense:16,anticipation:10,passing:7,skating:5,physical:4,shooting:2,stickhandling:5}},
+    ShutdownD:    {name:'Shutdown D',  icon:'[L]', desc:'Assignment: stop the other teams best player.',       boosts:{defense:26,anticipation:18,skating:4,passing:-10,shooting:-4,stickhandling:-6}}
   },
   G: {
     Butterfly:    {name:'Butterfly',   icon:'[B]', desc:'Positioning and post-sealing. Classic modern style.', boosts:{positioning:16,reboundControl:10,glove:-4,stamina:4}},
@@ -461,29 +684,169 @@ var ARCHETYPES = {
   }
 };
 
-/** Playable post-game: extra +/- on top of moment-accumulated pm for D (all) and two-way F. */
+/** Assists occur ~2.1× as often as goals league-wide (not 50/50). */
+var ASSIST_TO_GOAL_RATIO=2.1;
+function getDefaultGoalPointShare(){
+  return 1/(1+ASSIST_TO_GOAL_RATIO);
+}
+
+/** Per-league goal share of points — LHL favors finishers; established leagues favor playmakers (~2.1:1 A:G). */
+function getLeagueGoalPointShare(leagueKey){
+  var lk=leagueKey||(typeof G!=='undefined'&&G?G.leagueKey:'');
+  var L=(typeof LEAGUES!=='undefined'&&lk)?LEAGUES[lk]:null;
+  if(L&&L.tier==='local') return 0.58;
+  return typeof getDefaultGoalPointShare==='function'?getDefaultGoalPointShare():0.323;
+}
+
+/** Split total points into goals/assists using league goal-share (assists ~2.1× goals). */
+function getArchetypeGoalPointShare(arch, pos, opts){
+  opts=opts||{};
+  var line=opts.line!=null?opts.line:3;
+  var perf=opts.perf!=null?opts.perf:0.85;
+  var leagueKey=opts.leagueKey||(typeof G!=='undefined'&&G?G.leagueKey:'');
+  var base=typeof getLeagueGoalPointShare==='function'?getLeagueGoalPointShare(leagueKey):(typeof getDefaultGoalPointShare==='function'?getDefaultGoalPointShare():0.323);
+  if(pos==='G') return 0;
+  if(pos==='D'){
+    if(arch==='OffensiveD') return cl(base*1.38, 0.12, 0.40);
+    if(arch==='TwoWayD') return cl(base*0.98, 0.10, 0.32);
+    if(arch==='StayAtHome') return cl(base*0.65, 0.08, 0.24);
+    if(arch==='ShutdownD') return cl(base*0.55, 0.06, 0.20);
+    return cl(base*0.82, 0.08, 0.30);
+  }
+  var share=base;
+  if(arch==='Sniper'){
+    share=0.40+perf*0.24;
+    if(line===1) share+=0.07;
+    if(line===1&&perf>=0.94) share+=0.05;
+    if(line===1&&perf>=0.97) share+=0.03;
+    return cl(share, 0.36, 0.74);
+  }
+  if(arch==='PowerForward'){
+    share=0.34+perf*0.16;
+    if(line===1) share+=0.05;
+    return cl(share, 0.30, 0.58);
+  }
+  if(arch==='Playmaker'){
+    share=0.13+perf*0.09;
+    return cl(share, 0.09, 0.27);
+  }
+  if(arch==='TwoWay'){
+    share=0.24+perf*0.10;
+    return cl(share, 0.16, 0.38);
+  }
+  if(arch==='Grinder'||arch==='Enforcer'){
+    share=0.17+perf*0.07;
+    return cl(share, 0.11, 0.30);
+  }
+  return cl(base+(perf-0.85)*0.14, 0.14, 0.42);
+}
+
+function splitGoalsAssistsFromPoints(totalPts, goalShare){
+  var out={g:0,a:0};
+  var pts=Math.max(0, Math.round(+totalPts||0));
+  if(pts<=0) return out;
+  var pGoal=typeof goalShare==='number'?goalShare:(typeof getDefaultGoalPointShare==='function'?getDefaultGoalPointShare():0.323);
+  pGoal=cl(pGoal, 0.08, 0.75);
+  for(var i=0;i<pts;i++){
+    if(Math.random()<pGoal) out.g++;
+  }
+  out.a=pts-out.g;
+  return out;
+}
+
+function getCreatePointBudget(gender){
+  return String(gender||'M').toUpperCase()==='F'?25:50;
+}
+
+function getCreateMaxSubBoost(gender){
+  return String(gender||'M').toUpperCase()==='F'?10:12;
+}
+
+/** Map rating to bar fill (20–99 → visible 0–100%). */
+function statBarPct(v, floor, cap){
+  var f=typeof floor==='number'?floor:20;
+  var c=typeof cap==='number'?cap:99;
+  var n=cl(+v||0, f, c);
+  return Math.min(100, Math.max(0, Math.round((n-f)/(c-f)*100)));
+}
+
+/** Per-game +/- — good seasons land around +30 over ~65 GP; losses can go negative. */
+function computeSkaterGamePlusMinus(won, tied, goals, assists, blocks, pos, arch, momentPm){
+  if(pos==='G') return Math.round(momentPm||0);
+  var pts=(+goals||0)+(+assists||0);
+  var base=won?0.72:(tied?0.08:-0.58);
+  if(pts>=1) base+=Math.min(0.32, pts*0.11);
+  if(pts>=3) base+=0.16;
+  var defBonus=getArchetypeDefensivePlusMinusBonus(pos, arch, won, tied, goals, assists, blocks||0);
+  var fight=(momentPm||0)*0.14;
+  var raw=base+defBonus*0.22+fight;
+  var cap=pts>=2?1.45:1.15;
+  var floor=won?-0.35:-1.15;
+  return Math.round(cl(raw,floor,cap));
+}
+
+/** Playable post-game: small +/- bump on top of moment pm — elite seasons target ~+30–50 total. */
 function getArchetypeDefensivePlusMinusBonus(pos, arch, won, tied, goals, assists, blocks){
   var g=+goals||0,a=+assists||0,b=+blocks||0,pts=g+a;
   var da=String(arch||'');
   if(pos==='D'){
-    var d=(won?2:(tied?1:-1));
-    if(b>=2) d+=1;
+    var d=(won?1:(tied?0:-1));
     if(b>=4) d+=1;
-    if(pts>=1) d+=1;
-    if(da==='StayAtHome'||da==='ShutdownD') d+=2;
-    else if(da==='TwoWayD') d+=1;
-    else if(da==='OffensiveD') d+=0;
-    else d+=1;
-    return cl(d,-2,7);
+    if(pts===0&&won&&(da==='StayAtHome'||da==='ShutdownD')) d+=1;
+    return cl(d,-2,2);
   }
   if(pos==='F' && da==='TwoWay'){
     var f=(won?1:(tied?0:-1));
-    if(b>=1) f+=1;
-    if(b>=2) f+=1;
-    if(pts===0&&won) f+=1;
-    return cl(f,-1,5);
+    if(b>=3&&pts===0&&won) f+=1;
+    return cl(f,-1,2);
   }
   return 0;
+}
+
+/** Enforcer / grinder / brat types — PIM is a badge, not a blemish. */
+function isPhysicalIdentityPlayer(pos, arch, xFactor){
+  if(pos==='G') return false;
+  var a=String(arch||'');
+  if(a==='Enforcer'||a==='Grinder'||a==='PowerForward') return true;
+  var xf=String(xFactor||'');
+  return xf==='heavy_hitter'||xf==='brat'||xf==='careless';
+}
+
+function getPlayerPimRateMult(pos, arch, xFactor){
+  if(pos==='G') return 0.45;
+  var m=1;
+  var a=String(arch||'');
+  if(a==='Enforcer') m*=2.5;
+  else if(a==='Grinder') m*=1.8;
+  else if(a==='PowerForward') m*=1.22;
+  else if(a==='ShutdownD'||a==='StayAtHome') m*=1.12;
+  var xf=String(xFactor||'');
+  if(xf==='heavy_hitter') m*=1.55;
+  if(xf==='brat') m*=1.4;
+  if(xf==='careless') m*=1.18;
+  return m;
+}
+
+function rollSkaterGamePim(pos, arch, xFactor){
+  if(pos==='G') return Math.random()<0.05?2:0;
+  var mult=getPlayerPimRateMult(pos, arch, xFactor);
+  var pim=0;
+  if(Math.random()<0.12*mult) pim+=2;
+  if(Math.random()<0.075*mult) pim+=ri(2,4);
+  if(Math.random()<0.045*mult&&(arch==='Enforcer'||xFactor==='heavy_hitter')) pim+=5;
+  return pim;
+}
+
+function getHubPimDisplayColor(pim, pos, arch, xFactor){
+  var p=+pim||0;
+  if(isPhysicalIdentityPlayer(pos, arch, xFactor)){
+    if(p>=40) return 'var(--gold)';
+    if(p>=12) return 'var(--green)';
+    return 'var(--mut)';
+  }
+  if(p>=90) return 'var(--red)';
+  if(p>=50) return 'var(--mut)';
+  return 'var(--text)';
 }
 
 var ATTRS = {
@@ -544,10 +907,12 @@ function migrateLegacySkaterAttrs(a, GG){
   }
   if(typeof a.shotBlocking==='number'){
     a.defense=Math.round(cl(Math.max(a.defense||55, blend(a.defense||55, a.shotBlocking)),20,96));
+    a.slotDefense=a.defense;
     delete a.shotBlocking;
   }
   if(typeof a.faceoffs==='number'){
     a.stickhandling=blend(typeof a.stickhandling==='number'?a.stickhandling:55, a.faceoffs);
+    a.puckControl=a.stickhandling;
     delete a.faceoffs;
   }
   if(typeof a.stamina==='number' && GG&&GG.pos!=='G'){
@@ -556,11 +921,219 @@ function migrateLegacySkaterAttrs(a, GG){
   }
 }
 
+function getCategoryAverage(attrs, catDef){
+  if(!attrs||!catDef||!catDef.keys) return 55;
+  var s=0, c=0, i, v;
+  for(i=0;i<catDef.keys.length;i++){
+    v=attrs[catDef.keys[i]];
+    if(typeof v==='number'&&!isNaN(v)){ s+=v; c++; }
+  }
+  return c?Math.round(s/c):55;
+}
+
+function syncLegacySkaterAttrsFromCategories(attrs){
+  if(!attrs||typeof SKATER_ATTR_CATEGORIES==='undefined') return;
+  var ck, cd;
+  for(ck in SKATER_ATTR_CATEGORIES){
+    if(!SKATER_ATTR_CATEGORIES.hasOwnProperty(ck)) continue;
+    cd=SKATER_ATTR_CATEGORIES[ck];
+    attrs[cd.legacy]=getCategoryAverage(attrs, cd);
+  }
+  attrs.anticipation=typeof attrs.offensiveAwareness==='number'?attrs.offensiveAwareness:getCategoryAverage(attrs, SKATER_ATTR_CATEGORIES.hockeyIQ);
+  attrs.conditioning=Math.round(cl(getCategoryAverage(attrs, SKATER_ATTR_CATEGORIES.physical)*0.88+14, 32, 96));
+}
+
+function applyLegacyBoostsToSubs(bases, boosts, floor, capPre){
+  if(!bases||!boosts) return;
+  var cap=capPre||92, k, v, cat, cd, i, sub, share;
+  for(k in boosts){
+    if(!boosts.hasOwnProperty(k)) continue;
+    v=boosts[k];
+    if(k==='agitation'||k==='offensiveAwareness'||k==='defensiveAwareness'){
+      if(typeof bases[k]==='number') bases[k]=cl(bases[k]+v, floor, cap);
+      continue;
+    }
+    if(k==='anticipation'){
+      bases.offensiveAwareness=cl((bases.offensiveAwareness||50)+Math.round(v*0.62), floor, cap);
+      bases.defensiveAwareness=cl((bases.defensiveAwareness||50)+Math.round(v*0.38), floor, cap);
+      continue;
+    }
+    cat=LEGACY_BOOST_CATEGORY[k];
+    if(!cat||!SKATER_ATTR_CATEGORIES[cat]) continue;
+    cd=SKATER_ATTR_CATEGORIES[cat];
+    share=v/cd.keys.length;
+    for(i=0;i<cd.keys.length;i++){
+      sub=cd.keys[i];
+      bases[sub]=cl((bases[sub]||50)+Math.round(share+rd(-1,1)), floor, cap);
+    }
+  }
+}
+
+/** Small L/R tradeoffs: lefties lean precision/accuracy; righties lean power. */
+function applyHandednessAttrProfile(attrs, hand, floor, cap){
+  if(!attrs||!hand) return;
+  var f=typeof floor==='number'?floor:22;
+  var c=typeof cap==='number'?cap:99;
+  var h=String(hand).toUpperCase();
+  if(h==='L'){
+    attrs.accuracy=cl((attrs.accuracy||50)+2, f, c);
+    attrs.passAccuracy=cl((attrs.passAccuracy||50)+2, f, c);
+    attrs.technique=cl((attrs.technique||50)+1, f, c);
+    attrs.passTouch=cl((attrs.passTouch||50)+1, f, c);
+    attrs.power=cl((attrs.power||50)-1, f, c);
+  } else {
+    attrs.power=cl((attrs.power||50)+2, f, c);
+    attrs.release=cl((attrs.release||50)+1, f, c);
+    attrs.bodyChecking=cl((attrs.bodyChecking||50)+1, f, c);
+    attrs.accuracy=cl((attrs.accuracy||50)-1, f, c);
+  }
+}
+
+function getHandednessMomentNudge(attrName, hand){
+  var h=String(hand||'R').toUpperCase();
+  var a=String(attrName||'');
+  if(h==='L'){
+    if(a==='shooting') return 1.6;
+    if(a==='passing') return 1.0;
+    if(a==='stickhandling') return 0.5;
+    return 0;
+  }
+  if(a==='shooting') return 1.2;
+  if(a==='physical') return 0.8;
+  return 0;
+}
+
+function getHandednessGoalBias(hand){
+  var h=String(hand||'R').toUpperCase();
+  return h==='L'?-0.02:0.025;
+}
+
+/** Archetype-shaped starting sheet — not flat 55s; boosts are baked in before point-buy. */
+function buildSkaterCreateBases(pos, archKey, gender, hand){
+  var floor=40;
+  var core=50;
+  var bases={}, i, k;
+  for(i=0;i<SKATER_SUB_ATTR_KEYS.length;i++){
+    k=SKATER_SUB_ATTR_KEYS[i];
+    bases[k]=cl(core+ri(-5,5), floor, 86);
+  }
+  bases.durability=cl(54+ri(-4,4), floor, 90);
+  if(pos==='D'){
+    bases.gapControl=cl(bases.gapControl+5, floor, 88);
+    bases.slotDefense=cl(bases.slotDefense+4, floor, 88);
+    bases.stickChecks=cl(bases.stickChecks+3, floor, 88);
+    bases.offensiveAwareness=cl(bases.offensiveAwareness-2, floor, 88);
+  } else {
+    bases.offensiveAwareness=cl(bases.offensiveAwareness+2, floor, 88);
+  }
+  var arch=ARCHETYPES[pos]&&ARCHETYPES[pos][archKey];
+  if(arch&&arch.boosts) applyLegacyBoostsToSubs(bases, arch.boosts, floor, 92);
+  if(hand) applyHandednessAttrProfile(bases, hand, floor, 92);
+  return bases;
+}
+
+function getCreateSkaterAttrKeys(){
+  return SKATER_SUB_ATTR_KEYS.concat(['durability']);
+}
+
+function finalizeCreateSkaterAttrs(pos, gender, baseAttrs, extraAttrs){
+  var floor=40;
+  var attrs={}, keys=pos==='G'?(ATTRS.G||[]):getCreateSkaterAttrKeys();
+  var i, key;
+  for(i=0;i<keys.length;i++){
+    key=keys[i];
+    attrs[key]=cl((baseAttrs[key]||50)+(extraAttrs[key]||0), floor, 99);
+  }
+  if(pos!=='G'&&typeof syncLegacySkaterAttrsFromCategories==='function') syncLegacySkaterAttrsFromCategories(attrs);
+  return attrs;
+}
+
+function migrateSubAttrRenames(a){
+  if(!a) return;
+  var blend=function(x,y){ return Math.round(cl((x+y)/2,20,96)); };
+  if(typeof a.laneReads==='number'){
+    a.offensiveAwareness=blend(typeof a.offensiveAwareness==='number'?a.offensiveAwareness:52, a.laneReads);
+    delete a.laneReads;
+  }
+  if(typeof a.offensiveSupport==='number'){
+    a.offensiveAwareness=blend(typeof a.offensiveAwareness==='number'?a.offensiveAwareness:52, a.offensiveSupport);
+    delete a.offensiveSupport;
+  }
+  if(typeof a.anticipation==='number'&&typeof a.offensiveAwareness!=='number'){
+    a.offensiveAwareness=a.anticipation;
+    a.defensiveAwareness=typeof a.defensiveAwareness==='number'?a.defensiveAwareness:Math.round(a.anticipation*0.85);
+    delete a.anticipation;
+  } else if(typeof a.anticipation==='number'&&a.offensiveAwareness!=null){
+    delete a.anticipation;
+  }
+  if(typeof a.agitation!=='number') a.agitation=50;
+}
+
+function redistributeCategorySubsFromLegacy(attrs, catKey){
+  var cd=SKATER_ATTR_CATEGORIES[catKey];
+  if(!cd||typeof attrs[cd.legacy]!=='number') return;
+  var v=attrs[cd.legacy], i;
+  for(i=0;i<cd.keys.length;i++){
+    attrs[cd.keys[i]]=cl(Math.round(v+rd(-3,3)), 22, 99);
+  }
+}
+
+function redistributeAllCategorySubsFromLegacy(attrs){
+  var ck;
+  for(ck in SKATER_ATTR_CATEGORIES){
+    if(SKATER_ATTR_CATEGORIES.hasOwnProperty(ck)) redistributeCategorySubsFromLegacy(attrs, ck);
+  }
+}
+
+function ensureSkaterSubAttrs(G){
+  if(!G||!G.attrs||G.pos==='G') return;
+  var a=G.attrs, amin=typeof G._attrClampMin==='number'?G._attrClampMin:40;
+  migrateSubAttrRenames(a);
+  var ck, cd, i, legacy, needsSplit;
+  for(ck in SKATER_ATTR_CATEGORIES){
+    if(!SKATER_ATTR_CATEGORIES.hasOwnProperty(ck)) continue;
+    cd=SKATER_ATTR_CATEGORIES[ck];
+    legacy=typeof a[cd.legacy]==='number'?a[cd.legacy]:55;
+    needsSplit=false;
+    for(i=0;i<cd.keys.length;i++){
+      if(typeof a[cd.keys[i]]!=='number'||isNaN(a[cd.keys[i]])) needsSplit=true;
+    }
+    if(needsSplit) redistributeCategorySubsFromLegacy(a, ck);
+  }
+  if(typeof a.stickChecks==='number'&&!needsSplit){
+    a.stickChecks=cl(Math.round(a.stickChecks), amin, 99);
+  }
+  syncLegacySkaterAttrsFromCategories(a);
+  for(i=0;i<SKATER_SUB_ATTR_KEYS.length;i++){
+    a[SKATER_SUB_ATTR_KEYS[i]]=cl(Math.round(a[SKATER_SUB_ATTR_KEYS[i]]||55), amin, 99);
+  }
+  if(typeof a.durability!=='number'||isNaN(a.durability)){
+    a.durability=Math.round(cl((typeof G.health==='number'?G.health:88)*0.55+(a.physical||55)*0.45, 22, 99));
+  }
+  try{ ensureSecondarySubPos(G); }catch(eSec){}
+  try{ if(typeof updatePlayerConditioning==='function') updatePlayerConditioning(); }catch(eCond){}
+}
+
+function applyAttrCategoryDelta(attrs, catKey, delta, cap, floor){
+  var cd=SKATER_ATTR_CATEGORIES[catKey];
+  if(!cd||!attrs) return;
+  var i, f=floor||22, c=cap||99;
+  for(i=0;i<cd.keys.length;i++){
+    attrs[cd.keys[i]]=cl(Math.round((attrs[cd.keys[i]]||55)+delta), f, c);
+  }
+  syncLegacySkaterAttrsFromCategories(attrs);
+}
+
+function getAllSkaterSubAttrKeys(){
+  return SKATER_SUB_ATTR_KEYS.slice();
+}
+
 /** Fill missing unified skater keys after load or legacy saves. */
 function ensureUnifiedSkaterAttrs(G){
   if(!G||!G.attrs||G.pos==='G') return;
   var a=G.attrs;
   migrateLegacySkaterAttrs(a, G);
+  migrateSubAttrRenames(a);
   var r=function(k,fb){ var v=a[k]; return typeof v==='number'&&!isNaN(v)?v:fb; };
   var blend=function(x,y){ return Math.round(cl((x+y)/2,20,96)); };
   if(typeof a.skating!=='number'||isNaN(a.skating)) a.skating=55;
@@ -577,9 +1150,13 @@ function ensureUnifiedSkaterAttrs(G){
   }
   if(typeof a.stickChecks!=='number'||isNaN(a.stickChecks)){
     a.stickChecks=Math.round(cl(blend(r('defense',a.defense),r('anticipation',60))+(r('physical',a.physical)-60)*0.2,22,96));
+    a.gapControl=a.stickChecks;
+    a.slotDefense=a.defense;
   }
-  if(typeof a.anticipation!=='number'||isNaN(a.anticipation)){
-    a.anticipation=blend(r('passing',a.passing),r('defense',a.defense));
+  if(typeof a.offensiveAwareness!=='number'||isNaN(a.offensiveAwareness)){
+    a.offensiveAwareness=blend(r('passing',a.passing),r('shooting',a.shooting));
+    a.defensiveAwareness=blend(r('defense',a.defense||60), r('passing',a.passing));
+    a.agitation=cl(48+ri(-6,6), 22, 96);
   }
   if(typeof a.conditioning!=='number'||isNaN(a.conditioning)){
     a.conditioning=blend(r('physical',a.physical), 52);
@@ -589,13 +1166,7 @@ function ensureUnifiedSkaterAttrs(G){
   }
   delete a.positioning; delete a.shotBlocking; delete a.faceoffs;
   if(G.pos!=='G') delete a.stamina;
-  var amin=typeof G._attrClampMin==='number'?G._attrClampMin:22;
-  for(var i=0;i<SKATER_ATTRS_LIST.length;i++){
-    var k=SKATER_ATTRS_LIST[i];
-    a[k]=cl(Math.round(r(k,55)),amin,99);
-  }
-  try{ ensureSecondarySubPos(G); }catch(eSec){}
-  try{ if(typeof updatePlayerConditioning==='function') updatePlayerConditioning(); }catch(eCond){}
+  ensureSkaterSubAttrs(G);
 }
 
 /** Moment / shootout rolls — faceoffs use puck control (stickhandling + stick checks). */
@@ -616,7 +1187,9 @@ function getMomentAttrValue(attrName, GG){
   if(raw==='anticipation'){
     return (+attrs.anticipation||60);
   }
-  return +attrs[raw]||60;
+  var val=+attrs[raw]||60;
+  if(GG.pos!=='G'&&GG.hand) val+=getHandednessMomentNudge(raw, GG.hand);
+  return val;
 }
 
 /** Weekly attr growth multiplier by league path (OJL balanced, QMJL skill/creative, WJL heavy, euro technical, ARHL creative/slow, Asian clubs budget, college well-rounded). */
@@ -625,7 +1198,8 @@ function getLeagueAttrDevMultiplier(leagueKey, teamName, attr){
   var tn=String(teamName||'');
   var M={};
   var chinaKhl=/Beijing|Kunlun|Shanghai|Shenzhen/i.test(tn);
-  var asiaPac=/Seoul|Yokohama|Sapporo|Tokyo|Busan|Taipei|Astana/i.test(tn);
+  var centralAsia=/Astana|Almaty|Tashkent|Bishkek|Ashgabat|Dushanbe|Samarkand|Steppe|Snowleopard|Pamir|Sandstorm|Silk Route/i.test(tn);
+  var asiaPac=/Seoul|Yokohama|Sapporo|Tokyo|Busan|Taipei/i.test(tn);
 
   if(lk==='OJL'){
     M={skating:1.12,positioning:1.08,physical:1.07,stickhandling:1.07,passing:1.07,shooting:1.06,stamina:1.05,defense:1.05,shotBlocking:1.04,
@@ -645,9 +1219,12 @@ function getLeagueAttrDevMultiplier(leagueKey, teamName, attr){
   } else if(lk==='EWJC'||lk==='AWJC'){
     M={passing:1.05,positioning:1.04,skating:1.03,stickhandling:1.03,stamina:1.02,physical:0.95,
       reflexes:1.03,glove:1.02,blocker:1.02,reboundControl:1.02,mental:1.03};
-  } else if(lk==='NEHL'||lk==='CEHL'){
+  } else if(lk==='NEHL'||lk==='FHL'){
     M={passing:1.1,positioning:1.08,stickhandling:1.07,skating:1.03,defense:1.03,physical:0.93,shooting:1.02,
       mental:1.06,reflexes:1.04,glove:1.03,blocker:1.03,reboundControl:1.04};
+  } else if(lk==='CEHL'){
+    M={passing:1.02,positioning:1.01,stickhandling:1.0,skating:0.98,defense:0.96,physical:0.94,shooting:0.97,
+      mental:0.98,reflexes:0.97,glove:0.96,blocker:0.96,reboundControl:0.96};
   } else if(lk==='ARHL'){
     if(chinaKhl){
       M={physical:0.72,stamina:0.78,skating:0.8,positioning:0.88,stickhandling:1.08,passing:1.06,shooting:0.95,defense:0.85,shotBlocking:0.86,
@@ -655,6 +1232,9 @@ function getLeagueAttrDevMultiplier(leagueKey, teamName, attr){
     } else if(asiaPac){
       M={skating:0.9,physical:0.88,stamina:0.92,stickhandling:1.05,passing:1.04,positioning:0.94,
         reflexes:0.93,glove:0.94,blocker:0.94,reboundControl:0.93,mental:0.95};
+    } else if(centralAsia){
+      M={stickhandling:1.08,passing:1.06,shooting:1.03,skating:0.92,stamina:0.94,positioning:0.98,physical:0.98,defense:1.0,shotBlocking:0.98,
+        reflexes:0.96,glove:0.97,blocker:0.97,reboundControl:0.96,mental:1.02};
     } else {
       M={stickhandling:1.12,passing:1.1,shooting:1.04,skating:0.86,stamina:0.9,positioning:0.96,physical:0.97,
         reflexes:0.94,glove:0.95,blocker:0.95,reboundControl:0.94,mental:1.1};
@@ -679,6 +1259,9 @@ function getLeagueAttrDevMultiplier(leagueKey, teamName, attr){
     } else {
       M={passing:1.05,positioning:1.03,stickhandling:1.03};
     }
+  } else if(lk==='LHCM'||lk==='LHLF'){
+    M={stickhandling:1.14,passing:1.12,skating:1.1,shooting:1.08,positioning:1.06,defense:1.05,physical:1.04,stamina:1.05,
+      reflexes:1.05,glove:1.04,blocker:1.04,reboundControl:1.04,mental:1.08};
   }
 
   var v=M[attr];
@@ -691,18 +1274,30 @@ function getLeagueAttrDevMultiplier(leagueKey, teamName, attr){
 }
 var ATTR_LABELS = {
   skating:'SKATING',shooting:'SHOOTING',stickhandling:'CONTROL',passing:'PASSING',
-  physical:'PHYSICAL',defense:'DEFENSE',
-  stickChecks:'STICK CHECKS',anticipation:'AWARENESS',conditioning:'CONDITIONING',
+  physical:'PHYSICAL',defense:'DEFENSE',hockeyIQ:'HOCKEY IQ',anticipation:'OFF. AWARENESS',conditioning:'CONDITIONING',
   durability:'DURABILITY',
+  speed:'SPEED',technique:'TECHNIQUE',agility:'AGILITY',
+  release:'RELEASE',accuracy:'ACCURACY',power:'POWER',
+  deking:'DEKING',puckControl:'PUCK CONTROL',handSpeed:'HAND SPEED',
+  passVision:'PASS VISION',passAccuracy:'PASS ACCURACY',passTouch:'PASS TOUCH',
+  strength:'STRENGTH',balance:'BALANCE',bodyChecking:'BODY CHECKING',
+  gapControl:'GAP CONTROL',stickChecks:'STICK CHECKS',slotDefense:'SLOT DEFENSE',
+  offensiveAwareness:'OFFENSIVE AWARENESS',defensiveAwareness:'DEFENSIVE AWARENESS',agitation:'AGITATION',
   positioning:'POSITIONING',stamina:'STAMINA',
   reflexes:'REFLEXES',glove:'GLOVE',blocker:'BLOCKER',
   reboundControl:'REB CTRL',mental:'MENTAL'
 };
 var ATTR_COLORS = {
   skating:'#00d2d3',shooting:'#d63031',stickhandling:'#fd79a8',passing:'#6c5ce7',
-  physical:'#e17055',defense:'#74b9ff',
-  stickChecks:'#a8e6cf',anticipation:'#dfe6e9',conditioning:'#81ecec',
+  physical:'#e17055',defense:'#74b9ff',hockeyIQ:'#ffeaa7',anticipation:'#dfe6e9',conditioning:'#81ecec',
   durability:'#55efc4',
+  speed:'#00d2d3',technique:'#00cec9',agility:'#55efc4',
+  release:'#d63031',accuracy:'#e17055',power:'#fab1a0',
+  deking:'#fd79a8',puckControl:'#f368e0',handSpeed:'#ff9ff3',
+  passVision:'#6c5ce7',passAccuracy:'#a29bfe',passTouch:'#74b9ff',
+  strength:'#e17055',balance:'#fdcb6e',bodyChecking:'#d35400',
+  gapControl:'#74b9ff',stickChecks:'#a8e6cf',slotDefense:'#0984e3',
+  offensiveAwareness:'#ffeaa7',defensiveAwareness:'#fdcb6e',agitation:'#e84393',
   positioning:'#0984e3',stamina:'#00b894',
   reflexes:'#ff7675',glove:'#fdcb6e',blocker:'#81ecec',
   reboundControl:'#55efc4',mental:'#dfe6e9'

@@ -3,6 +3,7 @@
 // HUB
 // ============================================================
 function renderHub(){
+  if(typeof ensureProCallUpStintComplete==='function') ensureProCallUpStintComplete();
   var o=ovr(G.attrs,G.pos);
   var fullName=String(G.first+' '+G.last).trim();
   applyTeamTheme(G.team&&G.team.n?G.team.n:'TEAM');
@@ -19,16 +20,22 @@ function renderHub(){
   var teamIdent=safeEl('hub-team-ident');
   if(teamIdent) teamIdent.innerHTML='<span class="team-wordmark">'+G.team.n+'</span>';
   safeEl('hub-ovr').textContent='OVR '+o;
-  safeEl('hub-league-badge').textContent=stripBracketIcons(G.league.short);
-  var conText=G.contract.type+(G.contract.sal>0?' -- '+fmt(G.contract.sal):' -- AMATEUR');
+  var lbb=safeEl('hub-league-badge');
+  if(lbb){
+    lbb.textContent=stripBracketIcons(G.league.short);
+    lbb.title=(G.league.name||G.league.short)+' — '+G.league.tier.toUpperCase();
+  }
+  var yrsLeft=G.contractYrsLeft!=null?G.contractYrsLeft:(G.contract&&G.contract.yrs);
+  var conText=G.contract.type+(G.contract.sal>0?' — '+fmt(G.contract.sal)+'/yr':' — AMATEUR');
+  if(typeof yrsLeft==='number'&&yrsLeft>0) conText+=' ('+yrsLeft+' yr'+(yrsLeft!==1?'s':'')+')';
   safeEl('hub-contract-badge').textContent=conText;
+  var cbb=safeEl('hub-contract-badge');
+  if(cbb) cbb.title=G.contract.type+(G.contract.sal>0?(' · '+fmt(G.contract.sal)+' per season'):'');
   var me=G.morale;
   var mei=me>=80?':)':me>=60?':|':me>=40?':S':':(';
   safeEl('hub-morale-badge').textContent=mei+' '+me;
   var hubIc=safeEl('hub-icon');
   if(hubIc) hubIc.innerHTML=teamLogoSVG(G.team.n,72,G.leagueKey);
-  if(G.xFactor==='sniper_xf') G.xFactor='quick_release';
-  if(G.arch==='OQD') G.arch='OffensiveD';
   var xfId=G.xFactor&&X_FACTORS[G.xFactor]?G.xFactor:'none';
   var xf=X_FACTORS[xfId]||X_FACTORS.none;
   var xfb=safeEl('hub-xfactor-badge');
@@ -47,15 +54,17 @@ function renderHub(){
   safeEl('hub-xp').style.width=Math.min(100,G.xp/xpNxt*100)+'%';
   safeEl('hub-xp-lbl').textContent=G.xp+'/'+xpNxt;
   var perWkHub=getGamesPerWeek(G.leagueKey);
-  var totalWks=Math.ceil((G.league.games||68)/perWkHub);
+  var totalWks=typeof getSeasonWeekCount==='function'?getSeasonWeekCount(G.leagueKey):Math.ceil((G.league.games||68)/perWkHub);
   var psub=safeEl('hub-season-sub');
   var ptitle=safeEl('hub-season-ptitle');
   if(G._playoffCtx&&G._playoffCtx.active){
-    var boN=typeof PLAYOFF_SERIES_WINS==='number'?PLAYOFF_SERIES_WINS:4;
+    var boN=typeof getPlayoffSeriesWinsNeeded==='function'?getPlayoffSeriesWinsNeeded():4;
     var serHdr=boN<=1?'1 GAME':'BO'+boN+' (race to '+boN+')';
     if(ptitle) ptitle.innerHTML='PLAYOFFS <span style="color:var(--mut)">—</span> <span id="wk-lbl">'+escHtml(G._playoffCtx.roundName||'ROUND')+'</span> <span style="color:var(--mut)">·</span> <span id="wk-max">'+serHdr+'</span>';
     var _px=G._playoffCtx,_pr=_px.pairs&&_px.pairs[_px.pairIndex];
-    var subP='<b>SIM ROUND</b> resolves CPU series up to yours. <b>SIM MY SERIES</b> fast-sims your matchup. <b>PLAY GAME</b> is one game at a time (best-of-7). If you are eliminated, <b>SIM ROUND</b> runs the rest of the bracket to a champion, then offseason.';
+    var subP=(G.league&&G.league.tier==='local')
+      ?'<b>COMMUNITY SHOWCASE</b> — top 8 clubs, single-game rounds. Play your matchup or sim the bracket. Eliminated? You go straight to offseason.'
+      :('<b>SIM ROUND</b> resolves CPU series up to yours. <b>SIM MY SERIES</b> fast-sims your matchup. <b>PLAY GAME</b> is one game at a time. Eliminated? Bracket auto-finishes — offseason next.');
     if(_pr&&(_pr[0].isMe||_pr[1].isMe)&&!_px.eliminated){
       var _uW=_pr[0].isMe?_px.seriesHW:_px.seriesAW,_oW=_pr[0].isMe?_px.seriesAW:_px.seriesHW,_on=_pr[0].isMe?_pr[1].team.n:_pr[0].team.n;
       subP='Series tracker: you '+_uW+' — '+_oW+' '+_on+(boN<=1?'':' (first to '+boN+')')+'. '+subP;
@@ -63,7 +72,9 @@ function renderHub(){
     if(psub) psub.textContent=subP;
   } else {
     if(ptitle) ptitle.innerHTML='WEEK <span id="wk-lbl">'+G.week+'</span> / <span id="wk-max">'+totalWks+'</span>';
-    if(psub) psub.textContent=perWkHub+' GAMES THIS WEEK. CLICK TO PLAY EACH ONE:';
+    if(psub) psub.textContent=(G.league.tier==='local'
+      ?'12 LEAGUE GAMES + COMMUNITY EVENTS — 9 weeks, 2 slots per week. Events do not count as GP.'
+      :perWkHub+' GAMES THIS WEEK. CLICK TO PLAY EACH ONE:');
   }
   if(G.isInjured){
     safeEl('inj-banner').style.display='block';
@@ -75,65 +86,102 @@ function renderHub(){
   // Dynamic stat grid for goalies vs skaters
   var pm=G.plusminus;
   if(G.pos==='G'){
-    var svpctSzn=G.saves+(G.goalsAgainst||0)>0?Math.round(G.saves/(G.saves+(G.goalsAgainst||0))*1000)/10:'--';
     var gaaSzn=G.gp>0?Math.round(((G.goalsAgainst||0)/G.gp)*100)/100:'--';
     safeEl('hub-stat-grid').innerHTML=
       '<div class="stbox"><div class="stlbl">GP</div><div class="stval">'+G.gp+'</div></div>'+
       '<div class="stbox"><div class="stlbl">GA</div><div class="stval" style="color:var(--red)">'+(G.goalsAgainst||0)+'</div></div>'+
       '<div class="stbox"><div class="stlbl">SV</div><div class="stval" style="color:var(--green)">'+G.saves+'</div></div>'+
-      '<div class="stbox"><div class="stlbl">SV%</div><div class="stval" style="color:var(--gold)">'+(svpctSzn==='--'?svpctSzn:svpctSzn+'%')+'</div></div>'+
+      '<div class="stbox"><div class="stlbl">SV%</div><div class="stval" style="color:var(--gold)">'+formatSvPctFromCounts(G.saves,G.goalsAgainst||0)+'</div></div>'+
       '<div class="stbox"><div class="stlbl">GAA</div><div class="stval">'+gaaSzn+'</div></div>'+
-      '<div class="stbox"><div class="stlbl">W/L</div><div class="stval" style="color:'+(pm>=0?'var(--green)':'var(--red)')+'">'+(pm>=0?'+':'')+pm+'</div></div>';
+      '<div class="stbox"><div class="stlbl">W-L-OTL</div><div class="stval" style="color:var(--gold)">'+(G.w||0)+'-'+(G.l||0)+'-'+(G.otl||0)+'</div></div>';
   } else {
+    var pimClr=typeof getHubPimDisplayColor==='function'?getHubPimDisplayColor(G.pim,G.pos,G.arch,G.xFactor):'var(--text)';
     safeEl('hub-stat-grid').innerHTML=
       '<div class="stbox"><div class="stlbl">GP</div><div class="stval">'+G.gp+'</div></div>'+
       '<div class="stbox"><div class="stlbl">G</div><div class="stval" style="color:var(--red)">'+G.goals+'</div></div>'+
       '<div class="stbox"><div class="stlbl">A</div><div class="stval" style="color:var(--acc)">'+G.assists+'</div></div>'+
       '<div class="stbox"><div class="stlbl">PTS</div><div class="stval" style="color:var(--gold)">'+(G.goals+G.assists)+'</div></div>'+
       '<div class="stbox"><div class="stlbl">+/-</div><div class="stval" style="color:'+(pm>=0?'var(--green)':'var(--red)')+'">'+(pm>=0?'+':'')+pm+'</div></div>'+
-      '<div class="stbox"><div class="stlbl">SOG</div><div class="stval">'+G.sog+'</div></div>';
+      '<div class="stbox"><div class="stlbl">PIM</div><div class="stval" style="color:'+pimClr+'">'+(G.pim||0)+'</div></div>';
   }
   var msgs=[];
   if(G.pos==='G'){
-    var svDisp=G.saves+(G.goalsAgainst||0)>0?(Math.round(G.saves/(G.saves+(G.goalsAgainst||0))*1000)/10)+'%':'--';
+    var svDisp=formatSvPctFromCounts(G.saves,G.goalsAgainst||0);
     msgs.push(fullName+' -- '+G.gp+'GP '+G.saves+'SV SV%'+svDisp+' THIS SEASON');
   } else {
     msgs.push(fullName+' -- '+(G.goals+G.assists)+' PTS ('+G.goals+'G '+G.assists+'A) THIS SEASON');
-    if(G.gp>0){
-      var ppgH=(G.goals+G.assists)/G.gp, bar=getPpgCaliberOvrThreshold(G.leagueKey);
-      if(ppgH>=1&&o>=bar) msgs.push('PPG CALIBER FOR '+G.league.short+' (OVR '+Math.round(o)+' / TYPICAL BAR ~'+bar+')');
-    }
   }
   if(G._playoffCtx&&G._playoffCtx.active){
     msgs.push('PLAYOFFS — '+G._playoffCtx.roundName);
   } else {
-    msgs.push(G.team.n.toUpperCase()+' GAME DAY');
+    msgs.push(G.league.name.toUpperCase()+' · WEEK '+G.week);
+    msgs.push(G.team.n.toUpperCase()+' — GAME DAY');
   }
-  msgs.push('LEAGUE SCORING RACE HEATING UP');
-  msgs.push('SCOUTS IN THE HOUSE TONIGHT');
-  msgs.push('TIP: PRESS ? OR / FOR HOW TO');
+  var divLbl=typeof getTeamDivisionName==='function'?getTeamDivisionName(G.leagueKey,G.team.n):'';
+  if(divLbl) msgs.push(divLbl.toUpperCase()+' STANDINGS RACE');
+  msgs.push('TIP: PRESS ? OR / FOR HELP');
   if(G.streakType && G.streakType!=='none' && G.streakCount>=2) msgs.push('TREND: '+G.streakType+G.streakCount+' STREAK');
   if(G.streakType && G.streakType!=='none' && G.streakCount>=4) msgs.push('ARENA ENERGY: '+G.streakType+G.streakCount+' -- EVERY SHIFT MATTERS');
   if(typeof draftClubWillingToSignElc==='function' && hasActiveDraftRights() && !draftClubWillingToSignElc())
-    msgs.push('DRAFT: '+G.draftRights.team+' HOLDS RIGHTS -- DEV TRACK (TARGET '+getDraftClubElcMinOvr()+'+ OVR)');
+    msgs.push('DRAFT: '+G.draftRights.team+' HOLDS RIGHTS (NO CONTRACT) — OVERSEAS SEMI-PRO OK · ELC AT '+getDraftClubElcMinOvr()+'+ OVR');
+  if(typeof isPlayerUnderBindingContract==='function' && isPlayerUnderBindingContract())
+    msgs.push('CONTRACT: '+getContractCircuitHint(G._contractCircuit||'')+' ('+(G.contractYrsLeft||0)+' YR LEFT)');
   if(G.morale>=88) msgs.push(G.first.toUpperCase()+' -- LOCKER ROOM VIBES: MORALE THROUGH THE ROOF');
+  if(typeof isUserHealthyScratch==='function'&&isUserHealthyScratch()) msgs.push('DEPTH: HEALTHY SCRATCH — WAITING FOR A SPOT OR CALL-UP');
+  if(G._callUpCtx&&G._callUpCtx.active) msgs.push('CALL-UP: '+G._callUpCtx.proTeamName+' ('+G._callUpCtx.gamesLeft+' GAMES LEFT)');
   if(G.league.tier==='pro' && G.gp>0 && (G.w/G.gp)<0.45) msgs.push('MEDIA: Press conference demand spikes after poor form.');
+  if(G.streakCount>=3&&(G.streakType==='W'||G.streakType==='L')) msgs.push('STREAK: '+G.streakCount+(G.streakType==='W'?'W':'L'));
   if(G.news.length) msgs.push(G.news[0].txt);
   safeEl('hub-tick').textContent=shuf(msgs).join('  --  ');
-  if(G.league.tier==='pro' && G.gp>0 && Math.random()<0.12 && (G.w/G.gp)<0.5){
-    addNews('Media: A controversial performance has the fanbase and commentators on edge.','bad');
+  if(G.league.tier==='pro' && G.gp>0 && (G.w/G.gp)<0.5){
+    if(G._mediaHeatWeek!==G.week && Math.random()<0.4){
+      G._mediaHeatWeek=G.week;
+      addNews('Media: A controversial stretch has the fanbase and commentators on edge.','bad');
+    }
   }
+  maybeMidSeasonPulse();
   renderWeekGames();
   renderNewsFeed();
   if(G.activeTab) hubTab(G.activeTab);
   maybeTriggerRandomLifeScenario();
 }
 
+function maybeMidSeasonPulse(){
+  if(!G||G._inOffseason||G._playoffCtx&&G._playoffCtx.active) return;
+  if(G._midSeasonPulseWeek===G.week) return;
+  if(Math.random()>0.22) return;
+  G._midSeasonPulseWeek=G.week;
+  var tier=G.league&&G.league.tier||'';
+  var lines=[
+    {t:'Teammates grab post-practice food — locker room energy is up.',m:4,x:8},
+    {t:'Local media ran a short feature on '+G.first+' '+G.last+'.',m:3,x:10},
+    {t:'Equipment manager hooked you up with fresh steel — small edge.',m:2,x:6},
+    {t:'Video coach dropped a clip breakdown on your habits.',m:2,x:12},
+    {t:'Fan account posted a hype reel — followers tick up.',m:5,x:5,f:ri(20,80)}
+  ];
+  if(tier==='local'){
+    lines.push({t:'Community night at the rink — families stayed late.',m:6,x:14});
+    lines.push({t:'Try-hockey volunteers thanked you on social — good vibes.',m:5,x:10,f:ri(15,60)});
+  }
+  if(tier==='junior'||tier==='college'){
+    lines.push({t:'Scouts were in the building this week — pressure, but motivation.',m:1,x:9});
+  }
+  var pick=lines[ri(0,lines.length-1)];
+  G.morale=cl((G.morale||50)+pick.m,0,100);
+  G.xp=(G.xp||0)+(pick.x||8);
+  if(pick.f) G.socialFollowers=(G.socialFollowers||0)+pick.f;
+  addNews(pick.t,'good');
+}
+
 function renderPlayoffHubPanel(){
   var el=safeEl('week-games');
   var ctx=G._playoffCtx;
   if(!ctx||!ctx.active){ el.innerHTML=''; return; }
-  var boN=typeof PLAYOFF_SERIES_WINS==='number'?PLAYOFF_SERIES_WINS:4;
+  if(ctx.eliminated){
+    onPlayoffEliminated();
+    return;
+  }
+  var boN=typeof getPlayoffSeriesWinsNeeded==='function'?getPlayoffSeriesWinsNeeded():4;
   var serLabel=boN<=1?'one game (winner take all)':'best-of-'+(boN*2-1)+' · first to '+boN+' wins';
   var html='<div class="playoff-hub-bracket" style="border:1px solid var(--rl);background:var(--rink);padding:12px;margin-bottom:10px">';
   html+='<div class="vt" style="font-size:16px;color:var(--gold);margin-bottom:6px">'+escHtml(G.league.short)+' PLAYOFF BRACKET</div>';
@@ -176,9 +224,6 @@ function renderPlayoffHubPanel(){
     html+='<button type="button" class="btn bs bw" style="margin-right:8px;margin-bottom:8px" onclick="simMyPlayoffSeriesFromHub()">SIM MY SERIES</button>';
   }
   html+='<button type="button" class="btn bs bw" style="margin-right:8px;margin-bottom:8px" onclick="simPlayoffRoundHubStep()">SIM ROUND</button>';
-  if(ctx.eliminated){
-    html+='<div class="vt" style="margin-top:8px;color:var(--mut)">Eliminated — use <b>SIM ROUND</b> to advance the bracket until a champion is crowned.</div>';
-  }
   el.innerHTML=html;
 }
 
@@ -191,7 +236,7 @@ function startPlayoffPregameFromHub(){
   if(ing&&ing.classList.contains('on')) return;
   var ctx=G._playoffCtx;
   if(!ctx||!ctx.active||ctx.eliminated) return;
-  var boN=typeof PLAYOFF_SERIES_WINS==='number'?PLAYOFF_SERIES_WINS:4;
+  var boN=typeof getPlayoffSeriesWinsNeeded==='function'?getPlayoffSeriesWinsNeeded():4;
   var pr=ctx.pairs[ctx.pairIndex];
   if(!pr||(!pr[0].isMe&&!pr[1].isMe)) return;
   if(ctx.seriesHW>=boN||ctx.seriesAW>=boN) return;
@@ -222,7 +267,7 @@ function resolveCurrentPlayoffUserSeriesSim(ctx){
   var home=pr[0], away=pr[1];
   var userRow=home.isMe?home:away;
   var oppRow=home.isMe?away:home;
-  while(ctx.seriesHW<PLAYOFF_SERIES_WINS && ctx.seriesAW<PLAYOFF_SERIES_WINS){
+  while(ctx.seriesHW<getPlayoffSeriesWinsNeeded() && ctx.seriesAW<getPlayoffSeriesWinsNeeded()){
     if(playoffSingleGameHomeWins(home,away)) ctx.seriesHW++;
     else ctx.seriesAW++;
     addPlayoffSimGameToMyStats();
@@ -240,6 +285,9 @@ function resolveCurrentPlayoffUserSeriesSim(ctx){
     ctx.winnersThisRound.push(oppRow);
     ctx.eliminated=true;
     ctx.roundReached=ctx.roundName;
+    ctx.pairIndex++;
+    onPlayoffEliminated();
+    return;
   }
   ctx.seriesHW=0;
   ctx.seriesAW=0;
@@ -275,11 +323,11 @@ function simMyPlayoffSeriesFromHub(){
   if(!ctx||!ctx.active||ctx.eliminated) return;
   var pr=ctx.pairs[ctx.pairIndex];
   if(!pr||(!pr[0].isMe&&!pr[1].isMe)) return;
-  var boN=typeof PLAYOFF_SERIES_WINS==='number'?PLAYOFF_SERIES_WINS:4;
+  var boN=typeof getPlayoffSeriesWinsNeeded==='function'?getPlayoffSeriesWinsNeeded():4;
   if(ctx.seriesHW>=boN||ctx.seriesAW>=boN) return;
   resolveCurrentPlayoffUserSeriesSim(ctx);
   if(ctx.pairIndex>=ctx.pairs.length) tryCompletePlayoffRoundFromHub();
-  if(G._playoffCtx&&G._playoffCtx.eliminated) flushEliminatedPlayoffsCpu();
+  if(G._playoffCtx&&G._playoffCtx.eliminated) onPlayoffEliminated();
   if(G._playoffCtx&&G._playoffCtx.active){ try{renderHub();}catch(eMy){} }
 }
 
@@ -295,7 +343,7 @@ function flushEliminatedPlayoffsCpu(){
 function simPlayoffRoundHubStep(){
   var ctx=G._playoffCtx;
   simPlayoffCpuMatchupsInRound(!!(ctx&&ctx.eliminated));
-  if(G._playoffCtx&&G._playoffCtx.eliminated) flushEliminatedPlayoffsCpu();
+  if(G._playoffCtx&&G._playoffCtx.eliminated) onPlayoffEliminated();
   if(G._playoffCtx&&G._playoffCtx.active){
     try{renderHub();}catch(eR0){}
   }
@@ -312,7 +360,7 @@ function simAllRemainingPlayoffRoundsCpu(){
 function renderWeekGames(){
   var el=safeEl('week-games');
   var perWeek=getGamesPerWeek(G.leagueKey);
-  var totalWks=Math.ceil((G.league.games||68)/perWeek);
+  var totalWks=typeof getSeasonWeekCount==='function'?getSeasonWeekCount(G.leagueKey):Math.ceil((G.league.games||68)/perWeek);
   if(G._inOffseason){
     el.innerHTML='<div class="vt" style="font-size:16px;color:var(--gold)">OFFSEASON</div><div class="vt" style="font-size:14px;color:var(--mut);margin:8px 0">Season complete — finish contract talks and camp prep on the offseason screen.</div><button class="btn bp bw" onclick="show(\'s-offseason\')">OFFSEASON SCREEN &gt;</button>';
     return;
@@ -322,6 +370,10 @@ function renderWeekGames(){
     return;
   }
   if(G.week>totalWks){
+    if(typeof endRegSeason==='function'){
+      endRegSeason();
+      return;
+    }
     el.innerHTML='<div class="vt" style="font-size:16px;color:var(--gold)">REGULAR SEASON COMPLETE!</div><button class="btn bp bw" onclick="endRegSeason()">PLAYOFFS / OFFSEASON &gt;</button>';
     return;
   }
@@ -332,16 +384,31 @@ function renderWeekGames(){
     var opp=G.allOpponents[weekStart+i];
     if(!opp) continue;
     var played=i<G.weekGames;
-    var injBlock=G.isInjured&&G.league.tier!=='minor';
+    var isEvent=typeof isLocalScheduleEvent==='function'&&isLocalScheduleEvent(opp);
+    var injBlock=!isEvent&&G.isInjured&&G.league.tier!=='minor';
+    var scratchBlock=!isEvent&&typeof isUserHealthyScratch==='function'&&isUserHealthyScratch();
     var youStart=!gMask||gMask[i];
     var bname=(G._goalieBackupNamesForWeek&&G._goalieBackupNamesForWeek[i])?G._goalieBackupNamesForWeek[i]:'BACKUP';
     html+='<div style="display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--rl);margin-bottom:6px;background:var(--rink)">';
-    html+='<div class="vt" style="font-size:14px;color:var(--mut);width:60px">GAME '+(i+1)+'</div>';
+    html+='<div class="vt" style="font-size:14px;color:var(--mut);width:72px">'+(isEvent?'EVENT':'GAME')+' '+(i+1)+'</div>';
+    if(isEvent){
+      html+='<div class="vt" style="font-size:15px;flex:1"><span style="color:var(--gold)">'+escHtml(opp.label||opp.n)+'</span>';
+      if(opp.desc) html+='<span class="vt" style="font-size:12px;color:var(--mut);display:block;margin-top:4px">'+escHtml(opp.desc)+'</span>';
+      if(G.isInjured) html+='<span class="vt" style="font-size:12px;color:var(--acc);display:block;margin-top:4px">Light participation — no game contact</span>';
+      html+='</div>';
+    } else {
     html+='<div class="vt" style="font-size:15px;flex:1">'+teamLogoChip(G.team.n,20,G.leagueKey)+' '+G.team.n+' <span style="color:var(--mut)">VS</span> '+teamLogoChip(opp.n,20,G.leagueKey)+' '+opp.n;
     if(G.pos==='G'&&!injBlock) html+='<span class="vt" style="font-size:12px;color:var(--mut);display:block;margin-top:4px">'+(youStart?'YOU START':'BENCH -- '+bname+' starts')+'</span>';
+    if(scratchBlock) html+='<span class="vt" style="font-size:12px;color:var(--gold);display:block;margin-top:4px">HEALTHY SCRATCH — press box</span>';
+    if(G._callUpCtx&&G._callUpCtx.active) html+='<span class="vt" style="font-size:12px;color:var(--gold);display:block;margin-top:4px">PRO CALL-UP ('+G._callUpCtx.gamesLeft+' left)</span>';
     html+='</div>';
+    }
     if(played){
-      html+='<span class="badge green">PLAYED</span>';
+      html+='<span class="badge green">'+(isEvent?'DONE':'PLAYED')+'</span>';
+    } else if(isEvent){
+      html+='<button class="btn bg" style="font-size:13px;padding:5px 12px" onclick="runLocalScheduleEvent('+i+')">JOIN</button>';
+    } else if(scratchBlock){
+      html+='<button class="btn bs" style="font-size:13px;padding:5px 12px" onclick="simScratchedGame('+i+')">SIM (SCRATCH)</button>';
     } else if(injBlock){
       html+='<button class="btn bd" style="font-size:13px;padding:4px 10px" onclick="simInjuredGame('+i+')">SIM INJ</button>';
     } else if(G.pos==='G'&&!youStart){
@@ -371,7 +438,7 @@ function renderNewsFeed(){
 
 function hubTab(tab){
   G.activeTab=tab;
-  var tabs=['season','attrs','contract','standings','depth','leaders','career','awards','social'];
+  var tabs=['season','attrs','contract','standings','depth','team','leaders','career','awards','social'];
   for(var i=0;i<tabs.length;i++){
     var el=safeEl('tab-'+tabs[i]);
     if(el) el.style.display=tabs[i]===tab?'block':'none';
@@ -381,7 +448,8 @@ function hubTab(tab){
   if(tab==='attrs') renderAttrTab();
   if(tab==='standings') renderStandingsTab();
   if(tab==='depth') renderDepthChartTab();
-  if(tab==='leaders') renderLeagueLeadersTab();
+  if(tab==='team') renderTeamRelationsTab();
+  if(tab==='leaders'){ renderLeadersControls(); renderLeagueLeadersTab(); }
   if(tab==='career') renderCareerTab();
   if(tab==='awards') renderAwardsTab();
   if(tab==='contract') renderContractTab();
@@ -393,7 +461,7 @@ function renderAttrTab(){
   var potK=G.potential&&POTENTIALS[G.potential]?G.potential:'support';
   html+='<div class="vt" style="font-size:13px;color:var(--mut);margin-bottom:10px;line-height:1.45">'+
     '<span style="color:var(--acc)">Projection:</span> '+potentialTierWord(potK)+' — '+POTENTIALS[potK].desc+'</div>';
-  html+='<div class="vt" style="font-size:12px;color:var(--mut);margin-bottom:10px;line-height:1.45">Forwards and D share the same sheet. <b>OVR</b> includes all rating rows. <b>Control</b> covers stickhandling and draws. <b>Awareness</b> is reads/lanes. <b>Defense</b> covers blocks. <b>Physical</b> includes endurance. <b>Conditioning</b> shifts with games played and summer work. <b>Durability</b> is outside OVR.</div>';
+  html+='<div class="vt" style="font-size:12px;color:var(--mut);margin-bottom:10px;line-height:1.45">Ratings are grouped by category. <b>Hockey IQ</b> covers offensive/defensive reads and <b>agitation</b> (edge, pest, goon). <b>Defense</b> is gap, stick, and slot work. Physical condition is below.</div>';
   if(G.pos==='F'||G.pos==='D'){
     var spare=G.secondarySubPos?String(G.secondarySubPos):'';
     html+='<div class="vt" style="font-size:11px;color:var(--acc);margin-bottom:6px">LISTED: <b>'+String(G.subPos||'—')+'</b> &nbsp;·&nbsp; COMFORT SPARE: <b>'+(spare||'none')+'</b></div>';
@@ -415,11 +483,33 @@ function renderAttrTab(){
   function attrRow(k,v){
     var color=ATTR_COLORS[k]||'var(--mut)';
     var lbl=ATTR_LABELS[k]||k;
-    return '<div class="srow"><div class="slbl">'+lbl+'</div><div class="sbar"><div class="sfill" style="background:'+color+';width:'+Math.round(v)+'%"></div></div><div class="sval">'+Math.round(v)+'</div></div>';
+    var cmin=typeof G._attrClampMin==='number'?G._attrClampMin:40;
+    var barW=typeof statBarPct==='function'?statBarPct(v,cmin,99):Math.round(v);
+    return '<div class="srow"><div class="slbl">'+lbl+'</div><div class="sbar"><div class="sfill" style="'+(barW>0?'min-width:1px;':'')+'background:'+color+';width:'+barW+'%"></div></div><div class="sval">'+Math.round(v)+'</div></div>';
+  }
+  function catHeader(cd, catOvr){
+    return '<div class="vt" style="font-size:12px;color:'+(cd.color||'var(--gold)')+';margin:10px 0 4px">'+cd.label+' <span style="color:var(--mut);font-size:11px">· '+catOvr+'</span></div>';
   }
   if(G.pos==='G'){
     var gk=ATTRS.G||[];
     for(var gi=0;gi<gk.length;gi++) html+=attrRow(gk[gi],G.attrs[gk[gi]]||0);
+  } else if(typeof SKATER_ATTR_CATEGORIES!=='undefined'){
+    var ck, cd, ci, subKey, catOvr;
+    for(ck in SKATER_ATTR_CATEGORIES){
+      if(!SKATER_ATTR_CATEGORIES.hasOwnProperty(ck)) continue;
+      cd=SKATER_ATTR_CATEGORIES[ck];
+      catOvr=typeof getCategoryAverage==='function'?getCategoryAverage(G.attrs,cd):55;
+      html+=catHeader(cd, catOvr);
+      for(ci=0;ci<cd.keys.length;ci++){
+        subKey=cd.keys[ci];
+        html+=attrRow(subKey, G.attrs[subKey]||0);
+      }
+    }
+    html+='<div class="vt" style="font-size:12px;color:var(--acc);margin:10px 0 4px">BASE</div>';
+    html+=attrRow('durability', G.attrs.durability||0);
+    if((G.careerInjuryCount||0)>0){
+      html+='<div class="vt" style="font-size:11px;color:var(--mut);margin-top:6px">Injury log: '+G.careerInjuryCount+' career · '+(G.seasonInjuryCount||0)+' this season</div>';
+    }
   } else {
     html+='<div class="vt" style="font-size:12px;color:var(--gold);margin:4px 0">RATING (OVR)</div>';
     var rk=typeof SKATER_RATING_ATTR_KEYS!=='undefined'?SKATER_RATING_ATTR_KEYS:[];
@@ -428,27 +518,40 @@ function renderAttrTab(){
     var bk=typeof SKATER_BASE_ATTR_KEYS!=='undefined'?SKATER_BASE_ATTR_KEYS:[];
     for(var bi=0;bi<bk.length;bi++) html+=attrRow(bk[bi],G.attrs[bk[bi]]||0);
   }
-  html+='<div class="vt" style="font-size:12px;color:var(--mut);margin-top:10px">TEAM STATUS: HEALTH / STAMINA / MORALE</div>';
+  html+='<div class="vt" style="font-size:12px;color:var(--mut);margin-top:10px">PHYSICAL CONDITION</div>';
   safeEl('hub-attr-bars').innerHTML=html;
-  safeEl('b-health').style.width=G.health+'%';safeEl('v-health').textContent=Math.round(G.health);
-  safeEl('b-stam').style.width=G.stamina+'%';safeEl('v-stam').textContent=Math.round(G.stamina);
-  safeEl('b-morale').style.width=G.morale+'%';safeEl('v-morale').textContent=Math.round(G.morale);
+  var barPct=typeof statBarPct==='function'?statBarPct:function(v){return Math.min(100,Math.max(0,Math.round(v)));};
+  safeEl('b-health').style.width=barPct(G.health,0,100)+'%';safeEl('v-health').textContent=Math.round(G.health);
+  safeEl('b-stam').style.width=barPct(G.stamina,0,100)+'%';safeEl('v-stam').textContent=Math.round(G.stamina);
+  safeEl('b-morale').style.width=barPct(G.morale,0,100)+'%';safeEl('v-morale').textContent=Math.round(G.morale);
 }
 
 function hubTrainSkill(){
   if(!G||G.pos==='G'){ notify('Extra training is for skaters.','gold'); return; }
   if((G._hubTrainWeek|0)==(G.week|0)){ notify('Already logged extra work this week.','gold'); return; }
   if((G.stamina|0)<18){ notify('Need more stamina (18+) before another heavy session.','red'); return; }
-  if(typeof SKATER_RATING_ATTR_KEYS==='undefined'||!SKATER_RATING_ATTR_KEYS.length) return;
   G.stamina=cl(G.stamina-15,0,100);
-  var trainPool=SKATER_RATING_ATTR_KEYS.filter(function(k){return k!=='conditioning';});
-  var pick=trainPool[ri(0,trainPool.length-1)];
   var cap=getAttrCapForAge(G.age||16);
   var amin=G._attrClampMin||40;
   var gain=rd(0.8,1.55)*getPotentialDevMult(G.potential||'support');
-  G.attrs[pick]=cl(Math.round((G.attrs[pick]||55)+gain),amin,cap);
+  var pick, lbl;
+  if(typeof SKATER_ATTR_CATEGORIES!=='undefined'){
+    var catList=[], ck;
+    for(ck in SKATER_ATTR_CATEGORIES){ if(SKATER_ATTR_CATEGORIES.hasOwnProperty(ck)) catList.push(ck); }
+    var catKey=catList[ri(0,catList.length-1)];
+    var cd=SKATER_ATTR_CATEGORIES[catKey];
+    pick=cd.keys[ri(0,cd.keys.length-1)];
+    lbl=ATTR_LABELS[pick]||pick;
+    G.attrs[pick]=cl(Math.round((G.attrs[pick]||55)+gain),amin,cap);
+    if(typeof syncLegacySkaterAttrsFromCategories==='function') syncLegacySkaterAttrsFromCategories(G.attrs);
+  } else if(typeof SKATER_RATING_ATTR_KEYS!=='undefined'&&SKATER_RATING_ATTR_KEYS.length){
+    var trainPool=SKATER_RATING_ATTR_KEYS.filter(function(k){return k!=='conditioning';});
+    pick=trainPool[ri(0,trainPool.length-1)];
+    lbl=ATTR_LABELS[pick]||pick;
+    G.attrs[pick]=cl(Math.round((G.attrs[pick]||55)+gain),amin,cap);
+  } else return;
   G._hubTrainWeek=G.week;
-  addNews('EXTRA TRAINING: '+String(ATTR_LABELS[pick]||pick).toUpperCase()+' +'+Math.round(gain*10)/10+'.','good');
+  addNews('EXTRA TRAINING: '+String(lbl).toUpperCase()+' +'+Math.round(gain*10)/10+'.','good');
   renderHub(); hubTab('attrs');
 }
 
@@ -507,7 +610,7 @@ function hubSwitchSkaterPos(){
 }
 
 function renderStandingsTab(){
-  G.standings = buildStandings(G.leagueKey);
+  refreshStandings(G.leagueKey);
   var el=safeEl('hub-standings');
   var lk=G.leagueKey;
   var st=G.standings.slice().sort(function(a,b){return b.pts-a.pts;});
@@ -571,7 +674,7 @@ function renderCareerTab(){
     (G.pos==='G'
       ? '<div class="stbox"><div class="stlbl">SV</div><div class="stval" style="color:var(--green)">'+G.cSaves+'</div></div>'+
         '<div class="stbox"><div class="stlbl">GA</div><div class="stval" style="color:var(--red)">'+(G.cGoalsAgainst||0)+'</div></div>'+
-        '<div class="stbox"><div class="stlbl">SV%</div><div class="stval" style="color:var(--gold)">'+(G.cSaves+(G.cGoalsAgainst||0)>0?(Math.round(G.cSaves/(G.cSaves+(G.cGoalsAgainst||0))*1000)/10)+'%':'--')+'</div></div>'+
+        '<div class="stbox"><div class="stlbl">SV%</div><div class="stval" style="color:var(--gold)">'+formatSvPctFromCounts(G.cSaves,G.cGoalsAgainst||0)+'</div></div>'+
         '<div class="stbox"><div class="stlbl">GAA</div><div class="stval">'+(G.cGP>0?Math.round(((G.cGoalsAgainst||0)/G.cGP)*100)/100:'--')+'</div></div>'
       : '<div class="stbox"><div class="stlbl">G</div><div class="stval" style="color:var(--red)">'+G.cGoals+'</div></div>'+
         '<div class="stbox"><div class="stlbl">A</div><div class="stval" style="color:var(--acc)">'+G.cAssists+'</div></div>'+
@@ -610,7 +713,7 @@ function renderCareerTab(){
       html+='<span style="color:var(--gold)">'+lk+'</span> ';
       html+='<span style="color:var(--mut)">('+row.seasons+' season'+(row.seasons!==1?'s':'')+')</span> ';
       if(row.isGoalie){
-        var svPct=row.sv+row.ga>0?(Math.round((row.sv/(row.sv+row.ga))*1000)/10)+'%':'--';
+        var svPct=formatSvPctFromCounts(row.sv,row.ga);
         var gaa=row.gp>0?Math.round((row.ga/row.gp)*100)/100:'--';
         html+=row.gp+'GP '+row.sv+'SV '+row.ga+'GA SV%'+svPct+' GAA'+gaa;
       } else {
@@ -629,7 +732,7 @@ function renderCareerTab(){
       html+='<span style="color:var(--mut)">'+pr.league+' '+pr.team+'</span> ';
       html+=pr.wonCup?'CHAMPION ':stripBracketIcons(pr.round)+' ';
       if(pr.isGoalie){
-        var psvPct=pr.sv+pr.ga>0?(Math.round((pr.sv/(pr.sv+pr.ga))*1000)/10)+'%':'--';
+        var psvPct=formatSvPctFromCounts(pr.sv,pr.ga);
         html+=pr.gp+'GP '+pr.sv+'SV '+pr.ga+'GA SV%'+psvPct;
       } else {
         html+=pr.gp+'GP '+pr.g+'G '+pr.a+'A '+(pr.g+pr.a)+'PTS';
@@ -647,10 +750,10 @@ function renderCareerTab(){
       html+='<span style="color:var(--mut)">'+wr.team+' -- '+wr.tournament+'</span> ';
       html+='['+wr.medal+'] ';
       if(wr.isGoalie){
-        var wsvPct=wr.sv+wr.ga>0?(Math.round((wr.sv/(wr.sv+wr.ga))*1000)/10)+'%':'--';
+        var wsvPct=formatSvPctFromCounts(wr.sv,wr.ga);
         html+=wr.gp+'GP '+wr.sv+'SV '+wr.ga+'GA SV%'+wsvPct;
       } else {
-        html+=wr.gp+'GP '+wr.g+'G '+wr.a+'A '+(wr.g+wr.a)+'PTS';
+        html+=wr.gp+'GP '+Math.round(wr.g)+'G '+Math.round(wr.a)+'A '+(Math.round(wr.g)+Math.round(wr.a))+'PTS';
       }
       html+='</div>';
     }
@@ -708,34 +811,50 @@ function renderContractTab(){
     elcLine='<div class="vt" style="font-size:14px;color:var(--mut);margin-top:6px">ELC NOT STARTED</div>';
   }
   if(G.draftRights){
-    rightsLine='<div class="vt" style="font-size:14px;color:var(--gold);margin-top:6px">DRAFT RIGHTS: '+G.draftRights.team+' ('+G.draftRights.leagueKey+')</div>';
+    var drNote=G.draftRights.team+' ('+G.draftRights.leagueKey+')';
+    if(typeof isPlayerUnderBindingContract==='function' && isPlayerUnderBindingContract()){
+      rightsLine='<div class="vt" style="font-size:14px;color:var(--gold);margin-top:6px">DRAFT RIGHTS: '+drNote+'</div>';
+    } else {
+      rightsLine='<div class="vt" style="font-size:14px;color:var(--gold);margin-top:6px">DRAFT RIGHTS: '+drNote+' — <span style="color:var(--acc)">rights only</span> (overseas semi-pro OK, no '+getProLeagueKeyByGender(G.gender)+' contract yet)</div>';
+    }
   } else if(G._formerDraftClubName){
-    rightsLine='<div class="vt" style="font-size:14px;color:var(--mut);margin-top:6px">DRAFT RIGHTS: NONE &mdash; FORMER ENTRY CLUB: '+G._formerDraftClubName+'</div>';
+    rightsLine='<div class="vt" style="font-size:14px;color:var(--mut);margin-top:6px">DRAFT RIGHTS: NONE — FORMER ENTRY CLUB: '+G._formerDraftClubName+'</div>';
   } else if(G.everDrafted){
     rightsLine='<div class="vt" style="font-size:14px;color:var(--mut);margin-top:6px">DRAFT RIGHTS: PREVIOUSLY DRAFTED</div>';
   } else {
     rightsLine='<div class="vt" style="font-size:14px;color:var(--mut);margin-top:6px">DRAFT RIGHTS: NONE</div>';
   }
+  var bindingLine='';
+  if(typeof isPlayerUnderBindingContract==='function' && isPlayerUnderBindingContract()){
+    bindingLine='<div class="vt" style="font-size:14px;color:var(--acc);margin-top:8px;line-height:1.5"><b>CIRCUIT LOCK:</b> '+getContractCircuitHint(G._contractCircuit||'')+
+      '. You cannot sign in another league until this deal expires or the club grants a <b>release</b> (offseason).</div>';
+  }
   safeEl('hub-contract-info').innerHTML=
     '<div style="background:var(--rink);border:1px solid var(--rl);padding:12px;margin-bottom:10px">'+
     '<div class="vt" style="font-size:14px;color:var(--mut)">CURRENT CONTRACT</div>'+
-    '<div class="vt" style="font-size:13px;color:var(--acc);margin-top:4px">CAREER EARNINGS '+fmt(G.careerEarnings||0)+'</div>'+
     '<div class="cval-big">'+(c.sal>0?fmt(c.sal):'AMATEUR')+'</div>'+
     '<div class="vt" style="font-size:15px;color:var(--mut);margin-top:4px">'+c.type+' -- '+G.contractYrsLeft+' YR'+(G.contractYrsLeft!==1?'S':'')+' REMAINING</div>'+
     elcLine+
     rightsLine+
+    bindingLine+
     (c.ntc?'<span class="badge green">NTC</span>':'')+
     (c.bonus?'<span class="badge blue">PERF BONUS</span>':'')+
     '</div>'+
+    (typeof renderPlayerFinanceSection==='function'?renderPlayerFinanceSection():'')+
     '<div class="vt" style="font-size:15px;color:'+(G.contractYrsLeft<=1?'var(--red)':'var(--mut)')+'">'+
-    (G.contractYrsLeft<=1?'CONTRACT EXPIRES THIS OFFSEASON':'CONTRACT STATUS STABLE -- '+G.contractYrsLeft+' YEARS LEFT')+
+    (G.contractYrsLeft<=1?'CONTRACT EXPIRES THIS OFFSEASON — FREE AGENCY OPENS':'CONTRACT STATUS STABLE -- '+G.contractYrsLeft+' YEARS LEFT')+
     '</div>'+
     (function(){
+      var rel='';
+      if(typeof isPlayerUnderBindingContract==='function' && isPlayerUnderBindingContract() && G._inOffseason){
+        rel='<div style="margin-top:10px"><button type="button" class="btn bd bw" onclick="requestContractRelease()">REQUEST CONTRACT RELEASE</button>'+
+          '<div class="vt" style="font-size:12px;color:var(--mut);margin-top:6px">Ask to leave your circuit early. Club may buy you out — not guaranteed.</div></div>';
+      }
       var dg=getDemandTradeGate();
       var op=!dg.ok?' style="opacity:.52"':'';
       var tit=dg.hint?(' title="'+dg.hint.replace(/"/g,'&quot;')+'"'):'';
-      return '<div style="margin-top:12px"><button class="btn bd bw"'+op+tit+' onclick="demandTrade()">DEMAND TRADE</button>'+
-        '<div class="vt" style="font-size:12px;color:var(--mut);margin-top:6px;line-height:1.4">NEEDS LOW STANDINGS OR BAD CLUB WIN RATE PLUS STRONG OVR OR WINNING PERSONAL RECORD.</div></div>';
+      return rel+'<div style="margin-top:12px"><button class="btn bd bw"'+op+tit+' onclick="demandTrade()">DEMAND TRADE</button>'+
+        '<div class="vt" style="font-size:12px;color:var(--mut);margin-top:6px;line-height:1.4">Same league, new team — needs weak club results plus strong personal play. Does not break your circuit lock.</div></div>';
     })();
 }
 

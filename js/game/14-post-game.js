@@ -7,6 +7,17 @@ var _shootoutMoment=null;
 var _shootoutDoneCb=null;
 var _shootoutTimerSec=10;
 
+function commitPlayerGamePim(){
+  if(!G||G.pos==='G') return;
+  var p=Math.round(gameStats.pim||0);
+  if(typeof rollSkaterGamePim==='function') p+=rollSkaterGamePim(G.pos,G.arch,G.xFactor);
+  if(p<=0) return;
+  G.pim=(G.pim||0)+p;
+  if(typeof isPhysicalIdentityPlayer==='function'&&isPhysicalIdentityPlayer(G.pos,G.arch,G.xFactor)){
+    G.morale=cl(G.morale+Math.min(2,Math.floor(p/4)),0,100);
+  }
+}
+
 function clearShootoutTimer(){
   if(_shootoutTimer){ clearInterval(_shootoutTimer); _shootoutTimer=null; }
 }
@@ -187,35 +198,36 @@ function selectShootoutOption(idx, auto){
 
 function endGame(){
   if(G.pos==='G'){
-    var bulkShots=ri(22,34);
-    var svRate=cl(0.88+(G.attrs.reflexes+G.attrs.positioning-120)*0.001,0.82,0.96);
-    var bulkSaves=Math.round(bulkShots*svRate);
-    var bulkGA=bulkShots-bulkSaves;
-    gameStats.sv+=bulkSaves;
-    gameStats.ga+=bulkGA;
-    gameAwayScore+=bulkGA;
+    var credited=(gameStats.sv||0)+(gameStats.ga||0);
+    var bulkShots=Math.max(0,ri(18,28)-credited);
+    if(bulkShots>0){
+      var svRate=cl(0.88+(G.attrs.reflexes+G.attrs.positioning-120)*0.001,0.82,0.96);
+      var bulkSaves=Math.round(bulkShots*svRate);
+      var bulkGA=bulkShots-bulkSaves;
+      gameStats.sv+=bulkSaves;
+      gameStats.ga+=bulkGA;
+      gameAwayScore+=bulkGA;
+    }
   }
-  var regWon=gameHomeScore>gameAwayScore;
-  var regTied=gameHomeScore===gameAwayScore;
   var isWorld=!!G._worldStageCtx;
   var isPlayoff=!!(G._playoffCtx&&G._isPlayoffGame);
   var isRegSeason=!isWorld&&!isPlayoff;
 
-  if(regTied){
+  if(gameHomeScore===gameAwayScore){
     if(isWorld) resolveSuddenDeathOTForTiedGame('WORLD');
     else if(isPlayoff) resolveSuddenDeathOTForTiedGame('PLAYOFFS');
     else if(isRegSeason){
       if(!tryRegSeasonOvertimeTwoRounds()){
-        beginShootoutThen(function(){ finalizeEndGameBody(regWon, regTied); });
+        startShootoutThen(function(){ finalizeEndGameBody(); });
         return;
       }
     }
   }
 
-  finalizeEndGameBody(regWon, regTied);
+  finalizeEndGameBody();
 }
 
-function finalizeEndGameBody(regWon, regTied){
+function finalizeEndGameBody(){
   var won=gameHomeScore>gameAwayScore;
   var tied=gameHomeScore===gameAwayScore;
   if(tied){
@@ -227,13 +239,19 @@ function finalizeEndGameBody(regWon, regTied){
   }
   var gRnd=Math.round(gameStats.g);
   var aRnd=Math.round(gameStats.a);
-  var pm=Math.round(gameStats.pm||0);
-  if(G.xFactor==='careless' && (G._playoffCtx&&G._isPlayoffGame||G._worldStageCtx) && G.pos!=='G' && !regWon && !regTied){
-    pm=cl(pm-1-(Math.random()<0.45?1:0),-6,6);
+  if(G._worldStageCtx){
+    var wsCap=G._worldStageCtx.ev&&G._worldStageCtx.ev.isFaceoff?2:1;
+    gRnd=Math.min(gRnd,wsCap);
+    aRnd=Math.min(aRnd,wsCap);
   }
   var blkPg=Math.round(gameStats.block||0);
-  var defBonus=getArchetypeDefensivePlusMinusBonus(G.pos,G.arch,won,tied,gRnd,aRnd,blkPg);
-  var pmTotal=G.pos==='G'?pm:(pm+defBonus);
+  var pm=typeof computeSkaterGamePlusMinus==='function'
+    ?computeSkaterGamePlusMinus(won,tied,gRnd,aRnd,blkPg,G.pos,G.arch,gameStats.pm||0)
+    :Math.round(gameStats.pm||0);
+  if(G.xFactor==='careless' && (G._playoffCtx&&G._isPlayoffGame||G._worldStageCtx) && G.pos!=='G' && !won && !tied){
+    pm=cl(pm-1, -3, 2);
+  }
+  var pmTotal=G.pos==='G'?Math.round(gameStats.pm||0):pm;
   var svpctRaw=gameStats.sv+gameStats.ga>0?gameStats.sv/(gameStats.sv+gameStats.ga):0;
   var svpctStr=gameStats.sv+gameStats.ga>0?formatSvPctFromRatio(svpctRaw):'---';
   var mAvg=getMomentScoresAverage();
@@ -242,8 +260,13 @@ function finalizeEndGameBody(regWon, regTied){
     var wctx=G._worldStageCtx;
     var ev=wctx.ev;
     wctx.stats.gp++;
-    if(G.pos==='G'){wctx.stats.sv+=gameStats.sv;wctx.stats.ga+=gameStats.ga;}
-    else {wctx.stats.g+=gRnd;wctx.stats.a+=aRnd;}
+    if(G.pos==='G'){
+      wctx.stats.sv+=Math.round(gameStats.sv||0);
+      wctx.stats.ga+=Math.round(gameStats.ga||0);
+    } else {
+      wctx.stats.g+=gRnd;
+      wctx.stats.a+=aRnd;
+    }
     G.stamina=cl(G.stamina-ri(5,12),0,100);
     G.morale=cl(G.morale+(G.xFactor==='careless'?(won?8:tied?3:-4):(won?8:tied?3:-6)),0,100);
     G.xp+=Math.round((G.pos==='G'?Math.round(ri(22,42)*getXFactorGoalieXpMult(getXFactorGameContext())):ri(30,55))*getPotentialXpMult(G.potential||'support'));
@@ -252,6 +275,7 @@ function finalizeEndGameBody(regWon, regTied){
     if(gRnd>=2) addNews(G.first+' '+G.last+' scores '+gRnd+' -- multi-goal game!','big');
     if(aRnd>=2) addNews(G.first+' '+G.last+' picks up '+aRnd+' assists -- playmaking night!','big');
     if(G.pos!=='G') G.plusminus+=pmTotal;
+    commitPlayerGamePim();
     safeEl('pg2-home-n').textContent=ev.nt;
     safeEl('pg2-away-n').textContent=curOpponent.n;
     safeEl('pg2-home-s').textContent=gameHomeScore;
@@ -303,6 +327,7 @@ function finalizeEndGameBody(regWon, regTied){
     if(gRnd>=2) addNews(G.first+' '+G.last+' scores '+gRnd+' -- multi-goal game!','big');
     if(aRnd>=2) addNews(G.first+' '+G.last+' picks up '+aRnd+' assists -- playmaking night!','big');
     if(G.pos!=='G') G.plusminus+=pmTotal;
+    commitPlayerGamePim();
     safeEl('pg2-home-n').textContent=G.team.n;
     safeEl('pg2-away-n').textContent=curOpponent.n;
     safeEl('pg2-home-s').textContent=gameHomeScore;
@@ -340,7 +365,7 @@ function finalizeEndGameBody(regWon, regTied){
       var _h0=_prP[0],_a0=_prP[1];
       if(won){ if(_h0.isMe) _hw++; else _aw++; } else { if(_h0.isMe) _aw++; else _hw++; }
     }
-    var _serDone=!_prP || _hw>=PLAYOFF_SERIES_WINS || _aw>=PLAYOFF_SERIES_WINS;
+    var _serDone=!_prP || _hw>=getPlayoffSeriesWinsNeeded() || _aw>=getPlayoffSeriesWinsNeeded();
     safeEl('pg2-next-btn').textContent=_serDone?(won?'BRACKET / NEXT ROUND >':'PLAYOFFS OVER >'):'NEXT GAME >';
     safeEl('pg2-next-btn').onclick=function(){afterPlayoffPlayableGame(won);};
     if(won) RetroSound.gameWin(); else if(tied) RetroSound.gameTie(); else RetroSound.gameLose();
@@ -351,30 +376,25 @@ function finalizeEndGameBody(regWon, regTied){
   G.gp++;G.cGP++;
   if(typeof G.w==='undefined'){G.w=0;G.l=0;G.otl=0;}
   if(won){G.w++;} else if(tied){G.otl++;} else {G.l++;}
-  if(G.standings){
-    for(var i=0;i<G.standings.length;i++){
-      if(G.standings[i].isMe){
-        G.standings[i].gp=G.gp;
-        G.standings[i].w=G.w;
-        G.standings[i].l=G.l;
-        G.standings[i].otl=G.otl;
-        G.standings[i].pts=G.w*2+G.otl;
-        break;
-      }
-    }
-  }
+  applyGameResultStreak(won,tied);
+  syncUserStandingsRow();
   G.goals+=gRnd;G.assists+=aRnd;G.cGoals+=gRnd;G.cAssists+=aRnd;
   G.sog+=Math.round(gameStats.sog);G.cSOG+=Math.round(gameStats.sog);
   G.saves+=gameStats.sv;G.cSaves+=gameStats.sv;
   if(G.pos==='G'){G.goalsAgainst=(G.goalsAgainst||0)+gameStats.ga;G.cGoalsAgainst=(G.cGoalsAgainst||0)+gameStats.ga;}
   G.plusminus+=pmTotal;
+  commitPlayerGamePim();
   G.stamina=cl(G.stamina-ri(6,14),0,100);
   if(typeof updatePlayerConditioning==='function') updatePlayerConditioning();
   G.morale=cl(G.morale+(G.xFactor==='careless'?(won?5:tied?1:-2):(won?5:tied?1:-4)),0,100);
   if(!G.isInjured&&Math.random()<0.018) triggerInjury();
   G.xp+=Math.round((G.pos==='G'?Math.round(ri(14,38)*getXFactorGoalieXpMult(getXFactorGameContext())):ri(20,45))*getPotentialXpMult(G.potential||'support'));
   var sc=gameHomeScore+'-'+gameAwayScore;
-  addNews(G.team.n+' '+sc+' vs '+curOpponent.n+' -- '+(won?'WIN':'LOSS'),(won?'good':'bad'));
+  var winLines=['grinds out a '+sc+' win','takes two points in a '+sc+' battle','survives a '+sc+' slugfest','wins a tight '+sc+' affair'];
+  var lossLines=['drops a '+sc+' heartbreaker','falls '+sc+' on a tough night','comes up short in a '+sc+' loss','left frustrated after '+sc];
+  if(won) addNews(G.team.n+' '+shuf(winLines)[0]+' vs '+curOpponent.n+'.','good');
+  else if(tied) addNews(G.team.n+' '+sc+' vs '+curOpponent.n+' -- split the points in a deadlock.','neutral');
+  else addNews(G.team.n+' '+shuf(lossLines)[0]+' vs '+curOpponent.n+'.','bad');
   if(gRnd>=2) addNews(G.first+' '+G.last+' scores '+gRnd+' -- multi-goal game!','big');
   if(aRnd>=2) addNews(G.first+' '+G.last+' picks up '+aRnd+' assists -- playmaking night!','big');
   checkMilestones();
@@ -408,12 +428,26 @@ function finalizeEndGameBody(regWon, regTied){
   }
   var rating=getGameRating(G.pos,gRnd,aRnd,svpctRaw,won,mAvg);
   statsHtml+=buildPostgameRatingBlock(rating,mAvg);
+  if(typeof tickProCallUpAfterGame==='function'&&G._callUpCtx&&G._callUpCtx.active){
+    var callUpPerf=typeof blendedGamePerformanceNumeric==='function'
+      ?blendedGamePerformanceNumeric(G.pos,gRnd,aRnd,svpctRaw,won,mAvg):50;
+    tickProCallUpAfterGame({
+      g:gRnd,a:aRnd,
+      sv:Math.round(gameStats.sv||0),ga:Math.round(gameStats.ga||0),
+      won:won,tied:tied,pm:pmTotal,perfN:callUpPerf
+    });
+  }
   safeEl('pg2-stats').innerHTML=statsHtml;
   safeEl('pg2-news').innerHTML=G.news.slice(0,3).map(function(n){return n.txt;}).join('<br>');
   G.weekGames++;
   var perWeek=getGamesPerWeek(G.leagueKey);
   var weekStart=(G.week-1)*perWeek;
-  var hasMore=G._curGameIdx<perWeek-1&&G.allOpponents[weekStart+G._curGameIdx+1];
+  var hasMore=false;
+  var hi, ns;
+  for(hi=G._curGameIdx+1; hi<perWeek; hi++){
+    ns=G.allOpponents[weekStart+hi];
+    if(ns&&!(typeof isLocalScheduleEvent==='function'&&isLocalScheduleEvent(ns))){ hasMore=true; break; }
+  }
   if(G.weekGames>=perWeek||!hasMore){
     safeEl('pg2-next-btn').textContent='RETURN TO HUB &gt;';
     safeEl('pg2-next-btn').onclick=function(){renderHub();show('s-hub');};
@@ -421,7 +455,7 @@ function finalizeEndGameBody(regWon, regTied){
     safeEl('pg2-next-btn').textContent='NEXT GAME &gt;';
     safeEl('pg2-next-btn').onclick=function(){preGame(G._curGameIdx+1);};
   }
-  if(Math.random()<0.01&&G.season>2&&(G.tradeOffersThisSeason||0)===0&&(G._tradeCooldownUntilGp||0)<=G.gp) triggerTrade();
+  if(Math.random()<0.006&&G.season>2&&(G.tradeOffersThisSeason||0)===0&&(G._tradeCooldownUntilGp||0)<=G.gp) triggerTrade();
   maybeTriggerTrade(gRnd,aRnd,won);
   setTimeout(function(){ maybeTriggerPostGamePressOnce(won,gRnd,aRnd); },380);
   if(won) RetroSound.gameWin(); else if(tied) RetroSound.gameTie(); else RetroSound.gameLose();

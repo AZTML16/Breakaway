@@ -2,14 +2,44 @@
 // ============================================================
 // IN-GAME
 // ============================================================
+function pickGameMoments(pool, count){
+  count=count||4;
+  var expanded=[], i, j, m, o, assistN, goalN;
+  var goalHeavy=typeof G!=='undefined'&&G.league&&G.league.tier==='local';
+  for(i=0;i<pool.length;i++){
+    m=pool[i];
+    assistN=0; goalN=0;
+    for(j=0;j<(m.opts||[]).length;j++){
+      o=m.opts[j];
+      if(o.reward==='assist') assistN++;
+      else if(o.reward==='goal') goalN++;
+    }
+    expanded.push(m);
+    if(goalHeavy){
+      if(goalN>assistN){
+        expanded.push(m);
+        if(Math.random()<0.55) expanded.push(m);
+      } else if(goalN>0&&Math.random()<0.35){
+        expanded.push(m);
+      }
+    } else if(assistN>goalN){
+      expanded.push(m);
+      if(Math.random()<0.55) expanded.push(m);
+    } else if(assistN>0&&Math.random()<0.35){
+      expanded.push(m);
+    }
+  }
+  return shuf(expanded).slice(0, count);
+}
+
 function startGame(){
   gameHomeScore=ri(0,2);
   gameAwayScore=ri(0,3);
-  gameStats={g:0,a:0,sog:0,block:0,sv:0,ga:0,pm:0};
+  gameStats={g:0,a:0,sog:0,block:0,sv:0,ga:0,pm:0,pim:0};
   curMoment=0;
   gameMomentScores=[];
   var pool=MOMENTS[G.pos]||MOMENTS['F'];
-  gameMoments=shuf(pool.slice()).slice(0,4);
+  gameMoments=typeof pickGameMoments==='function'?pickGameMoments(pool,4):shuf(pool.slice()).slice(0,4);
   safeEl('ig-home-name').textContent=G._worldStageCtx?G._worldStageCtx.ev.nt:G.team.n;
   safeEl('ig-away-name').textContent=curOpponent.n;
   updateScoreboard();
@@ -41,7 +71,7 @@ function showMoment(){
     var rewardIcon=o.reward==='assist'?'ASSIST':o.reward==='goal'?'GOAL':o.reward==='save'?'SAVE':o.reward==='fight'?'FIGHT':o.reward==='scrum'?'SCRUM':o.reward==='block'?'STOP':'PLAY';
     html+='<button class="opt-btn" id="opt-'+i+'" onclick="selectOption('+i+',false)">';
     html+='<span>'+stripBracketIcons(o.t)+'</span>';
-    html+='<span class="attr-tag">['+lbl.toUpperCase()+'] &mdash; '+rewardIcon+'</span>';
+    html+='<span class="attr-tag">['+lbl.toUpperCase()+'] — '+rewardIcon+'</span>';
     html+='<span class="risk-tag" style="color:'+riskColor+'">'+o.risk+'</span>';
     html+='</button>';
   }

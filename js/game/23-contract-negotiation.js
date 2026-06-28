@@ -157,7 +157,7 @@ function draftClubWillingToSignElc(){
 
 function finalizeContract(sal,yrs,ntc,bonus){
   RetroSound.contractSign();
-  var cType=(G.league.tier==='junior'||G.league.tier==='college')?'AMATEUR':getProContractType();
+  var cType=(G.league.tier==='junior'||G.league.tier==='college'||G.league.tier==='local')?'AMATEUR':getProContractType();
   if(G.league.tier==='minor'){
     var parent=getProLeagueKeyByGender(G.gender);
     cType='TWO-WAY ('+parent+')';
@@ -168,9 +168,12 @@ function finalizeContract(sal,yrs,ntc,bonus){
   G.contract={sal:sal,yrs:yrs,type:cType,ntc:ntc,bonus:bonus};
   if(cType==='ENTRY LEVEL'){G.hadELC=true;G.elcYears=3;}
   G.contractYrsLeft=yrs;G.pendingContract=false;
+  if(G.league.tier!=='junior'&&G.league.tier!=='college') stampContractBinding(G.leagueKey, G.team&&G.team.n);
   if(G._inOffseason) G._offseasonContractSigned=true;
   if(sal>0){
-    G.careerEarnings=(G.careerEarnings||0)+(bonus?Math.round(sal*0.1):0);
+    var signBonus=bonus?Math.round(sal*0.1):0;
+    if(signBonus>0&&typeof creditPlayerMoney==='function') creditPlayerMoney(signBonus, 'signing');
+    else if(signBonus>0) G.careerEarnings=(G.careerEarnings||0)+signBonus;
   }
   addNews(G.first+' '+G.last+' signs '+yrs+'-year deal worth '+fmt(sal*yrs)+' total!','big');
   notify('CONTRACT SIGNED!','gold');

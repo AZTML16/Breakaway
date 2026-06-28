@@ -1,43 +1,134 @@
 /* breakaway — LEAGUE TALENT NEWS (other players making headlines) */
 // ============================================================
 // LEAGUE TALENT NEWS (other players making headlines)
+// Names: shared pool in name-pool.js
 // ============================================================
-var TALENT_FIRST = [
-  'Caden','Wyatt','Niko','Dmitri','Patrik','Alexei','Jordan','Connor','Brayden','Tomas',
-  'Mikael','Owen','Sergei','Jesse','Tyler','Marcus','Stefan','Ryan','Kyle','Jake',
-  'Mohammad','Yusuf','Hiroshi','Wei','Luca','Carlos','Aarav','Matteo','Kenji','Rafael',
-  'Emma','Taylor','Sofia','Annika','Petra','Cassidy','Maya','Nadia','Jules','Raina',
-  'Fatima','Yuki','Priya','Amara','Valentina','Ibrahim','Arjun','Hamid','Felix','Zara'
-];
-var TALENT_LAST = [
-  'Forsberg','Volkov','Haugen','Sundqvist','Malashenko','Kuznetsov','Ashworth','Healy',
-  'Tremblay','Dvoracek','Lindqvist','Ritchie','Callahan','Fairbanks','Morrison','Kovacs',
-  'Holmberg','Okafor','Bernier','Petrov','Al-Rashid','Okonkwo','Tanaka','Zhang','Ferretti',
-  'Reyes','Sharma','Russo','Watanabe','Moura','Diallo','Nair','Rezaei','Nguyen','Osei'
-];
 
-function getRandomTalentName(){
-  return TALENT_FIRST[ri(0,TALENT_FIRST.length-1)]+' '+TALENT_LAST[ri(0,TALENT_LAST.length-1)];
+function pickNewsLeagueTeam(excludeName){
+  var pool=(TEAMS[G.leagueKey]||[]).slice();
+  if(excludeName) pool=pool.filter(function(t){return t.n!==excludeName;});
+  if(!pool.length) return {n:'a rival club'};
+  return pool[ri(0,pool.length-1)];
+}
+
+function pickNewsRivalTeam(){
+  var myTeam=G.team&&G.team.n;
+  var perWeek=getGamesPerWeek(G.leagueKey);
+  var weekStart=(G.week-1)*perWeek;
+  var opp=null;
+  if(G.allOpponents&&G.allOpponents.length){
+    opp=G.allOpponents[weekStart+ri(0,perWeek-1)]||G.allOpponents[weekStart];
+    if(opp&&typeof isLocalScheduleEvent==='function'&&isLocalScheduleEvent(opp)) opp=G.allOpponents[weekStart];
+    if(opp&&opp.n===myTeam) opp=G.allOpponents[weekStart];
+  }
+  return opp&&opp.n?opp:pickNewsLeagueTeam(myTeam);
+}
+
+function pickNewsStandingsTeam(){
+  if(G.standings&&G.standings.length){
+    var row=G.standings[ri(0,Math.min(G.standings.length-1,14))];
+    if(row&&row.team) return row.team;
+  }
+  return pickNewsLeagueTeam(G.team&&G.team.n);
 }
 
 function addLeagueTalentNews(){
   var peerName=typeof getTeammateNameForNews==='function'?getTeammateNameForNews():getRandomTalentName();
+  var myTeam=G.team&&G.team.n||'your club';
+  var league=G.league.short||'league';
+  var rival=pickNewsRivalTeam();
+  var other=pickNewsStandingsTeam();
+  var divLabel=typeof getTeamDivisionName==='function'?getTeamDivisionName(G.leagueKey,myTeam):'';
+  var divBit=divLabel?(' the '+divLabel+' race'):'';
   var news=[
-    function(){var n=peerName;addNews(n+' hits '+ri(2,5)+' points in last 3 games -- leading scorer push in '+G.league.short+'.','neutral');},
-    function(){var n=getRandomTalentName();addNews(n+' traded to '+shuf(TEAMS[G.leagueKey]||[{n:'rival'}])[0].n+' -- blockbuster move shakes up the league.','neutral');},
-    function(){var n=peerName;addNews(n+' named '+G.league.short+' Player of the Week after '+ri(3,5)+'-point outing.','neutral');},
-    function(){var n=getRandomTalentName();addNews(n+' signs extension -- stays with club through next season.','neutral');},
-    function(){var n=getRandomTalentName();addNews(n+' placed on injured reserve -- '+ri(2,6)+' week timeline.','neutral');},
-    function(){var n=getRandomTalentName();addNews('Scouts raving about '+n+' -- projected top prospect for upcoming draft.','neutral');},
-    function(){var n=getRandomTalentName();addNews(n+' notches hat trick -- '+G.league.short+' fans calling it one of the best performances of the year.','neutral');},
-    function(){var n=getRandomTalentName();addNews(n+' passes '+ri(200,400)+' career points -- milestone night at home.','neutral');},
-    function(){addNews(G.team.n+' sign depth forward ahead of trade deadline -- management bolsters lineup.','neutral');},
-    function(){var n=getRandomTalentName();addNews(n+' speaks out: \'We\'re not satisfied. This team is built to win.\'','neutral');},
-    function(){var n=getRandomTalentName();addNews('League insiders link '+n+' to a potential summer move after contract talks stall.','neutral');},
-    function(){var n=getRandomTalentName();addNews(n+' posts '+ri(8,15)+' hits in a rivalry game -- tone-setting performance.','neutral');},
-    function(){addNews('Front office rumors: '+G.league.short+' clubs exploring major cap-clearing deals before camp.','neutral');}
+    function(){
+      var n=peerName;
+      addNews('INSIDE '+myTeam.toUpperCase()+': '+n+' tells local media the room is "hungry" after back-to-back '+league+' wins.','good');
+    },
+    function(){
+      var n=getRandomTalentName();
+      var t=pickNewsLeagueTeam(myTeam);
+      addNews('TRADE RUMOR: '+t.n+' and '+rival.n+' linked in a '+ri(2,4)+'-team rumor mill swirl -- '+n+' name keeps surfacing.','neutral');
+    },
+    function(){
+      var n=peerName;
+      addNews(n+' named '+league+' Player of the Week -- '+ri(3,6)+' points and the building knew it was his night.','good');
+    },
+    function(){
+      var n=getRandomTalentName();
+      addNews(n+' inks a short extension with '+other.n+' -- "I want to finish what we started," he says.','neutral');
+    },
+    function(){
+      var n=getRandomTalentName();
+      addNews('INJURY WIRE: '+n+' ('+other.n+') out '+ri(2,6)+' weeks -- upper-body, no timetable for contact.','bad');
+    },
+    function(){
+      var n=getRandomTalentName();
+      addNews('SCOUTS BUZZ: '+n+' drawing eyes from pro staffs -- "He plays bigger than the box score," one director says.','neutral');
+    },
+    function(){
+      var n=getRandomTalentName();
+      addNews('HAT TRICK ALERT: '+n+' buries three as '+other.n+' erupts -- fans litter the ice with caps.','big');
+    },
+    function(){
+      var n=getRandomTalentName();
+      addNews(n+' hits '+ri(200,400)+' career points in '+league+' play -- standing ovation at the horn.','good');
+    },
+    function(){
+      var n=peerName;
+      addNews('BETWEEN THE PIPES: '+n+' steals '+league+' Goalie of the Week with a '+ri(28,36)+'-save shutout feel.','good');
+    },
+    function(){
+      var n=getRandomTalentName();
+      addNews('SOUND BITE: '+n+' ('+other.n+') -- "Nobody in our room is satisfied. We want the whole thing."','neutral');
+    },
+    function(){
+      var n=getRandomTalentName();
+      addNews('CONTRACT WATCH: Talks stall between '+other.n+' and '+n+' -- agent hints at a summer market.','neutral');
+    },
+    function(){
+      var n=getRandomTalentName();
+      addNews('OLD-TIME HOCKEY: '+n+' drops the gloves and rattles '+rival.n+' with '+ri(8,14)+' hits -- bench loves it.','neutral');
+    },
+    function(){
+      var n=peerName;
+      addNews(myTeam+' recalls '+n+' from the affiliate -- depth move before a heavy '+league+' week.','neutral');
+    },
+    function(){
+      var n=getRandomTalentName();
+      addNews(rival.n+' coach calls '+n+' "the guy who tilted the ice" after a '+ri(2,4)+'-goal night.','neutral');
+    },
+    function(){
+      var n=getRandomTalentName();
+      addNews(divBit?('STANDINGS HEAT'+divBit+': '+other.n+' leapfrog talk after a wild OT win.'):('STANDINGS SHAKE-UP: '+other.n+' climb the table after a wild OT win.'),'good');
+    },
+    function(){
+      var n=getRandomTalentName();
+      addNews('POWER PLAY SURGE: '+other.n+' click at '+ri(28,42)+'% over the last week -- '+n+' running point.','neutral');
+    },
+    function(){
+      var n=peerName;
+      addNews('TEAMMATE WATCH: '+n+' picks up a secondary assist on every '+myTeam+' goal this week -- quiet star.','good');
+    },
+    function(){
+      var n=getRandomTalentName();
+      addNews('ROAD TRIP GRIND: '+other.n+' bus through three cities in four nights -- '+n+' says legs are fine, minds are not.','neutral');
+    },
+    function(){
+      addNews('RIVALRY REMINDER: '+myTeam+' and '+rival.n+' meet again soon -- last one had '+ri(48,62)+' combined hits.','neutral');
+    },
+    function(){
+      var n=getRandomTalentName();
+      addNews('ROOKIE SPOTLIGHT: '+n+' ('+other.n+') first multi-point game -- crowd chants his name in the third.','good');
+    },
+    function(){
+      var n=getRandomTalentName();
+      addNews('DISCIPLINE: '+n+' suspended one game for a late hit vs '+rival.n+' -- team will appeal.','bad');
+    },
+    function(){
+      var n=getRandomTalentName();
+      addNews('GOALIE DUEL: '+n+' and a '+rival.n+' netminder trade '+ri(30,38)+'-save periods -- final goes to a shootout.','neutral');
+    }
   ];
-  // Pick 1-2 random news items
-  var picks=shuf(news.slice()).slice(0,ri(1,2));
-  picks.forEach(function(fn){fn();});
+  news[ri(0,news.length-1)]();
 }

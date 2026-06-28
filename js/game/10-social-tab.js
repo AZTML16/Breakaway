@@ -275,7 +275,8 @@ function generateSocialMessages(){
       msgs.push({type:'fan',sender:'BoardsNation',handle:'@BoardsNation',
         text:'Toronto/Montreal/NY-tier pressure: fans aren\'t patient. '+G.first+' either delivers in April or the narrative writes itself.',mood:'bad',idx:msgs.length});
     }
-    if((G.nat==='Canada'||G.nat==='Canadian') && lastWorldStageWasTeamCanadaNoMedal()){
+    var playerNat=typeof normalizePlayerNat==='function'?normalizePlayerNat(G.nat):G.nat;
+    if(playerNat==='Canada' && lastWorldStageWasTeamCanadaNoMedal()){
       msgs.push({type:'fan',sender:'Hockey Canada Heat',handle:'@CanadaHockeyDesk',
         text:'Whole country still rewinding that tournament. Men\'s Team Canada expectations aren\'t "try hard" — it\'s gold-or-scrutiny. '+G.last+' knows.',mood:'bad',idx:msgs.length});
     }
@@ -311,7 +312,7 @@ function renderSocialTab(){
   var ovrVal=ovr(G.attrs,G.pos);
   var statBadge='';
   if(G.pos==='G'){
-    var svpctCard=G.saves+(G.goalsAgainst||0)>0?(Math.round(G.saves/(G.saves+(G.goalsAgainst||0))*1000)/10)+'%':'--';
+    var svpctCard=formatSvPctFromCounts(G.saves,G.goalsAgainst||0);
     statBadge='<span class="badge blue">'+G.saves+'SV  SV%'+svpctCard+'</span>';
   } else {
     statBadge='<span class="badge blue">'+G.goals+'G '+G.assists+'A</span>';

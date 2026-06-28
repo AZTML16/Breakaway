@@ -2,50 +2,131 @@
 // ============================================================
 // STANDINGS + SCHEDULE
 // ============================================================
-function buildStandings(lk){
+function teamStandingsStrength(teamName, lk){
+  var h=0, s=String(teamName)+'|'+String(lk||'');
+  for(var i=0;i<s.length;i++) h=((h<<5)-h)+s.charCodeAt(i)|0;
+  return 0.22+((Math.abs(h)%1000)/1000)*0.48;
+}
+
+function initStandings(lk){
   var teams=(TEAMS[lk]||TEAMS['OJL']).slice();
-  var shuffled=shuf(teams);
-  var result=[];
+  var result=[], i, t, isMe;
+  for(i=0;i<teams.length;i++){
+    t=teams[i];
+    isMe=(G&&G.team&&t.n===G.team.n);
+    result.push({
+      team:t, gp:0, w:0, l:0, otl:0, pts:0, isMe:isMe,
+      leagueKey:lk, strength:teamStandingsStrength(t.n, lk)
+    });
+  }
+  return result;
+}
+
+/** Stable league table — CPU strength is fixed per team; only calendar games advance. */
+function refreshStandings(lk){
+  if(typeof G==='undefined'||!G) return [];
+  var teams=(TEAMS[lk]||[]);
+  if(!G.standings||!G.standings.length||G.standings[0].leagueKey!==lk||G.standings.length!==teams.length){
+    G.standings=initStandings(lk);
+  }
   var totalGames=LEAGUES[lk].games||68;
   var perWeek=getGamesPerWeek(lk);
   var played=0;
-  if(typeof G!=='undefined'&&G&&G.leagueKey===lk){
-    played=Math.min(totalGames,((G.week-1)*perWeek)+(G.weekGames||0));
-  }
-  for(var i=0;i<shuffled.length;i++){
-    var t=shuffled[i];
-    var isMe=(G&&G.team&&t.n===G.team.n);
-    var gp=isMe?G.gp:Math.max(0,Math.min(totalGames,played+ri(-1,1)));
-    var w,l,otl;
-    if(isMe){
-      w=G.w||0; l=G.l||0; otl=G.otl||0;
-      gp=Math.max(gp,G.gp);
+  if(G.leagueKey===lk){
+    var lkTier=LEAGUES[lk]&&LEAGUES[lk].tier;
+    if(lkTier==='local'&&typeof countCompletedLocalGames==='function'){
+      played=countCompletedLocalGames();
     } else {
-      var strength=(shuffled.length-i)/(shuffled.length-1||1);
-      var winPct=cl(0.24 + strength*0.42 + (ri(-8,8)/100),0.14,0.76);
-      w=Math.round(gp*winPct);
-      var rem=Math.max(0,gp-w);
-      otl=Math.round(rem*0.12);
-      l=rem-otl;
+      played=Math.min(totalGames,((G.week-1)*perWeek)+(G.weekGames||0));
     }
-    result.push({team:t,gp:gp,w:w,l:l,otl:otl,pts:w*2+otl,isMe:isMe,leagueKey:lk});
   }
-  result.sort(function(a,b){return b.pts-a.pts;});
-  return result;
+  for(var i=0;i<G.standings.length;i++){
+    var row=G.standings[i];
+    if(!row.team) continue;
+    row.isMe=!!(G.team&&row.team.n===G.team.n);
+    if(row.isMe){
+      row.gp=G.gp||0;
+      row.w=G.w||0;
+      row.l=G.l||0;
+      row.otl=G.otl||0;
+    } else {
+      if(typeof row.strength!=='number') row.strength=teamStandingsStrength(row.team.n, lk);
+      row.gp=played;
+      var winPct=cl(row.strength,0.14,0.76);
+      row.w=Math.round(row.gp*winPct);
+      var rem=Math.max(0,row.gp-row.w);
+      row.otl=Math.round(rem*0.12);
+      row.l=rem-row.otl;
+    }
+    row.pts=row.w*2+row.otl;
+  }
+  G.standings.sort(function(a,b){return b.pts-a.pts;});
+  return G.standings;
+}
+
+function buildStandings(lk){
+  return refreshStandings(lk);
+}
+
+function applyGameResultStreak(won, tied){
+  if(typeof G==='undefined'||!G) return;
+  var prevType=G.streakType||'none';
+  if(won){
+    G.streakType='W';
+    G.streakCount=(prevType==='W'?G.streakCount:0)+1;
+    G._curHotStreak=(G._curHotStreak||0)+1;
+    if(G._curHotStreak>(G._seasonHotStreak||0)) G._seasonHotStreak=G._curHotStreak;
+  } else if(tied){
+    G.streakType='OTL';
+    G.streakCount=(prevType==='OTL'?G.streakCount:0)+1;
+    G._curHotStreak=0;
+  } else {
+    G.streakType='L';
+    G.streakCount=(prevType==='L'?G.streakCount:0)+1;
+    G._curHotStreak=0;
+  }
+}
+
+function syncUserStandingsRow(){
+  if(!G||!G.standings) return;
+  for(var i=0;i<G.standings.length;i++){
+    if(G.standings[i].isMe){
+      G.standings[i].gp=G.gp||0;
+      G.standings[i].w=G.w||0;
+      G.standings[i].l=G.l||0;
+      G.standings[i].otl=G.otl||0;
+      G.standings[i].pts=(G.w||0)*2+(G.otl||0);
+      break;
+    }
+  }
 }
 
 function getGamesPerWeek(lk){
   return (LEAGUES[lk] && LEAGUES[lk].gamesPerWeek) ? LEAGUES[lk].gamesPerWeek : 3;
 }
 
-/** OVR at which you're considered "PPG-caliber" for this league (women's leagues: -40 vs men's bar). */
+function getSeasonWeekCount(lk){
+  if(typeof isLocalLeague==='function'&&isLocalLeague(lk)&&typeof getLocalSeasonWeekCount==='function'){
+    return getLocalSeasonWeekCount(lk);
+  }
+  var L=LEAGUES[lk]||{};
+  return Math.ceil((L.games||68)/getGamesPerWeek(lk));
+}
+
+/** OVR at which you're considered "PPG-caliber" for this league. */
 function getPpgCaliberOvrThreshold(leagueKey){
   var L=LEAGUES[leagueKey]||{};
-  var isF=L.gender==='F';
   var base=65;
-  if(leagueKey==='PHL'||leagueKey==='PWL') base=90;
+  if(leagueKey==='PHL'||leagueKey==='PWL') base=88;
+  else if(leagueKey==='NAML'||leagueKey==='PWDL') base=72;
   else if(L.tier==='college') base=75;
-  else if(L.tier==='minor'||L.tier==='euro'||L.tier==='asia') base=80;
+  else if(leagueKey==='CEHL') base=50;
+  else if(leagueKey==='FHL') base=62;
+  else if(leagueKey==='NEHL') base=72;
+  else if(L.tier==='euro'||L.tier==='asia') base=78;
+  else if(L.tier==='minor') base=74;
+  else if(L.tier==='minor') base=74;
+  else if(L.tier==='local') base=52;
   else if(L.tier==='junior'){
     if(leagueKey==='OJL'||leagueKey==='CWHL') base=65;
     else if(leagueKey==='QMJL'||leagueKey==='WJL') base=64;
@@ -53,28 +134,21 @@ function getPpgCaliberOvrThreshold(leagueKey){
     else if(leagueKey==='NEJC'||leagueKey==='CEJC'||leagueKey==='ARJC'||leagueKey==='EWJC'||leagueKey==='AWJC') base=58;
     else base=63;
   }
-  if(isF) base=Math.max(25, base-40);
   return base;
 }
 
-/** Men's ELC-ready bar; women's path is 30 OVR lower (e.g. 80 → 50). */
 var DRAFT_CLUB_ELC_MIN_OVR_MEN=80;
 function getDraftClubElcMinOvr(){
-  if(typeof G==='undefined'||!G) return DRAFT_CLUB_ELC_MIN_OVR_MEN;
-  return G.gender==='F'?Math.max(25, DRAFT_CLUB_ELC_MIN_OVR_MEN-30):DRAFT_CLUB_ELC_MIN_OVR_MEN;
+  return DRAFT_CLUB_ELC_MIN_OVR_MEN;
 }
 function getEliteReadyOvrBar(){
-  if(typeof G==='undefined'||!G) return 83;
-  return G.gender==='F'?Math.max(40, 83-30):83;
+  return 83;
 }
 function getProAffiliateDemotionMaxOvr(){
-  if(typeof G==='undefined'||!G) return 80;
-  return G.gender==='F'?50:80;
+  return 80;
 }
-/** Men 75 / women 45 (-30): (1) main-pro hard floor before reassignment, (2) min OVR to join NAML/PWDL from junior/college/semi-pro — below = stay dev path. */
 function getProHardDevelopmentFloorOvr(){
-  if(typeof G==='undefined'||!G) return 75;
-  return G.gender==='F'?45:75;
+  return 75;
 }
 
 function recordPlayoffLogFromResult(playoff){
@@ -146,6 +220,11 @@ function onTeamChangeLeadershipReset(){
   G.teamTenure=0;
   G._teamRosterKey=null;
   G._leagueStatsKey=null;
+  G.teamRoster=null;
+  G.leaguePlayerStats=null;
+  if(G.league&&G.league.tier!=='junior'&&Array.isArray(G.juniorTeammateIds)){
+    G.juniorTeammateIds.forEach(function(m){ m.promoted=false; });
+  }
   maybeClearDraftRightsIfLeftHoldingClub();
 }
 
@@ -162,6 +241,9 @@ function maybeClearDraftRightsIfLeftHoldingClub(){
 }
 
 function genSeason(lk,myTeam){
+  if(typeof isLocalLeague==='function'&&isLocalLeague(lk)&&typeof genLocalSeason==='function'){
+    return genLocalSeason(lk,myTeam);
+  }
   var teams=TEAMS[lk]||[];
   var opp=teams.filter(function(t){return t.n!==myTeam.n;});
   if(!opp.length) opp=teams.slice();
@@ -227,8 +309,13 @@ function simBackupGoalieNight(opp,gameIndex,weeklyStats){
   if(away===home+1&&Math.random()<0.2) home++;
   var won=home>away;
   var tied=home===away;
+  if(tied){ if(Math.random()<0.5) home++; else away++; won=home>away; tied=false; }
+  if(typeof G.w==='undefined'){G.w=0;G.l=0;G.otl=0;}
+  if(won){G.w++;} else {G.l++;}
+  applyGameResultStreak(won,false);
+  syncUserStandingsRow();
   var sc=home+'-'+away;
-  addNews(G.team.n+' '+sc+' vs '+opp.n+' -- '+(won?'WIN':tied?'TIE':'LOSS')+' [BACKUP: '+backup+' -- YOU DID NOT DRESS]',(won?'good':tied?'neutral':'bad'));
+  addNews(G.team.n+' '+sc+' vs '+opp.n+' -- '+(won?'WIN':'LOSS')+' [BACKUP: '+backup+' -- YOU DID NOT DRESS]',(won?'good':'bad'));
   G.morale=cl(G.morale+(won?2:tied?0:-2),0,100);
   G.xp+=Math.round(ri(4,10)*getPotentialXpMult(G.potential||'support'));
   if(weeklyStats) weeklyStats.backupNights=(weeklyStats.backupNights||0)+1;

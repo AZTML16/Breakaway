@@ -16,7 +16,7 @@ function setPregamePlayButton(backupNight,gameIdx){
 function preGame(idx){
   /* Playoffs: hub "play next" must work even if awaitingUserGame was cleared (e.g. after render). */
   var _px=G._playoffCtx;
-  var _boN=typeof PLAYOFF_SERIES_WINS==='number'?PLAYOFF_SERIES_WINS:4;
+  var _boN=typeof getPlayoffSeriesWinsNeeded==='function'?getPlayoffSeriesWinsNeeded():4;
   var _hubSeriesReady=_px&&_px.active&&_px.hubScheduleMode&&!_px.eliminated&&_px.pairIndex<_px.pairs.length;
   if(_hubSeriesReady){
     var _pair=_px.pairs[_px.pairIndex];
@@ -104,6 +104,10 @@ function preGame(idx){
       notify('FINISH GAME '+(G.weekGames+1)+' ON THE SCHEDULE FIRST','gold');
       return;
     }
+    if(G.isInjured&&G.league.tier!=='minor'){
+      notify('INJURED — use SIM INJ on the schedule or wait out the week.','gold');
+      return;
+    }
     if(G.pos==='G'&&!G.isInjured){
       var _gm=ensureGoalieStartMask();
       if(_gm&&!_gm[idx]) G._pregameBackupNight=true;
@@ -111,7 +115,12 @@ function preGame(idx){
   }
   var perWeek=getGamesPerWeek(G.leagueKey);
   var weekStart=(G.week-1)*perWeek;
-  curOpponent=G.allOpponents[weekStart+idx]||{n:'Opponent',e:'[-]'};
+  var slot=G.allOpponents[weekStart+idx];
+  if(typeof isLocalScheduleEvent==='function'&&isLocalScheduleEvent(slot)){
+    runLocalScheduleEvent(idx);
+    return;
+  }
+  curOpponent=slot||{n:'Opponent',e:'[-]'};
   G._curGameIdx=idx;
   safeEl('pg-hdr').textContent='WEEK '+G.week+' -- GAME '+(idx+1);
   safeEl('pg-home').textContent=G.team.n;

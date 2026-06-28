@@ -33,19 +33,32 @@ function startCareer(){
   var teamPool=G._availableTeams||(TEAMS[lk]||TEAMS['OJL']);
   var team=teamPool[tidx]||teamPool[0];
   // build attrs
-  var attrList=ATTRS[selPos];
-  var arch=ARCHETYPES[selPos][selArch];
-  var attrs={};
-  var baseStartF=gender==='F'?30:(selPos==='G'?58:55);
-  var attrClampMin=gender==='F'?22:40;
-  attrList.forEach(function(a){attrs[a]=baseStartF;});
-  if(arch && arch.boosts){
-    Object.keys(arch.boosts).forEach(function(k){if(attrs[k]!==undefined)attrs[k]=cl(attrs[k]+arch.boosts[k],attrClampMin,92);});
+  var attrClampMin=40;
+  var attrs=typeof finalizeCreateSkaterAttrs==='function'
+    ?finalizeCreateSkaterAttrs(selPos, gender, G._baseAttrs||{}, G._extraAttrs||{})
+    :{};
+  if(selPos==='G'){
+    var attrList=ATTRS.G||[];
+    var arch=ARCHETYPES.G[selArch];
+    var baseStart=58;
+    attrList.forEach(function(a){ if(attrs[a]==null) attrs[a]=baseStart; });
+    if(arch&&arch.boosts){
+      Object.keys(arch.boosts).forEach(function(k){if(attrs[k]!==undefined)attrs[k]=cl(attrs[k]+arch.boosts[k],attrClampMin,92);});
+    }
+    attrList.forEach(function(a){attrs[a]=cl((G._baseAttrs&&G._baseAttrs[a]||attrs[a])+(G._extraAttrs&&G._extraAttrs[a]||0),attrClampMin,99);});
   }
-  attrList.forEach(function(a){attrs[a]=cl((G._baseAttrs&&G._baseAttrs[a]||attrs[a])+(G._extraAttrs&&G._extraAttrs[a]||0),attrClampMin,99);});
   var pOvrInit=ovr(attrs, selPos);
   if(isStartingCollegeOrPaidSemiProBlocked(lk, gender, pOvrInit)){
-    notify('At 16, pick a junior path or raise OVR ('+START_LEAGUE_BYPASS_OVR_M+'+ men / '+START_LEAGUE_BYPASS_OVR_F+'+ women) for college or overseas semi-pro.','red');
+    notify('At 16, pick a junior path or raise OVR ('+START_LEAGUE_BYPASS_OVR_M+'+) for college or overseas semi-pro.','red');
+    return;
+  }
+  if(l.tier==='local'&&typeof qualifiesForLocalTeam==='function'&&!qualifiesForLocalTeam(nat)){
+    var localMsg=typeof getLocalLeagueBlockReason==='function'?getLocalLeagueBlockReason(nat):('LHL unavailable from '+nat+'.');
+    notify(localMsg,'red');
+    return;
+  }
+  if(l.tier==='junior'&&typeof isJuniorEligibleAge==='function'&&!isJuniorEligibleAge(G.age||16)){
+    notify('Junior leagues are ages '+getJuniorMinAge()+'–'+getJuniorMaxAge()+' only.','red');
     return;
   }
   // Rare high-ceiling tracks so a few prospects can be 80+ by draft age.
@@ -54,6 +67,7 @@ function startCareer(){
   var growthMult=prospectTrack==='generational'?1.28:(prospectTrack==='elite'?1.16:(prospectTrack==='high'?1.08:1.0));
   var initContract=(function(){
     if(l.tier==='junior') return {sal:0,yrs:(pOvrInit>=78?3:pOvrInit>=68?2:1),type:'JUNIOR DEAL',ntc:false,bonus:false};
+    if(l.tier==='local') return {sal:0,yrs:1,type:'COMMUNITY PROGRAM',ntc:false,bonus:false};
     if(l.tier==='college') return {sal:0,yrs:(pOvrInit>=78?4:pOvrInit>=68?3:2),type:'SCHOLARSHIP',ntc:false,bonus:false};
     var base=l.salBase||0;
     var sal=Math.round((base*cl(0.85+(pOvrInit-60)*0.015,0.7,1.5))/1000)*1000;
@@ -72,10 +86,10 @@ function startCareer(){
     age:16,season:1,
     leagueKey:lk,league:l,team:team,
     attrs:attrs,health:100,stamina:80,morale:70,
-    gp:0,w:0,l:0,otl:0,goals:0,assists:0,plusminus:0,sog:0,saves:0,goalsAgainst:0,
+    gp:0,w:0,l:0,otl:0,goals:0,assists:0,plusminus:0,pim:0,sog:0,saves:0,goalsAgainst:0,
     cGP:0,cGoals:0,cAssists:0,cSOG:0,cSaves:0,cGoalsAgainst:0,
     cMomentScoreSum:0,cMomentCount:0,cSimPerfSum:0,cSimPerfCount:0,
-    careerEarnings:0,socialFollowers:0,
+    careerEarnings:0,bankBalance:0,socialFollowers:0,
     week:1,weekGames:0,
     contract:initContract,
     contractYrsLeft:initContract.yrs,
@@ -86,6 +100,7 @@ function startCareer(){
     standings:[],wonCup:false,careerCups:0,
     allOpponents:[],activeTab:null,
     isInjured:false,injName:'',injWks:0,
+    careerInjuryCount:0,seasonInjuryCount:0,injuryHistory:[],
     pendingContract:false,
     _inOffseason:false,
     streakType:'none',streakCount:0,
@@ -114,13 +129,26 @@ function startCareer(){
     _lifeScenarioGuaranteeCgp:ri(120,280),
     _lifeScenarioRolledThisWeek:false,
     _originPlaceRaw:hometownRaw,
-    _attrClampMin:attrClampMin
+    _attrClampMin:attrClampMin,
+    leagueRostersCache:{},
+    leagueAlumni:[],
+    juniorTeammateIds:[],
+    _leadersFilter:'pts',
+    _leadersPosFilter:'all',
+    leagueStatsArchive:[],
+    careerLeagueStats:{},
+    _rosterGenVersion:15,
+    _attrSubVersion:2
   };
   try{ if(typeof ensureUnifiedSkaterAttrs==='function') ensureUnifiedSkaterAttrs(G); }catch(eEns){}
+  if(typeof ensurePlayerFinances==='function') ensurePlayerFinances();
+  if(G.contract.sal>0&&G.bankBalance<1) G.bankBalance=Math.round(G.contract.sal*0.05);
+  else if(G.bankBalance<1) G.bankBalance=(LEAGUES[lk]&&LEAGUES[lk].tier==='college')?1200:850;
+  if(initContract.sal>0&&l.tier!=='junior'&&l.tier!=='college') stampContractBinding(lk, team.n);
   G.standings=buildStandings(lk);
   G.allOpponents=genSeason(lk,team);
   G.socialMessages=generateSocialMessages();
-  addNews('Career begins with the '+team.n+'!','big');
+  addNews('Career begins with the '+team.n+' as a '+formatPlayerPositionLabel(selPos, selSubPos)+'!','big');
   if(G.contract.sal>0) addNews('Signs '+G.contract.type+' contract -- '+fmt(G.contract.sal)+'/yr for '+G.contract.yrs+' years.','good');
   else addNews('Signs '+G.contract.type+' with '+team.n+' for '+G.contract.yrs+' year'+(G.contract.yrs!==1?'s':'')+'.','neutral');
   renderHub();

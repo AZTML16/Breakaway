@@ -100,7 +100,7 @@ function composeOriginStory(G){
   body.push('<div class="p">'+mid+'</div>');
   body.push('<div class="p"><span style="color:var(--gold)">'+escHtml(archName)+'</span> — '+posSoul+'</div>');
   var tier=G.league&&G.league.tier?G.league.tier:'';
-  var tierNote=tier==='junior'?'early buses, loud rinks, and scouts who watch everything':tier==='college'?'books, blades, and the scholarship clock':tier==='pro'?'contracts, cameras, and no nights off':tier==='minor'?'mileage, pay stubs, and proving it again tomorrow':tier==='euro'||tier==='asia'?'new flags, new languages, same net':'league pace and real consequences';
+  var tierNote=tier==='local'?'short community seasons, reps over standings, growing the game at home':tier==='junior'?'early buses, loud rinks, and scouts who watch everything':tier==='college'?'books, blades, and the scholarship clock':tier==='pro'?'contracts, cameras, and no nights off':tier==='minor'?'mileage, pay stubs, and proving it again tomorrow':tier==='euro'||tier==='asia'?'new flags, new languages, same net':'league pace and real consequences';
   body.push('<div class="p">At sixteen, the '+escHtml(leagueShort)+' stops being a daydream and becomes a calendar: '+tierNote+'. The <span style="color:var(--acc)">'+escHtml(teamName)+'</span> sweater is the next page — written in ice time.</div>');
   var headlines={
     city:'NEON & KNIVES / CITY KID',
@@ -137,13 +137,14 @@ function continueCareerColdOpen(){
   if(_careerIntroLoadTimer){clearInterval(_careerIntroLoadTimer);_careerIntroLoadTimer=null;}
   var reduceMotion=typeof window!=='undefined'&&window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var msgs=shuf([
-    'Scanning barns, bus routes, and bad ice...',
-    'Melting snow off the glass...',
-    'Teaching the crowd how to pronounce your name...',
-    'Spawning coaches with opinions...',
-    'Importing late-night rink snacks...',
-    'Negotiating fate with a random number generator...',
-    'Warming up the Zamboni of destiny...'
+    'Building '+((G&&G.league&&G.league.short)||'your league')+' schedule...',
+    'Assigning roommates with strong opinions...',
+    'Tuning the crowd noise for your debut...',
+    'Loading depth charts and special teams...',
+    'Printing your jersey — #'+((G&&G.jersey)||'?')+'...',
+    'Scouting your first-week opponents...',
+    'Calibrating the stat engine...',
+    'Warming up the Zamboni...'
   ]);
   var mi=0;
   safeEl('career-load-status').textContent=msgs[0]||'Loading...';
@@ -181,6 +182,7 @@ function showCareerStoryScreen(){
 }
 function finishCareerOriginAndEnterHub(){
   show('s-hub');
-  notify('WELCOME TO THE '+G.team.n.toUpperCase()+'!');
+  var lg=G.league&&G.league.short?G.league.short:'LEAGUE';
+  notify('WELCOME TO THE '+G.team.n.toUpperCase()+' ('+lg+')');
   try{RetroSound.careerStart();}catch(e){}
 }

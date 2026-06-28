@@ -199,6 +199,25 @@ function teamLogoMergeClipDef(defs,uid){
   return teamLogoMergeNickDefs(defs,teamLogoClipPathDef(uid));
 }
 
+/** Radial fill + soft inner glow for crest shells. */
+function teamLogoCrestEnhanceDefs(uid,bg,bg2,ac){
+  var hi=hexBlend(bg,ac,0.14);
+  return '<radialGradient id="rg'+uid+'" cx="38%" cy="32%" r="72%"><stop offset="0" stop-color="'+hi+'"/><stop offset=".55" stop-color="'+bg+'"/><stop offset="1" stop-color="'+bg2+'"/></radialGradient>'+
+    '<filter id="ig'+uid+'" x="-12%" y="-12%" width="124%" height="124%"><feGaussianBlur in="SourceAlpha" stdDeviation=".55" result="b"/><feOffset in="b" dx="0" dy=".65" result="o"/><feComponentTransfer in="o"><feFuncA type="linear" slope=".22"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+}
+
+function teamLogoShellFill(uid,bg,bg2,useGrad){
+  return useGrad?'url(#rg'+uid+')':bg;
+}
+
+function teamLogoShellHighlight(){
+  return '<ellipse cx="18" cy="11.5" rx="9.5" ry="4.2" fill="rgba(255,255,255,.07)"/>';
+}
+
+function teamLogoGraphicWrap(inner,uid){
+  return '<g filter="url(#ig'+uid+')">'+inner+'</g>';
+}
+
 
 // ============================================================
 // TEAM LOGOS — NCAA / college SVG layouts

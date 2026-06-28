@@ -14,16 +14,9 @@ function triggerTrade(){
 function acceptTrade(){
   if(!pendingTrade)return;
   var keepWeek=G.week, keepWeekGames=G.weekGames, keepCurIdx=G._curGameIdx;
-  var currentTable=buildStandings(G.leagueKey);
-  var incoming=currentTable.filter(function(s){return s.team&&pendingTrade&&s.team.n===pendingTrade.team.n;})[0];
   G.team=pendingTrade.team;
   onTeamChangeLeadershipReset();
-  if(incoming){
-    G.w=incoming.w||0;
-    G.l=incoming.l||0;
-    G.otl=incoming.otl||0;
-  }
-  G.standings=buildStandings(G.leagueKey);
+  refreshStandings(G.leagueKey);
   G.week=keepWeek;G.weekGames=keepWeekGames;G._curGameIdx=keepCurIdx;
   G.morale=cl(G.morale+ri(-8,6),0,100);
   G._lastTradeSeason=G.season;
@@ -36,12 +29,14 @@ function acceptTrade(){
 }
 
 function declineTrade(){
+  if(!pendingTrade) return;
+  RetroSound.ping();
   if(G.contract.ntc){
-    RetroSound.ping();
     addNews(G.first+' '+G.last+' invokes NTC -- trade blocked.','neutral');
-    G._tradeCooldownUntilGp=G.gp+24;
-    pendingTrade=null;closeM('m-trade');
   } else {
-    acceptTrade();
+    addNews(G.first+' '+G.last+' declines the trade to '+pendingTrade.team.n+'.','neutral');
   }
+  G._tradeCooldownUntilGp=G.gp+24;
+  pendingTrade=null;
+  closeM('m-trade');
 }

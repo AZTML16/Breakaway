@@ -3,18 +3,10 @@
 // SIM WEEK
 // ============================================================
 function getLeagueBaselineOvr(leagueKey){
-  var perLeague={
-    // Men
-    OJL:66, QMJL:63, WJL:62, USJL:59, NCHA:67,
-    NEJC:54, CEJC:55, ARJC:56,
-    NEHL:70, CEHL:72, ARHL:74, NAML:78, PHL:90,
-    // Women (tighter baselines vs men — sim was too generous, esp. PWL)
-    CWHL:64, USWDL:62, NWCHA:68, EWJC:52, AWJC:53, SDHL:72, FWHL:73, AWHL:74, PWDL:81, PWL:93
-  };
-  if(Object.prototype.hasOwnProperty.call(perLeague,leagueKey)) return perLeague[leagueKey];
+  if(typeof getLeagueOvrBands==='function') return getLeagueOvrBands(leagueKey).baseline;
   var lk=LEAGUES[leagueKey]||{};
   var tier=lk.tier||'junior';
-  var fallback={junior:61,college:66,euro:71,asia:73,minor:78,pro:89};
+  var fallback={junior:52,college:64,euro:71,asia:73,minor:68,pro:86};
   return fallback[tier]||68;
 }
 
@@ -27,7 +19,7 @@ function addSimMediaMoment(won, gameStats, opp){
   var chance=hotNight ? 0.35 : (pressure ? 0.25 : 0.12);
   if(Math.random()>chance) return;
   if(hasGoalieLine){
-    var svTxt=Math.round(svPct*1000)/10;
+    var svTxt=formatSvPctFromRatio(svPct).replace('%','');
     addNews('MEDIA AVAILABILITY: "'+(won?'We stayed composed in our zone.':'I need one or two of those back.')+'" -- '+G.first+' '+G.last+' after a '+gameStats.sv+'SV, '+gameStats.ga+'GA night (SV% '+svTxt+'%) vs '+opp.n+'.','neutral');
     return;
   }
@@ -46,11 +38,17 @@ function getSimDefenseScoringTier(){
   return 'Dlow';
 }
 function getSimMaxPointsPerGame(perWeek,tier){
-  if(tier==='F') return perWeek<=3 ? 5 : 4;
-  if(tier==='Doff') return perWeek<=3 ? 3 : 2;
-  if(tier==='Dtwo') return perWeek<=3 ? 2 : 2;
-  if(tier==='Dmin') return 1;
-  return perWeek<=3 ? 2 : 1;
+  var jun=G.league&&G.league.tier==='junior';
+  var col=G.league&&G.league.tier==='college';
+  if(tier==='F'){
+    if(jun) return perWeek<=3?4:4;
+    if(col) return perWeek<=3?5:4;
+    return perWeek<=3?6:5;
+  }
+  if(tier==='Doff') return jun?3:(perWeek<=3?4:3);
+  if(tier==='Dtwo') return perWeek<=3?3:2;
+  if(tier==='Dmin') return 2;
+  return perWeek<=3?3:2;
 }
 /** reg | playoff | world — used for XP and PTS multipliers */
 function getXFactorGameContext(){
@@ -200,36 +198,38 @@ function getSimWomenLeagueScoringFactor(leagueKey, league){
 }
 /** Extra scoring vs weak leagues when you tower above the league (e.g. elite in OJL). */
 function simDominationScoringBoost(baseline,rel){
+  var jun=G.league&&G.league.tier==='junior';
+  var scale=jun?0.42:(G.league&&G.league.tier==='college'?0.65:1);
   if(rel<=0.25) return 0;
-  if(baseline<=62) return cl(rel*0.5,0,1.35);
-  if(baseline<=65) return cl(rel*0.38,0,1.05);
-  if(baseline<=68) return cl(rel*0.22,0,0.75);
-  if(baseline<=72 && rel>0.65) return cl((rel-0.45)*0.35,0,0.55);
+  if(baseline<=62) return cl(rel*0.58*scale,0,1.55*scale);
+  if(baseline<=65) return cl(rel*0.42*scale,0,1.18*scale);
+  if(baseline<=68) return cl(rel*0.28*scale,0,0.88*scale);
+  if(baseline<=72 && rel>0.65) return cl((rel-0.45)*0.42*scale,0,0.68*scale);
   return 0;
 }
 function simSkaterGoalAssistSplit(totalPts, perfBias, won){
   var out={g:0,a:0};
   if(totalPts<=0) return out;
-  var pGoal=0.34;
-  if(G.pos==='D'){
-    pGoal=0.19;
-    var da=G.arch||'';
-    if(da==='OffensiveD') pGoal=0.26;
-    else if(da==='TwoWayD') pGoal=0.18;
-    else if(da==='StayAtHome'||da==='ShutdownD') pGoal=0.1;
-  } else {
-    // All forward positions use the same goal vs assist mix; centres earn more total points in simWeek().
-    pGoal=0.32;
-    var fa=G.arch||'';
-    if(fa==='Sniper'||fa==='PowerForward') pGoal+=0.07;
-    if(fa==='Playmaker') pGoal-=0.08;
-    if(fa==='TwoWay') pGoal-=0.07;
-    if(fa==='Grinder'||fa==='Enforcer') pGoal-=0.09;
+  var line=2, perf=0.85+(perfBias||0)*0.04;
+  if(typeof ensureTeamRoster==='function'&&typeof getDepthLineFromSlot==='function'){
+    var roster=ensureTeamRoster();
+    if(roster&&roster.players){
+      for(var ui=0;ui<roster.players.length;ui++){
+        if(roster.players[ui].isMe&&roster.players[ui].depthSlot){
+          line=getDepthLineFromSlot(roster.players[ui].depthSlot,G.pos);
+          break;
+        }
+      }
+    }
   }
+  var pGoal=typeof getArchetypeGoalPointShare==='function'
+    ?getArchetypeGoalPointShare(G.arch,G.pos,{line:line,perf:perf,leagueKey:G.leagueKey})
+    :(typeof getLeagueGoalPointShare==='function'?getLeagueGoalPointShare(G.leagueKey):(typeof getDefaultGoalPointShare==='function'?getDefaultGoalPointShare():0.323));
   if((G.xFactor==='elite_vision'||G.xFactor==='smart_iq') && (G.pos==='F'||G.pos==='D')) pGoal-=0.07;
-  if(G.xFactor==='quick_release' && G.pos==='F') pGoal+=0.09;
-  if(G.xFactor==='good_stick' && G.pos==='D') pGoal-=0.05;
-  pGoal=cl(pGoal+perfBias*0.035+(won?0.025:-0.02),0.11,0.46);
+  if(G.xFactor==='quick_release' && G.pos==='F') pGoal+=0.08;
+  if(G.xFactor==='good_stick' && G.pos==='D') pGoal-=0.04;
+  if(G.pos!=='G'&&typeof getHandednessGoalBias==='function') pGoal+=getHandednessGoalBias(G.hand);
+  pGoal=cl(pGoal+(won?0.012:-0.015),0.08,0.75);
   for(var p=0;p<totalPts;p++){
     if(Math.random()<pGoal) out.g++;
   }
@@ -238,10 +238,13 @@ function simSkaterGoalAssistSplit(totalPts, perfBias, won){
 }
 
 function simWeek(){
-  if(G._playoffCtx&&G._playoffCtx.active) return;
+  if(G._playoffCtx&&G._playoffCtx.active){
+    notify('PLAYOFFS ACTIVE — use bracket controls, not SIM WEEK.','gold');
+    return;
+  }
   var perWeek=getGamesPerWeek(G.leagueKey);
   var weekStart=(G.week-1)*perWeek;
-  var weeklyStats={g:0,a:0,w:0,l:0,otl:0,pm:0,staminaLoss:0,sv:0,ga:0,pressHits:0,backupNights:0};
+  var weeklyStats={g:0,a:0,w:0,l:0,otl:0,pm:0,pim:0,staminaLoss:0,sv:0,ga:0,pressHits:0,backupNights:0};
   var teamGamesSimmed=0;
   var playerGamesSimmed=0;
   var missedInjuryGames=0;
@@ -250,6 +253,11 @@ function simWeek(){
     var opp=G.allOpponents[weekStart+i];
     if(!opp){
       console.warn('simWeek: missing opp index', weekStart+i);
+      continue;
+    }
+    if(typeof isLocalScheduleEvent==='function'&&isLocalScheduleEvent(opp)){
+      simLocalScheduleEvent(i);
+      teamGamesSimmed++;
       continue;
     }
     curOpponent=opp;
@@ -269,22 +277,25 @@ function simWeek(){
       var injWon=injHome>injAway;
       var injTied=injHome===injAway;
       if(injWon){G.w++;weeklyStats.w++;} else if(injTied){G.otl++;weeklyStats.otl++;} else {G.l++;weeklyStats.l++;}
-      var prevInjType=G.streakType||'none';
-      if(injWon){
-        G.streakType='W';
-        G.streakCount=(prevInjType==='W'?G.streakCount:0)+1;
-      } else if(injTied){
-        G.streakType='OTL';
-        G.streakCount=(prevInjType==='OTL'?G.streakCount:0)+1;
-      } else {
-        G.streakType='L';
-        G.streakCount=(prevInjType==='L'?G.streakCount:0)+1;
-      }
+      applyGameResultStreak(injWon,injTied);
       var injSc=injHome+'-'+injAway;
       addNews(G.team.n+' '+injSc+' vs '+opp.n+' -- '+(injWon?'WIN':injTied?'OTL':'LOSS')+' [DNP -- INJURED]',(injWon?'neutral':'bad'));
       G.weekGames++;
       teamGamesSimmed++;
       missedInjuryGames++;
+      continue;
+    }
+    if(typeof isUserHealthyScratch==='function'&&isUserHealthyScratch()&&!G._callUpCtx){
+      var scHome=ri(1,4);
+      var scAway=ri(1,5);
+      var scWon=scHome>scAway;
+      var scTied=scHome===scAway;
+      if(scTied){ if(Math.random()<0.5) scHome++; else scAway++; scWon=scHome>scAway; scTied=false; }
+      if(scWon){G.w++;weeklyStats.w++;} else if(scTied){G.otl++;weeklyStats.otl++;} else {G.l++;weeklyStats.l++;}
+      applyGameResultStreak(scWon,scTied);
+      addNews(G.team.n+' '+(scHome+'-'+scAway)+' vs '+opp.n+' -- '+(scWon?'WIN':scTied?'OTL':'LOSS')+' [DNP -- HEALTHY SCRATCH]',(scWon?'neutral':'bad'));
+      G.weekGames++;
+      teamGamesSimmed++;
       continue;
     }
     // Simulate game
@@ -297,7 +308,7 @@ function simWeek(){
     var oppBase=2.35 - perfBias*0.28 + rd(-1.0,1.0);
     gameHomeScore=Math.max(0,Math.round(teamBase));
     gameAwayScore=Math.max(0,Math.round(oppBase));
-    gameStats={g:0,a:0,sog:0,block:0,sv:0,ga:0,pm:0};
+    gameStats={g:0,a:0,sog:0,block:0,sv:0,ga:0,pm:0,pim:0};
     if(G.pos==='G'){
       var totalShots=ri(24,38);
       var svRate=cl(0.89 + perfBias*0.016 + (leagueDev-1)*0.008 + rd(-0.012,0.01),0.83,0.955);
@@ -318,29 +329,32 @@ function simWeek(){
       var centreBoost=(dTier==='F'&&(G.subPos||'')==='C')?0.28:0;
       var expGamePts;
       if(dTier==='F'){
-        // Forwards: strong weeks often land 6-9 PTS/week in 3-4 GP when hot vs league.
-        var fwdCore=0.48+ptSkill*0.98+centreBoost+domBoost+rd(0,0.82);
+        var fwdCore=0.48+ptSkill*0.88+centreBoost+domBoost+rd(0,0.48);
         expGamePts=cl(fwdCore,0,maxThisGame);
-        if(ptSkill>=1.0 && Math.random()<cl(0.1+ptSkill*0.1+domBoost*0.14,0.08,0.38)){
-          expGamePts=cl(expGamePts+ri(1,2),0,maxThisGame);
+        if(ptSkill>=1.15 && Math.random()<cl(0.12+ptSkill*0.1+domBoost*0.12,0.08,0.34)){
+          expGamePts=cl(expGamePts+1,0,maxThisGame);
+        } else if(ptSkill>=0.85 && Math.random()<cl(0.08+ptSkill*0.06,0.05,0.22)){
+          expGamePts=cl(expGamePts+1,0,maxThisGame);
         }
       } else if(dTier==='Doff'){
-        var offDCore=0.66+ptSkill*0.36+domBoost*0.3+rd(0,0.48);
+        var offDCore=0.82+ptSkill*0.44+domBoost*0.34+rd(0,0.55);
         expGamePts=cl(offDCore,0,maxThisGame);
-        if(ptSkill>=0.95 && Math.random()<0.16) expGamePts=cl(expGamePts+1,0,maxThisGame);
+        if(ptSkill>=0.95 && Math.random()<0.22) expGamePts=cl(expGamePts+1,0,maxThisGame);
       } else if(dTier==='Dtwo'){
-        expGamePts=cl(0.4+ptSkill*0.26+domBoost*0.18+rd(0,0.36),0,maxThisGame);
+        expGamePts=cl(0.55+ptSkill*0.32+domBoost*0.22+rd(0,0.42),0,maxThisGame);
       } else if(dTier==='Dmin'){
-        expGamePts=cl(0.12+ptSkill*0.12+domBoost*0.07+rd(0,0.22),0,maxThisGame);
+        expGamePts=cl(0.2+ptSkill*0.16+domBoost*0.1+rd(0,0.28),0,maxThisGame);
       } else {
-        expGamePts=cl(0.22+ptSkill*0.2+domBoost*0.12+rd(0,0.28),0,maxThisGame);
+        expGamePts=cl(0.32+ptSkill*0.26+domBoost*0.16+rd(0,0.34),0,maxThisGame);
       }
       var wSimFac=getSimWomenLeagueScoringFactor(G.leagueKey,G.league);
       var leagueScFac=typeof getLeagueSimScoringFactor==='function'?getLeagueSimScoringFactor(G.leagueKey):1;
+      var userSimLeagueFac=1+(leagueScFac-1)*0.28;
       var ppgBar=typeof getPpgCaliberOvrThreshold==='function'?getPpgCaliberOvrThreshold(G.leagueKey):72;
-      var ppgHurdle=playerOvr>=ppgBar?1:cl(0.55+(playerOvr-(ppgBar-18))/36,0.42,0.92);
+      var ppgHurdle=playerOvr>=ppgBar?1:cl(0.32+(playerOvr-(ppgBar-20))/42,0.26,0.86);
+      if(playerOvr<ppgBar-10) ppgHurdle*=0.82;
       var condFac=(G.pos!=='G')?cl(0.9+((G.attrs.conditioning||60)-60)/320,0.86,1.08):1;
-      expGamePts=cl(expGamePts*wSimFac*leagueScFac*ppgHurdle*condFac*getXFactorSkaterPtsMult('reg'),0,maxThisGame);
+      expGamePts=cl(expGamePts*wSimFac*userSimLeagueFac*ppgHurdle*condFac*getXFactorSkaterPtsMult('reg'),0,maxThisGame);
       var gamePts=Math.min(maxThisGame,Math.max(0,Math.round(expGamePts+rd(-0.35,0.55))));
       var gaSplit=simSkaterGoalAssistSplit(gamePts,perfBias,gameHomeScore>gameAwayScore);
       gameStats.g=gaSplit.g;
@@ -352,23 +366,9 @@ function simWeek(){
       if(G.xFactor==='heavy_hitter'&&(G.pos==='D'||G.pos==='F')) blk+=Math.random()<0.24?1:0;
       if(G.xFactor==='careless'&&isCarelessSlumping()&&(G.pos==='D'||G.pos==='F')&&Math.random()<0.38) blk=Math.max(0,blk-1);
       gameStats.block=blk;
-      // Smoother +/-; defensemen & two-way forwards trend higher when structure holds.
-      var defSkill=((G.attrs.mental||60)+(G.attrs.physical||60)-120)/30;
-      var posRead=((G.attrs.anticipation||60)-60)/50;
-      var archPm=0;
-      if(G.pos==='D'){
-        var dArch=G.arch||'';
-        if(dArch==='StayAtHome'||dArch==='ShutdownD') archPm=0.52;
-        else if(dArch==='TwoWayD') archPm=0.34;
-        else if(dArch==='OffensiveD') archPm=0.1;
-        else archPm=0.22;
-      } else if(G.pos==='F' && G.arch==='TwoWay'){
-        archPm=0.3+cl(posRead,-0.12,0.28);
-      }
-      var defBias=(G.pos==='D'?1.06:0) + archPm + cl(defSkill,-0.6,0.9)*(G.pos==='D'?0.52:0.36) + (gameStats.block>=2?(G.pos==='D'?0.48:0.34):0) + (G.pos==='D'&&gameStats.block>=1?0.22:0) + (G.pos==='F'&&gameStats.block>=1&&G.arch==='TwoWay'?0.14:0);
-      var rawPm=(gameHomeScore>gameAwayScore?1:gameHomeScore<gameAwayScore?-1:0) + ((gameStats.g+gameStats.a)>=2?1:0) + defBias + rd(-0.62,0.62);
-      var pmCap=G.pos==='D'?4:(G.pos==='F'&&G.arch==='TwoWay'?3:2);
-      gameStats.pm=cl(rawPm,-2,pmCap);
+      gameStats.pm=typeof computeSkaterGamePlusMinus==='function'
+        ?computeSkaterGamePlusMinus(gameHomeScore>gameAwayScore, gameHomeScore===gameAwayScore, gameStats.g, gameStats.a, blk, G.pos, G.arch, 0)
+        :0;
     }
     // Light team-support tilt: close games can swing either way, but less often against the player.
     if(gameHomeScore===gameAwayScore && Math.random()<0.58) gameHomeScore++;
@@ -377,17 +377,7 @@ function simWeek(){
     var tied=gameHomeScore===gameAwayScore;
     G.gp++;G.cGP++;
     if(won){G.w++;weeklyStats.w++;} else if(tied){G.otl++;weeklyStats.otl++;} else {G.l++;weeklyStats.l++;}
-    var prevType=G.streakType||'none';
-    if(won){
-      G.streakType='W';
-      G.streakCount=(prevType==='W'?G.streakCount:0)+1;
-    } else if(tied){
-      G.streakType='OTL';
-      G.streakCount=(prevType==='OTL'?G.streakCount:0)+1;
-    } else {
-      G.streakType='L';
-      G.streakCount=(prevType==='L'?G.streakCount:0)+1;
-    }
+    applyGameResultStreak(won,tied);
     var gRnd=Math.round(gameStats.g);
     var aRnd=Math.round(gameStats.a);
     G.goals+=gRnd;G.assists+=aRnd;G.cGoals+=gRnd;G.cAssists+=aRnd;
@@ -397,6 +387,15 @@ function simWeek(){
     if(G.pos==='G'){G.goalsAgainst=(G.goalsAgainst||0)+gameStats.ga;G.cGoalsAgainst=(G.cGoalsAgainst||0)+gameStats.ga; weeklyStats.sv+=gameStats.sv; weeklyStats.ga+=gameStats.ga;}
     var pm=Math.round(gameStats.pm||0);G.plusminus+=pm;
     weeklyStats.pm+=pm;
+    if(G.pos!=='G'){
+      var simPim=Math.round(gameStats.pim||0);
+      if(typeof rollSkaterGamePim==='function') simPim+=rollSkaterGamePim(G.pos,G.arch,G.xFactor);
+      G.pim=(G.pim||0)+simPim;
+      weeklyStats.pim=(weeklyStats.pim||0)+simPim;
+      if(simPim>0&&typeof isPhysicalIdentityPlayer==='function'&&isPhysicalIdentityPlayer(G.pos,G.arch,G.xFactor)){
+        G.morale=cl(G.morale+Math.min(2,Math.floor(simPim/4)),0,100);
+      }
+    }
     var staminaLoss=ri(5,15);
     G.stamina=cl(G.stamina-staminaLoss,0,100);
     weeklyStats.staminaLoss+=staminaLoss;
@@ -426,28 +425,26 @@ function simWeek(){
     G.cSimPerfCount++;
     if(G.xFactor==='brat'&&G.pos!=='G'&&won&&Math.random()<0.14){
       addNews('AFTER THE WHISTLE: '+G.last+' gets under the other bench -- they take a frustration penalty.','neutral');
+      gameStats.pim=(gameStats.pim||0)+2;
     }
     if(G.xFactor==='heavy_hitter'&&(G.pos==='D'||G.pos==='F')&&Math.random()<0.07){
       addNews('ROUGHING AFTER THE PLAY -- '+G.last+' finishes the hit, sits two minutes.','bad');
-      G.morale=cl(G.morale-1,0,100);
+      gameStats.pim=(gameStats.pim||0)+2;
+      if(typeof isPhysicalIdentityPlayer==='function'&&isPhysicalIdentityPlayer(G.pos,G.arch,G.xFactor)) G.morale=cl(G.morale+1,0,100);
+      else G.morale=cl(G.morale-1,0,100);
     }
     if(Math.random()<0.2) weeklyStats.pressHits++;
-    if(G.standings){
-      for(var s=0;s<G.standings.length;s++){
-        if(G.standings[s].isMe){
-          G.standings[s].gp=G.gp;
-          G.standings[s].w=G.w;
-          G.standings[s].l=G.l;
-          G.standings[s].otl=G.otl;
-          G.standings[s].pts=G.w*2+G.otl;
-          break;
-        }
-      }
-    }
+    syncUserStandingsRow();
     G.weekGames++;
     teamGamesSimmed++;
     playerGamesSimmed++;
+    if(typeof tickProCallUpAfterGame==='function') tickProCallUpAfterGame({
+      g:gRnd,a:aRnd,
+      sv:Math.round(gameStats.sv||0),ga:Math.round(gameStats.ga||0),
+      won:won,tied:tied,pm:Math.round(gameStats.pm||0),perfN:simPerfN
+    });
   }
+  if(typeof ensureProCallUpStintComplete==='function') ensureProCallUpStintComplete();
   if(missedInjuryGames>0 && G.injWks>0){
     G.injWks--;
     if(G.injWks<=0){
@@ -477,7 +474,7 @@ function simWeek(){
   if(missedInjuryGames>0) html+='<div>DNP (Injury): '+missedInjuryGames+' game(s)</div>';
   if(G.pos==='G'){
     var weekSv=weeklyStats.sv, weekGa=weeklyStats.ga;
-    var weekSvPct=weekSv+weekGa>0?(Math.round((weekSv/(weekSv+weekGa))*1000)/10)+'%':'--';
+    var weekSvPct=formatSvPctFromCounts(weekSv,weekGa);
     var weekGaa=playerGamesSimmed>0?Math.round((weekGa/playerGamesSimmed)*100)/100:'--';
     html+='<div>SV: '+weekSv+' | GA: '+weekGa+' | SV%: '+weekSvPct+' | GAA: '+weekGaa+'</div>';
   } else {
@@ -488,11 +485,10 @@ function simWeek(){
   html+='<div>Streak: '+streakLabel+' | Media Events: '+weeklyStats.pressHits+'</div>';
   html+='<div>Stamina Loss: -'+weeklyStats.staminaLoss+'</div>';
   if(G.pos==='G'){
-    var ssnF=(G.saves||0)+(G.goalsAgainst||0);
-    var ssnPct=ssnF>0?(Math.round((G.saves/ssnF)*1000)/10)+'%':'--';
-    html+='<div style="font-size:13px;color:var(--gold);margin-top:8px;border-top:1px solid rgba(122,184,224,.12);padding-top:6px">SEASON: '+G.gp+' GP &mdash; '+G.saves+' SV &middot; '+ssnPct+'</div>';
+    var ssnPct=formatSvPctFromCounts(G.saves,G.goalsAgainst||0);
+    html+='<div style="font-size:13px;color:var(--gold);margin-top:8px;border-top:1px solid rgba(122,184,224,.12);padding-top:6px">SEASON: '+G.gp+' GP — '+G.saves+' SV · '+ssnPct+'</div>';
   } else {
-    html+='<div style="font-size:13px;color:var(--gold);margin-top:8px;border-top:1px solid rgba(122,184,224,.12);padding-top:6px">SEASON: '+G.gp+' GP &mdash; '+(G.goals+G.assists)+' PTS ('+G.goals+'G '+G.assists+'A)</div>';
+    html+='<div style="font-size:13px;color:var(--gold);margin-top:8px;border-top:1px solid rgba(122,184,224,.12);padding-top:6px">SEASON: '+G.gp+' GP — '+(G.goals+G.assists)+' PTS ('+G.goals+'G '+G.assists+'A)</div>';
   }
   html+='<div>';
   html+='<div style="font-size:18px;color:'+(weeklyGrade==='A+'?'gold':weeklyGrade==='A'?'green':weeklyGrade==='B'?'orange':'gray')+'">'+weeklyGrade+'</div>';

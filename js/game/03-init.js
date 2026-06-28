@@ -7,7 +7,7 @@ function initSelectors(){
   for(var y=1960;y<=2030;y++){var o=document.createElement('option');o.value=y;o.text=y;ys.appendChild(o);}
   ys.value=2006;
   var ns=safeEl('c-nat');
-  NATS.forEach(function(n){var o=document.createElement('option');o.value=n.n;o.text='['+n.c+'] '+n.n;ns.appendChild(o);});
+  NATS.slice().sort(function(a,b){return a.n.localeCompare(b.n);}).forEach(function(n){var o=document.createElement('option');o.value=n.n;o.text='['+n.c+'] '+n.n;ns.appendChild(o);});
   // random default jersey
   safeEl('c-jersey').value=ri(1,99);
   setPos('F', document.querySelector('#pos-btns button'));

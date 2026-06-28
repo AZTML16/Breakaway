@@ -3,6 +3,7 @@
 // WEEK / SEASON
 // ============================================================
 function nextWeek(){
+  if(typeof ensureProCallUpStintComplete==='function') ensureProCallUpStintComplete();
   if(G._playoffCtx&&G._playoffCtx.active) return;
   var dev=G.league.dev||1.1;
   if(G.league.tier==='pro') dev=Math.max(0.35,dev-0.15);
@@ -13,17 +14,17 @@ function nextWeek(){
     var pDev=getPotentialDevMult(G.potential||'support');
     var amin=typeof G._attrClampMin==='number'?G._attrClampMin:40;
     var capAge=getAttrCapForAge(G.age||16);
-    var attrList=ATTRS[G.pos];
+    var attrList=G.pos!=='G'&&typeof SKATER_SUB_ATTR_KEYS!=='undefined'?SKATER_SUB_ATTR_KEYS.slice():(ATTRS[G.pos]||[]);
     var lkDev=G.leagueKey||'';
     var tnDev=G.team&&G.team.n||'';
     for(var i=0;i<attrList.length;i++){
       var a=attrList[i];
-      if(a==='conditioning') continue;
       var leagueMult=getLeagueAttrDevMultiplier(lkDev, tnDev, a);
       var inc=rd(0,0.4)*dev*pDev*(G.morale/100)*youthW*leagueMult;
       if(typeof SKATER_BASE_ATTR_KEYS!=='undefined' && SKATER_BASE_ATTR_KEYS.indexOf(a)>=0) inc*=0.4;
       if(G.attrs[a]<capAge) G.attrs[a]=cl(G.attrs[a]+inc,amin,capAge);
     }
+    if(G.pos!=='G'&&typeof syncLegacySkaterAttrsFromCategories==='function') syncLegacySkaterAttrsFromCategories(G.attrs);
   }
   // tougher leagues introduce more media pressure and fatigue on bad weeks
   if(G.league.tier==='pro' && G.gp>0 && (G.w/G.gp) < 0.45){
@@ -40,13 +41,92 @@ function nextWeek(){
   // Refresh social messages weekly
   if(G.week%3===0) G.socialMessages=generateSocialMessages();
   // Add league-wide talent news occasionally
-  if(Math.random()<0.55) addLeagueTalentNews();
+  if(Math.random()<0.45) addLeagueTalentNews();
+  if(typeof refreshStandings==='function') refreshStandings(G.leagueKey);
   accrueWeeklySalary();
   tickSocialFollowers();
+  if(typeof catchUpLeagueNpcStats==='function') catchUpLeagueNpcStats();
+  if(typeof weeklyTeamSystemsTick==='function') weeklyTeamSystemsTick();
+  var totalWks=typeof getSeasonWeekCount==='function'
+    ?getSeasonWeekCount(G.leagueKey)
+    :Math.ceil((G.league.games||68)/Math.max(1,getGamesPerWeek(G.leagueKey)));
+  if(G.week>totalWks&&typeof endRegSeason==='function'){
+    endRegSeason();
+    return;
+  }
   renderHub();show('s-hub');
 }
 
 var PLAYOFF_SERIES_WINS=4;
+
+function getPlayoffSeriesWinsForLeague(leagueKey){
+  if(typeof isLocalLeague==='function'&&isLocalLeague(leagueKey)) return 1;
+  var tier=(typeof LEAGUES!=='undefined'&&LEAGUES[leagueKey])?LEAGUES[leagueKey].tier:'';
+  if(tier==='junior'||tier==='college') return 3;
+  return 4;
+}
+
+function getPlayoffSeriesWinsNeeded(){
+  if(typeof G!=='undefined'&&G&&typeof G._playoffSeriesWins==='number') return G._playoffSeriesWins;
+  if(typeof G!=='undefined'&&G&&G.leagueKey) return getPlayoffSeriesWinsForLeague(G.leagueKey);
+  return PLAYOFF_SERIES_WINS;
+}
+
+/** When eliminated — fast-sim every remaining series/round until a champion, then offseason. */
+function fastSimRemainingPlayoffBracket(){
+  var ctx=G._playoffCtx;
+  if(!ctx||!ctx.active) return;
+  if(ctx.eliminated&&ctx.pairIndex<ctx.pairs.length){
+    var pr=ctx.pairs[ctx.pairIndex];
+    if(pr&&(pr[0].isMe||pr[1].isMe)) ctx.pairIndex++;
+  }
+  var boN=getPlayoffSeriesWinsNeeded();
+  var guard=0;
+  while(G._playoffCtx&&G._playoffCtx.active&&guard++<600){
+    ctx=G._playoffCtx;
+    while(ctx.pairIndex<ctx.pairs.length){
+      var pr=ctx.pairs[ctx.pairIndex];
+      var home=pr[0], away=pr[1];
+      var ser=simPlayoffSeriesWinner(home,away);
+      ctx._roundMatchups.push(home.team.n+' vs '+away.team.n+' -> '+ser.winner.team.n+' ('+ser.homeWins+'-'+ser.awayWins+')');
+      ctx.winnersThisRound.push(ser.winner);
+      ctx.pairIndex++;
+    }
+    ctx.summary.rounds.push({name:ctx.roundName,matchups:ctx._roundMatchups.slice()});
+    ctx.current=ctx.winnersThisRound.slice();
+    if(ctx.current.length<=1){
+      finishPlayablePlayoffs();
+      return;
+    }
+    ctx.roundName=getPlayoffRoundName(ctx.current.length);
+    ctx.pairs=[];
+    for(var i=0;i<ctx.current.length/2;i++){
+      ctx.pairs.push([ctx.current[i],ctx.current[ctx.current.length-1-i]]);
+    }
+    ctx.pairIndex=0;
+    ctx.winnersThisRound=[];
+    ctx._roundMatchups=[];
+    ctx.seriesHW=0;
+    ctx.seriesAW=0;
+  }
+  if(G._playoffCtx&&G._playoffCtx.active) finishPlayablePlayoffs();
+}
+
+function onPlayoffEliminated(){
+  if(!G._playoffCtx||!G._playoffCtx.active||!G._playoffCtx.eliminated) return;
+  if(G._playoffElimAutoRun) return;
+  G._playoffElimAutoRun=true;
+  var localTag=(G.league&&G.league.tier==='local')?'Community showcase over':'Playoff run over';
+  addNews(localTag+' — heading to offseason.','neutral');
+  notify('ELIMINATED — OFFSEASON','gold');
+  fastSimRemainingPlayoffBracket();
+  G._playoffElimAutoRun=false;
+  if(G._inOffseason){
+    try{show('s-offseason');}catch(eOff){}
+  } else if(!G._playoffCtx||!G._playoffCtx.active){
+    try{renderHub();show('s-hub');}catch(eHub){}
+  }
+}
 /** Simmed playoff games: flatter power curve, heavier player penalty, grind favors physical teams. */
 var PLAYOFF_SIM_POWER_DIV=44;
 var PLAYOFF_SIM_PLAYER_HURDLE=0.124;
@@ -94,7 +174,7 @@ function playoffSingleGameHomeWins(home,away){
 }
 function simPlayoffSeriesWinner(home,away){
   var hw=0,aw=0;
-  while(hw<PLAYOFF_SERIES_WINS && aw<PLAYOFF_SERIES_WINS){
+  while(hw<getPlayoffSeriesWinsNeeded() && aw<getPlayoffSeriesWinsNeeded()){
     if(playoffSingleGameHomeWins(home,away)) hw++; else aw++;
   }
   return {winner:hw>aw?home:away,homeWins:hw,awayWins:aw};
@@ -150,7 +230,7 @@ function simulatePlayoffs(){
       var hW=0,aW=0;
       if(home.isMe||away.isMe){
         roundReached=roundName;
-        while(hW<PLAYOFF_SERIES_WINS && aW<PLAYOFF_SERIES_WINS){
+        while(hW<getPlayoffSeriesWinsNeeded() && aW<getPlayoffSeriesWinsNeeded()){
           if(playoffSingleGameHomeWins(home,away)) hW++; else aW++;
           myStats.gp++;
           if(G.pos==='G'){
@@ -213,17 +293,21 @@ function simulatePlayoffs(){
 
 function initPlayablePlayoffs(){
   G._worldStageCtx=null;
+  G._playoffElimAutoRun=false;
   G.standings=buildStandings(G.leagueKey);
   var sorted=G.standings.slice().sort(function(a,b){return b.pts-a.pts;});
-  var bracket=buildPlayoffBracketFromStandings(sorted, G.leagueKey);
+  var isLocal=G.league&&G.league.tier==='local';
+  G._playoffSeriesWins=getPlayoffSeriesWinsForLeague(G.leagueKey);
+  var bracket=isLocal?sorted.slice(0,Math.min(8,sorted.length)):buildPlayoffBracketFromStandings(sorted, G.leagueKey);
   if(!bracket||bracket.length<2){
-    addNews('Not enough playoff teams -- skipping playable bracket.','neutral');
+    addNews(isLocal?'Community showcase skipped — not enough teams.':'Not enough playoff teams -- skipping playable bracket.','neutral');
+    if(isLocal&&typeof applyLocalCommunitySeasonAwards==='function') applyLocalCommunitySeasonAwards(sorted);
     finishSeasonToOffseason();
     return;
   }
   var divN2=getPlayoffDivisionTeamLists(G.leagueKey).length;
-  var poN2=(divN2>=2?' division winners + wild cards, re-seeded':' seeded by points');
-  addNews('PLAYOFFS BEGIN (PLAYABLE) in '+G.league.short+' — '+bracket.length+' teams (best-of-7), '+poN2+'. Hub: SIM ROUND (CPU), SIM MY SERIES, or PLAY GAME each win.','big');
+  var poN2=isLocal?'top 8 community clubs, single-game rounds':((divN2>=2?' division winners + wild cards, re-seeded':' seeded by points')+', best-of-'+(G._playoffSeriesWins*2-1));
+  addNews((isLocal?'COMMUNITY SHOWCASE':'PLAYOFFS BEGIN (PLAYABLE)')+' in '+G.league.short+' — '+bracket.length+' teams ('+poN2+'). Hub: play, sim your round, or sim the bracket.','big');
   G._playoffCtx={
     active:true,
     hubScheduleMode:true,
@@ -314,7 +398,7 @@ function afterPlayoffPlayableGame(won){
   if(!pr){
     if(ctx.hubScheduleMode&&ctx.pairIndex>=ctx.pairs.length){
       tryCompletePlayoffRoundFromHub();
-      if(G._playoffCtx&&G._playoffCtx.eliminated) simAllRemainingPlayoffRoundsCpu();
+      if(G._playoffCtx&&G._playoffCtx.eliminated) onPlayoffEliminated();
       if(G._playoffCtx&&G._playoffCtx.active){ try{renderHub();}catch(ePc){} show('s-hub'); }
       return;
     }
@@ -326,7 +410,7 @@ function afterPlayoffPlayableGame(won){
   var oppRow=home.isMe?away:home;
   if(won){ if(home.isMe) ctx.seriesHW++; else ctx.seriesAW++; }
   else { if(home.isMe) ctx.seriesAW++; else ctx.seriesHW++; }
-  if(ctx.seriesHW<PLAYOFF_SERIES_WINS && ctx.seriesAW<PLAYOFF_SERIES_WINS){
+  if(ctx.seriesHW<getPlayoffSeriesWinsNeeded() && ctx.seriesAW<getPlayoffSeriesWinsNeeded()){
     if(ctx.hubScheduleMode){
       ctx.awaitingUserGame=false;
       G._isPlayoffGame=false;
@@ -353,7 +437,10 @@ function afterPlayoffPlayableGame(won){
     ctx.winnersThisRound.push(oppRow);
     ctx.eliminated=true;
     ctx.roundReached=ctx.roundName;
+    ctx.pairIndex++;
     addNews('YOU LOSE '+ctx.roundName+' series '+aw+'-'+hw+' vs '+oppRow.team.n+'.','bad');
+    onPlayoffEliminated();
+    return;
   }
   ctx.seriesHW=0;
   ctx.seriesAW=0;
@@ -363,9 +450,6 @@ function afterPlayoffPlayableGame(won){
   if(ctx.hubScheduleMode){
     if(ctx.pairIndex>=ctx.pairs.length){
       tryCompletePlayoffRoundFromHub();
-    }
-    if(G._playoffCtx&&G._playoffCtx.eliminated){
-      simAllRemainingPlayoffRoundsCpu();
     }
     if(G._playoffCtx&&G._playoffCtx.active){
       try{renderHub();}catch(eH1){}
@@ -406,7 +490,16 @@ function finishPlayablePlayoffs(){
     addNews(champion.team.n+' wins the '+G.league.short+' championship.','good');
     addNews('CHAMPIONSHIP FINAL: '+champion.team.n+' close out the '+G.league.short+' season on top.','neutral');
   }
+  if(G.league&&G.league.tier==='local'&&typeof applyLocalCommunitySeasonAwards==='function'){
+    applyLocalCommunitySeasonAwards(G.standings||[]);
+  }
+  if(typeof buildSeasonRecapHTML==='function'){
+    G._lastSeasonRecapHTML=buildSeasonRecapHTML();
+  }
   finishSeasonToOffseason();
+  if(G._inOffseason){
+    try{show('s-offseason');}catch(eFp){}
+  }
 }
 
 function buildPlayoffRecapHTML(playoff){
@@ -427,7 +520,7 @@ function buildPlayoffRecapHTML(playoff){
   html+='<div style="margin-top:10px;padding:8px;border:1px solid rgba(46,204,113,.35);color:var(--green)">CHAMPION: '+playoff.summary.champion+'</div>';
   if(_lastPlayoffStats){
     if(G.pos==='G'){
-      var psvPct=_lastPlayoffStats.sv+_lastPlayoffStats.ga>0?Math.round((_lastPlayoffStats.sv/(_lastPlayoffStats.sv+_lastPlayoffStats.ga))*1000)/10+'%':'--';
+      var psvPct=formatSvPctFromCounts(_lastPlayoffStats.sv,_lastPlayoffStats.ga);
       html+='<div style="margin-top:8px">YOUR PLAYOFF STATS: '+_lastPlayoffStats.gp+'GP '+_lastPlayoffStats.sv+'SV '+_lastPlayoffStats.ga+'GA SV%'+psvPct+'</div>';
     } else {
       html+='<div style="margin-top:8px">YOUR PLAYOFF STATS: '+_lastPlayoffStats.gp+'GP '+_lastPlayoffStats.g+'G '+_lastPlayoffStats.a+'A '+(_lastPlayoffStats.g+_lastPlayoffStats.a)+'PTS</div>';
@@ -437,11 +530,12 @@ function buildPlayoffRecapHTML(playoff){
 }
 
 var TOP_HOCKEY_COUNTRIES = [
-  'Canada','United States','Swedish','Finnish','Russian','Czech','Slovak','Swiss','German',
-  'Latvian','Danish','Norwegian','Belarusian','Japanese'
+  'Canada','United States','Sweden','Finland','Russia','Czech Republic','Slovakia','Switzerland','Germany',
+  'Latvia','Denmark','Norway','Belarus','Japan'
 ];
 
 function isEliteIntlHockeyCountry(nat){
+  nat=typeof normalizePlayerNat==='function'?normalizePlayerNat(nat):nat;
   return TOP_HOCKEY_COUNTRIES.indexOf(nat)!==-1;
 }
 function isTopHockeyCountry(nat){
@@ -460,10 +554,11 @@ function getWorldStageScoringMult(ev){
 // World Stage: some national programs are harder to qualify from than others.
 // Differentiates "different countries harder to make" instead of a single binary gate.
 function getWorldStageCountryDifficultyMult(nat){
+  nat=typeof normalizePlayerNat==='function'?normalizePlayerNat(nat):nat;
   var map={
-    'Canada':0.95,'United States':0.98,'Swedish':1.00,'Finnish':1.00,'Russian':1.02,
-    'Czech':1.05,'Slovak':1.06,'Swiss':1.06,'German':1.07,
-    'Latvian':1.10,'Danish':1.11,'Norwegian':1.12,'Belarusian':1.12,'Japanese':1.15
+    'Canada':0.95,'United States':0.98,'Sweden':1.00,'Finland':1.00,'Russia':1.02,
+    'Czech Republic':1.05,'Slovakia':1.06,'Switzerland':1.06,'Germany':1.07,
+    'Latvia':1.10,'Denmark':1.11,'Norway':1.12,'Belarus':1.12,'Japan':1.15
   };
   if(map[nat]) return map[nat];
   // Unknown programs are harder than the modeled field.
@@ -483,21 +578,22 @@ function lastWorldStageWasTeamCanadaNoMedal(){
 }
 
 function getNationalTeamName(nat){
+  nat=typeof normalizePlayerNat==='function'?normalizePlayerNat(nat):nat;
   var map={
     'Canada':'Team Canada',
     'United States':'Team USA',
-    'Swedish':'Team Sweden',
-    'Finnish':'Team Finland',
-    'Russian':'Team Russia',
-    'Czech':'Team Czechia',
-    'Slovak':'Team Slovakia',
-    'Swiss':'Team Switzerland',
-    'German':'Team Germany',
-    'Latvian':'Team Latvia',
-    'Danish':'Team Denmark',
-    'Norwegian':'Team Norway',
-    'Belarusian':'Team Belarus',
-    'Japanese':'Team Japan'
+    'Sweden':'Team Sweden',
+    'Finland':'Team Finland',
+    'Russia':'Team Russia',
+    'Czech Republic':'Team Czechia',
+    'Slovakia':'Team Slovakia',
+    'Switzerland':'Team Switzerland',
+    'Germany':'Team Germany',
+    'Latvia':'Team Latvia',
+    'Denmark':'Team Denmark',
+    'Norway':'Team Norway',
+    'Belarus':'Team Belarus',
+    'Japan':'Team Japan'
   };
   return map[nat]||('Team '+nat);
 }
@@ -511,6 +607,17 @@ function pickRandomWorldOpponentLabel(faceoff){
   var pool=TOP_HOCKEY_COUNTRIES.filter(function(n){return n!==G.nat;});
   if(!pool.length) return 'WORLD SELECT TEAM';
   return getNationalTeamName(pool[ri(0,pool.length-1)]);
+}
+
+function roundWorldStageStatBlock(s){
+  if(!s) return {gp:0,g:0,a:0,sv:0,ga:0};
+  return {
+    gp:Math.round(+s.gp||0),
+    g:Math.round(+s.g||0),
+    a:Math.round(+s.a||0),
+    sv:Math.round(+s.sv||0),
+    ga:Math.round(+s.ga||0)
+  };
 }
 
 function beginWorldStagePlayableFromEval(ev){
@@ -535,7 +642,7 @@ function finalizeWorldStagePlayable(ctx){
   var tName=ev.tName, nt=ev.nt;
   var medal=ctx.medal||'';
   _lastWorldStageHTML+=ctx.htmlLines.join('');
-  _lastWorldStageStats={
+  _lastWorldStageStats=roundWorldStageStatBlock({
     team:nt,
     tournament:tName,
     gp:ctx.stats.gp||0,
@@ -543,7 +650,9 @@ function finalizeWorldStagePlayable(ctx){
     a:ctx.stats.a||0,
     sv:ctx.stats.sv||0,
     ga:ctx.stats.ga||0
-  };
+  });
+  _lastWorldStageStats.team=nt;
+  _lastWorldStageStats.tournament=tName;
   if(medal){
     G.awards.push({name:tName+' '+medal,icon:medal==='GOLD'?'[G]':medal==='SILVER'?'[S]':'[B]',desc:nt+' wins '+medal+' at '+tName,season:G.season});
     G.morale=cl(G.morale+(medal==='GOLD'?10:medal==='SILVER'?7:4),0,100);
@@ -577,10 +686,10 @@ function finalizeWorldStagePlayable(ctx){
       ga:_lastWorldStageStats.ga||0
     });
     if(G.pos==='G'){
-      var wsvPct=_lastWorldStageStats.sv+_lastWorldStageStats.ga>0?Math.round((_lastWorldStageStats.sv/(_lastWorldStageStats.sv+_lastWorldStageStats.ga))*1000)/10+'%':'--';
+      var wsvPct=formatSvPctFromCounts(_lastWorldStageStats.sv,_lastWorldStageStats.ga);
       _lastWorldStageHTML+='<div style="margin-top:6px">YOUR STATS: '+_lastWorldStageStats.gp+'GP '+_lastWorldStageStats.sv+'SV '+_lastWorldStageStats.ga+'GA SV%'+wsvPct+'</div>';
     } else {
-      _lastWorldStageHTML+='<div style="margin-top:6px">YOUR STATS: '+_lastWorldStageStats.gp+'GP '+_lastWorldStageStats.g+'G '+_lastWorldStageStats.a+'A '+(_lastWorldStageStats.g+_lastWorldStageStats.a)+'PTS</div>';
+      _lastWorldStageHTML+='<div style="margin-top:6px">YOUR STATS: '+_lastWorldStageStats.gp+'GP '+_lastWorldStageStats.g+'G '+_lastWorldStageStats.a+'A '+(Math.round(_lastWorldStageStats.g)+Math.round(_lastWorldStageStats.a))+'PTS</div>';
     }
   }
   G._worldStageCtx=null;
@@ -738,6 +847,8 @@ function evaluateWorldFaceoff(){
 function closeOffseasonWorldStageAndShow(){
   safeEl('offseason-playoff-recap').innerHTML=_lastPlayoffRecapHTML||'NO PLAYOFF RECAP YET.';
   safeEl('offseason-world-stage').innerHTML=_lastWorldStageHTML||'NO TOURNAMENT UPDATE YET.';
+  var recapEl=safeEl('offseason-season-recap');
+  if(recapEl) recapEl.innerHTML=(G&&G._lastSeasonRecapHTML)||(typeof buildSeasonRecapHTML==='function'?buildSeasonRecapHTML():'');
   G._inOffseason=true;
   show('s-offseason');
   setTimeout(function(){triggerOffseasonStaffChat();},400);
@@ -826,13 +937,17 @@ function runInternationalTournamentFromEval(ev){
     var sv=Math.round(shots*svRate);
     var ga=shots-sv;
     addNews((medal?medal+' MEDAL! ':'')+nt+' '+tName+' run -- '+G.first+' '+G.last+' posts '+sv+' SV and '+ga+' GA in '+gp+' games.','big');
-    _lastWorldStageStats={team:nt,tournament:tName,gp:gp,sv:sv,ga:ga,g:0,a:0};
+    _lastWorldStageStats=roundWorldStageStatBlock({team:nt,tournament:tName,gp:gp,sv:sv,ga:ga,g:0,a:0});
+    _lastWorldStageStats.team=nt;
+    _lastWorldStageStats.tournament=tName;
   } else {
-    var pts=Math.max(0,Math.round(gp*(isFaceoff?0.14:0.08)+(pOvr-60)*(isFaceoff?0.008:0.004)+rd(0,isFaceoff?0.18:0.08))*scoreMult*getXFactorSkaterPtsMult('world'));
+    var pts=Math.max(0,Math.round((gp*(isFaceoff?0.14:0.08)+(pOvr-60)*(isFaceoff?0.008:0.004)+rd(0,isFaceoff?0.18:0.08))*scoreMult*getXFactorSkaterPtsMult('world')));
     var g=Math.round(pts*rd(0.35,0.6));
     var a=Math.max(0,pts-g);
     addNews((medal?medal+' MEDAL! ':'')+nt+' '+tName+' run -- '+G.first+' '+G.last+' records '+g+'G '+a+'A in '+gp+' games.','big');
-    _lastWorldStageStats={team:nt,tournament:tName,gp:gp,g:g,a:a,sv:0,ga:0};
+    _lastWorldStageStats=roundWorldStageStatBlock({team:nt,tournament:tName,gp:gp,g:g,a:a,sv:0,ga:0});
+    _lastWorldStageStats.team=nt;
+    _lastWorldStageStats.tournament=tName;
   }
   if(medal){
     G.awards.push({name:tName+' '+medal,icon:medal==='GOLD'?'[G]':medal==='SILVER'?'[S]':'[B]',desc:nt+' wins '+medal+' at '+tName,season:G.season});
@@ -867,10 +982,10 @@ function runInternationalTournamentFromEval(ev){
       ga:_lastWorldStageStats.ga||0
     });
     if(G.pos==='G'){
-      var wsvPct=_lastWorldStageStats.sv+_lastWorldStageStats.ga>0?Math.round((_lastWorldStageStats.sv/(_lastWorldStageStats.sv+_lastWorldStageStats.ga))*1000)/10+'%':'--';
+      var wsvPct=formatSvPctFromCounts(_lastWorldStageStats.sv,_lastWorldStageStats.ga);
       _lastWorldStageHTML+='<div style="margin-top:6px">YOUR STATS: '+_lastWorldStageStats.gp+'GP '+_lastWorldStageStats.sv+'SV '+_lastWorldStageStats.ga+'GA SV%'+wsvPct+'</div>';
     } else {
-      _lastWorldStageHTML+='<div style="margin-top:6px">YOUR STATS: '+_lastWorldStageStats.gp+'GP '+_lastWorldStageStats.g+'G '+_lastWorldStageStats.a+'A '+(_lastWorldStageStats.g+_lastWorldStageStats.a)+'PTS</div>';
+      _lastWorldStageHTML+='<div style="margin-top:6px">YOUR STATS: '+_lastWorldStageStats.gp+'GP '+_lastWorldStageStats.g+'G '+_lastWorldStageStats.a+'A '+(Math.round(_lastWorldStageStats.g)+Math.round(_lastWorldStageStats.a))+'PTS</div>';
     }
   }
 }
@@ -892,17 +1007,19 @@ function endRegSeason(){
   var sorted=G.standings.slice().sort(function(a,b){return b.pts-a.pts;});
   var myIdx=0;
   for(var i=0;i<sorted.length;i++){if(sorted[i].isMe){myIdx=i;break;}}
-  var madePlayoffs=myIdx<Math.ceil(sorted.length/2);
+  var isLocal=G.league&&G.league.tier==='local';
+  var madePlayoffs=isLocal?(myIdx<8):(myIdx<Math.ceil(sorted.length/2));
   if(madePlayoffs){
     initPlayablePlayoffs();
-    notify('PLAYOFFS — HUB','gold');
+    notify(isLocal?'COMMUNITY SHOWCASE — HUB':'PLAYOFFS — HUB','gold');
     renderHub();
     show('s-hub');
     return;
   } else {
     G.wonCup=false;
-    addNews(G.team.n+' misses the playoffs.','bad');
-    _lastPlayoffRecapHTML='<div>'+G.team.n+' missed the playoffs this season.</div>';
+    addNews(G.team.n+(isLocal?' misses the community showcase.':' misses the playoffs.'),'bad');
+    _lastPlayoffRecapHTML=isLocal&&typeof buildLocalSeasonRecapHTML==='function'?buildLocalSeasonRecapHTML(sorted):('<div>'+G.team.n+' missed the playoffs this season.</div>');
+    if(isLocal&&typeof applyLocalCommunitySeasonAwards==='function') applyLocalCommunitySeasonAwards(sorted);
   }
   finishSeasonToOffseason();
 }
@@ -917,13 +1034,16 @@ function finishSeasonToOffseason(){
   // Store season stats in log
   var logEntry={year:G.year,season:G.season,league:G.league.short,leagueKey:G.leagueKey,team:G.team.n.split(' ').slice(-1)[0],gp:G.gp,ovrVal:ovr(G.attrs,G.pos),wonCup:G.wonCup,isGoalie:G.pos==='G'};
   if(G.pos==='G'){
-    var sSvPct=G.saves+(G.goalsAgainst||0)>0?(Math.round(G.saves/(G.saves+(G.goalsAgainst||0))*1000)/10):'--';
+    var sSvPct=G.saves+(G.goalsAgainst||0)>0?(G.saves/(G.saves+(G.goalsAgainst||0))):null;
     var sGAA=G.gp>0?Math.round(((G.goalsAgainst||0)/G.gp)*100)/100:'--';
     logEntry.sv=G.saves; logEntry.ga=G.goalsAgainst||0; logEntry.svpct=sSvPct; logEntry.gaa=sGAA;
   } else {
     logEntry.g=G.goals; logEntry.a=G.assists;
   }
   G.seasonLog.push(logEntry);
+  if(typeof buildSeasonRecapHTML==='function') G._lastSeasonRecapHTML=buildSeasonRecapHTML();
+  if(typeof snapshotJuniorTeammates==='function') snapshotJuniorTeammates();
+  if(typeof registerLeagueAlumni==='function') registerLeagueAlumni();
   // Season awards
   checkSeasonAwards();
   goToOffseason();

@@ -140,12 +140,18 @@ function fanHandleVariant(base, idx){
   return '@ice_'+b+ri(1,99);
 }
 function accrueWeeklySalary(){
+  if(typeof accrueWeeklyPlayerFinances==='function'){
+    accrueWeeklyPlayerFinances();
+    return;
+  }
   if(!G||G._inOffseason) return;
   var sal=(G.contract&&G.contract.sal)|0;
   if(sal<=0) return;
   var perWk=getGamesPerWeek(G.leagueKey);
   var wks=Math.max(1,Math.ceil((G.league.games||68)/perWk));
-  G.careerEarnings=(G.careerEarnings||0)+Math.round(sal/wks);
+  var pay=Math.round(sal/wks);
+  G.careerEarnings=(G.careerEarnings||0)+pay;
+  if(typeof G.bankBalance==='number') G.bankBalance+=pay;
 }
 function tickSocialFollowers(){
   if(!G) return;

@@ -396,15 +396,22 @@ function applyTeamTheme(teamName){
 /** Save % for UI from ratio 0..1 (e.g. 0.905 -> "90.5%"). */
 function formatSvPctFromRatio(ratio){
   if(!(ratio>0)||!isFinite(ratio)) return '--';
-  return (Math.round(ratio*1000)/10)+'%';
+  var pct=ratio<=1?ratio*100:ratio;
+  return (Math.round(pct*10)/10).toFixed(1)+'%';
+}
+/** From save + shot counts. */
+function formatSvPctFromCounts(sv,ga){
+  var shots=(sv||0)+(ga||0);
+  if(shots<=0) return '--';
+  return formatSvPctFromRatio(sv/shots);
 }
 /** Season log rows may store svpct as percent (90.2) or legacy ratio (0.902). */
 function formatSeasonLogSvPct(val){
   if(val==='--'||val==null||val==='') return '--';
-  var n=typeof val==='number'?val:parseFloat(String(val),10);
-  if(!isFinite(n)) return String(val);
-  if(n>0 && n<=1) return (Math.round(n*1000)/10)+'%';
-  return (Math.round(n*10)/10)+'%';
+  var n=typeof val==='number'?val:parseFloat(String(val).replace(/%/g,''),10);
+  if(!isFinite(n)||n<=0) return '--';
+  if(n>0&&n<=1) return formatSvPctFromRatio(n);
+  return (Math.round(n*10)/10).toFixed(1)+'%';
 }
 function ovr(attrs, pos){
   if(!attrs) return 60;
@@ -422,7 +429,8 @@ function ovr(attrs, pos){
     }
     return gc?Math.round(gs/gc):60;
   }
-  var keys=typeof SKATER_RATING_ATTR_KEYS!=='undefined'?SKATER_RATING_ATTR_KEYS:['skating','shooting','stickhandling','passing','physical','defense','stickChecks','anticipation','conditioning'];
+  if(typeof syncLegacySkaterAttrsFromCategories==='function') syncLegacySkaterAttrsFromCategories(attrs);
+  var keys=typeof SKATER_RATING_ATTR_KEYS!=='undefined'?SKATER_RATING_ATTR_KEYS:['skating','shooting','stickhandling','passing','physical','defense','anticipation','conditioning'];
   var ss=0,cc=0;
   for(var j=0;j<keys.length;j++){
     var vv=attrs[keys[j]];
@@ -620,7 +628,109 @@ function applyGameSnapshot(snap){
   if(typeof G.cSimPerfCount!=='number') G.cSimPerfCount=0;
   if(typeof G._tradeDemandSeason!=='number') G._tradeDemandSeason=0;
   if(typeof G.careerEarnings!=='number') G.careerEarnings=0;
+  if(typeof ensurePlayerFinances==='function') ensurePlayerFinances();
   if(typeof G.socialFollowers!=='number') G.socialFollowers=800+ri(0,900);
+  if(!G.leagueRostersCache||typeof G.leagueRostersCache!=='object') G.leagueRostersCache={};
+  if(!Array.isArray(G.leagueAlumni)) G.leagueAlumni=[];
+  if(!Array.isArray(G.juniorTeammateIds)) G.juniorTeammateIds=[];
+  if(!Array.isArray(G.leagueStatsArchive)) G.leagueStatsArchive=[];
+  if(!G.careerLeagueStats||typeof G.careerLeagueStats!=='object') G.careerLeagueStats={};
+  if(!G._leadersFilter) G._leadersFilter='pts';
+  if(!G._leadersPosFilter) G._leadersPosFilter='all';
+  if(!G._leadersViewMode) G._leadersViewMode='live';
+  if(G.xFactor==='sniper_xf') G.xFactor='quick_release';
+  if(G.arch==='OQD') G.arch='OffensiveD';
+  if(G.standings&&G.standings.length&&G.leagueKey&&typeof refreshStandings==='function'){
+    refreshStandings(G.leagueKey);
+  }
+  if(G._rosterGenVersion!==21){
+    G._rosterGenVersion=21;
+    G.leagueRostersCache={};
+    G._teamRosterKey=null;
+    G.teamRoster=null;
+    G._leagueStatsKey=null;
+    G.leaguePlayerStats=null;
+    G._npcStatsSyncedWeek=0;
+    G._teamOffenseFactors={};
+  }
+  if(typeof ensureInjuryTracking==='function') ensureInjuryTracking();
+  if(G.attrs&&G.pos!=='G'){
+    if(G._attrSubVersion!==2){
+      G._attrSubVersion=2;
+    }
+    if(typeof ensureUnifiedSkaterAttrs==='function') ensureUnifiedSkaterAttrs(G);
+  }
+  if(typeof migrateSaveBranding==='function') migrateSaveBranding();
+  if(G.league&&G.league.tier==='local'&&G.team&&typeof getLocalSeasonScheduleSlots==='function'&&typeof genLocalSeason==='function'){
+    var wantSlots=getLocalSeasonScheduleSlots(G.leagueKey);
+    if((!G.allOpponents||G.allOpponents.length<wantSlots)&&(G.gp||0)===0){
+      G.allOpponents=genLocalSeason(G.leagueKey,G.team);
+      G.week=1;G.weekGames=0;
+    }
+  }
+  if(typeof migrateRenamedTeamName==='function'){
+    if(G.team&&G.team.n) G.team.n=migrateRenamedTeamName(G.team.n);
+    var oi, opp;
+    if(G.allOpponents) for(oi=0;oi<G.allOpponents.length;oi++){
+      opp=G.allOpponents[oi];
+      if(opp&&opp.n) opp.n=migrateRenamedTeamName(opp.n);
+    }
+  }
+  if(G.worldStageLog) for(var oi=0;oi<G.worldStageLog.length;oi++){
+    var ws=G.worldStageLog[oi];
+    if(!ws) continue;
+    ws.gp=Math.round(+ws.gp||0); ws.g=Math.round(+ws.g||0); ws.a=Math.round(+ws.a||0);
+    ws.sv=Math.round(+ws.sv||0); ws.ga=Math.round(+ws.ga||0);
+  }
+  if(_lastWorldStageStats){
+    _lastWorldStageStats.gp=Math.round(+_lastWorldStageStats.gp||0);
+    _lastWorldStageStats.g=Math.round(+_lastWorldStageStats.g||0);
+    _lastWorldStageStats.a=Math.round(+_lastWorldStageStats.a||0);
+    _lastWorldStageStats.sv=Math.round(+_lastWorldStageStats.sv||0);
+    _lastWorldStageStats.ga=Math.round(+_lastWorldStageStats.ga||0);
+  }
+  if(typeof G.pim!=='number') G.pim=0;
+  if(G.nat&&typeof normalizePlayerNat==='function') G.nat=normalizePlayerNat(G.nat);
+  if(G._natLabelVersion!==2){
+    G._natLabelVersion=2;
+    function migrateRosterNats(roster){
+      if(!roster||!roster.players) return;
+      roster.players.forEach(function(p){
+        if(p.nat&&typeof normalizePlayerNat==='function') p.nat=normalizePlayerNat(p.nat);
+      });
+    }
+    migrateRosterNats(G.teamRoster);
+    if(G.leagueRostersCache){
+      Object.keys(G.leagueRostersCache).forEach(function(k){
+        migrateRosterNats(G.leagueRostersCache[k]);
+      });
+    }
+  }
+  if(G._relationsPersonalityVersion!==2){
+    G._relationsPersonalityVersion=2;
+    G.teamRelations=null;
+  }
+  if(G._npcScoringModelVersion!==6){
+    G._npcScoringModelVersion=6;
+    G._npcStatsSyncedWeek=0;
+    G._leagueStatsKey=null;
+    G.leaguePlayerStats=null;
+    G._teamOffenseFactors={};
+    function resetNpcSeasonStats(roster){
+      if(!roster||!roster.players) return;
+      roster.players.forEach(function(p){
+        if(p.isMe) return;
+        p.seasonStats={gp:0,g:0,a:0,pts:0,pm:0,pim:0,sv:0,ga:0,w:0,gpMissed:0};
+      });
+    }
+    if(G.leagueRostersCache){
+      Object.keys(G.leagueRostersCache).forEach(function(k){
+        resetNpcSeasonStats(G.leagueRostersCache[k]);
+      });
+    }
+    resetNpcSeasonStats(G.teamRoster);
+  }
+  if(!G.teamRelations) G.teamRelations={coach:null, teammates:{}};
   var x=snap.x||{};
   timerSec=(typeof x.timerSec==='number'&&x.timerSec>=0)?x.timerSec:10;
   curMoment=x.curMoment|0;
@@ -642,6 +752,7 @@ function applyGameSnapshot(snap){
   _lastWorldStageHTML=String(x._lastWorldStageHTML!=null?x._lastWorldStageHTML:'');
   _lastPlayoffStats=x._lastPlayoffStats!=null?x._lastPlayoffStats:null;
   _lastWorldStageStats=x._lastWorldStageStats!=null?x._lastWorldStageStats:null;
+  if(typeof migrateSaveBranding==='function') migrateSaveBranding();
   try{
     if(G.team&&G.team.n) applyTeamTheme(G.team.n);
     else applyTeamTheme(null);
@@ -676,6 +787,8 @@ function refreshUIRAfterLoad(screenId){
     if(id==='s-offseason'){
       G._inOffseason=true;
       safeEl('offseason-playoff-recap').innerHTML=_lastPlayoffRecapHTML;
+      var recapEl=safeEl('offseason-season-recap');
+      if(recapEl) recapEl.innerHTML=(G&&G._lastSeasonRecapHTML)||'';
       safeEl('offseason-world-stage').innerHTML=_lastWorldStageHTML;
       return;
     }
@@ -809,7 +922,7 @@ function show(id){
   var reduceMotion=typeof window!=='undefined'&&window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var allowGlitchFX=!reduceMotion&&isGlitchEffectsEnabled();
   /* Full CRT cut: game beats + intro/load/story (more common than before) */
-  var fullGlitchIds={'s-pregame':1,'s-ingame':1,'s-shootout':1,'s-postgame':1,'s-game-intro':1,'s-story-opening':1,'s-game-loading':1};
+  var fullGlitchIds={'s-pregame':1,'s-ingame':1,'s-shootout':1,'s-postgame':1,'s-game-intro':1,'s-story-opening':1,'s-game-loading':1,'s-pro-draft':1};
   /* Softer snap: hub, career UI, create flow — always micro-glitch */
   var softMicroIds={'s-hub':1,'s-offseason':1,'s-contract':1,'s-create':1,'s-arch':1,'s-potential':1,'s-xfactor':1,'s-attrs':1,'s-league':1,'s-team':1,'s-howto':1,'s-retire':1};
   var isBigGameTransition=!!fullGlitchIds[id];
@@ -1889,7 +2002,7 @@ function refreshAudioHintBanner(){
   try{
     if(localStorage.getItem('breakawaySound')==='0'){
       h.style.display='block';
-      h.innerHTML='<span class="ab">!</span> <b>SFX IS OFF</b> (saved). Open <b>SETTINGS</b> (bottom-right) &mdash; raise <b>SOUND EFFECTS</b>, then tap the page. <span class="ab">!</span>';
+      h.innerHTML='<span class="ab">!</span> <b>SFX IS OFF</b> (saved). Open <b>SETTINGS</b> (bottom-right) — raise <b>SOUND EFFECTS</b>, then tap the page. <span class="ab">!</span>';
     }
   }catch(e){}
 }
