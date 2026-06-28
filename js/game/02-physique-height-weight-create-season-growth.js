@@ -19,30 +19,30 @@ function roundWeightToTen(w){
   w=+w||0;
   return Math.round(cl(w,95,320)/10)*10;
 }
-/** Total listed-weight gain from age 16 to late 30s (lighter teen frames fill out more). */
+/** Total listed-weight gain from age 16 to late 30s (lighter teen frames fill out more). More realistic: 140lb 16yo can hit 180-190 by late 20s. */
 function careerWeightGainTotal(sw,isF){
   sw=roundWeightToTen(cl(sw,95,320));
   var lean=cl((200-sw)/105,0,1);
-  var maleGain=Math.round(52+lean*22);
-  maleGain=cl(maleGain,25,85);
-  if(isF) return Math.round(maleGain*0.48);
+  var maleGain=Math.round(62+lean*28);
+  maleGain=cl(maleGain,30,95);
+  if(isF) return Math.round(maleGain*0.42);
   return maleGain;
 }
-/** Target weight by age — gradual gain through career; most by late 20s, more to ~38; men gain more. */
+/** Target weight by age — gradual gain through career; most by late 20s, more to ~38; men gain more. Players can keep gaining weight into 30s. */
 function getTargetWeightForAge(age, gender, startW){
   var sw=roundWeightToTen(cl(startW,95,320));
   var isF=gender==='F';
   var total=careerWeightGainTotal(sw,isF);
-  var midFrac=isF?0.82:0.78;
+  var midFrac=isF?0.70:0.65;
   var midGain=total*midFrac;
   var lateGain=total-midGain;
   if(age<=16) return roundWeightToTen(sw);
-  if(age<=27){
-    var t=(age-16)/11;
+  if(age<=28){
+    var t=(age-16)/12;
     return roundWeightToTen(sw+midGain*t);
   }
   if(age<=40){
-    var t2=(age-27)/13;
+    var t2=(age-28)/12;
     return roundWeightToTen(sw+midGain+lateGain*t2);
   }
   return roundWeightToTen(sw+total);
