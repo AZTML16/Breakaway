@@ -38,17 +38,54 @@ function getSimDefenseScoringTier(){
   return 'Dlow';
 }
 function getSimMaxPointsPerGame(perWeek,tier){
+  var pace='structured';
+  var paceKnobs={nightCapF:3,nightCapD:2};
+  if(typeof G!=='undefined'&&G&&G.leagueKey&&typeof getLeagueScoringPaceClass==='function'){
+    pace=getLeagueScoringPaceClass(G.leagueKey);
+    if(typeof getLeaguePaceKnobsForLeague==='function') paceKnobs=getLeaguePaceKnobsForLeague(G.leagueKey);
+    else if(typeof getLeagueScoringPaceKnobs==='function') paceKnobs=getLeagueScoringPaceKnobs(pace);
+  }
   var jun=G.league&&G.league.tier==='junior';
   var col=G.league&&G.league.tier==='college';
   if(tier==='F'){
-    if(jun) return perWeek<=3?4:4;
-    if(col) return perWeek<=3?5:4;
-    return perWeek<=3?6:5;
+    var capF=paceKnobs.nightCapF;
+    if(jun&&pace==='rungun') capF=Math.max(capF,4);
+    if(col||pace==='tight'||pace==='lowskill') capF=Math.min(capF,3);
+    if(typeof G!=='undefined'&&G&&G.leagueKey==='PHL'&&G.arch==='Sniper'&&G.pos==='F'){
+      var phlMe=typeof getUserScoringProxy==='function'?getUserScoringProxy(1,0.94):null;
+      if(phlMe&&typeof isPhlGenerationalSniper==='function'&&isPhlGenerationalSniper(phlMe,1,0.94)){
+        capF=Math.max(capF, perWeek<=3?5:4);
+      } else if(phlMe&&typeof isPhlEliteSniper==='function'&&isPhlEliteSniper(phlMe,1,0.94)){
+        capF=Math.max(capF, perWeek<=3?4:3);
+      } else {
+        var phlOvrCap=phlMe?phlMe.ovr:(typeof ovr==='function'?ovr(G.attrs,G.pos):70);
+        if(phlOvrCap>=94){
+          capF=Math.max(capF, perWeek<=3?4:3);
+        } else if(phlOvrCap>=90){
+          capF=Math.max(capF, perWeek<=3?3:2);
+        } else {
+          capF=Math.min(capF, perWeek<=3?3:2);
+        }
+      }
+    } else if(typeof G!=='undefined'&&G&&G.leagueKey==='PHL'){
+      capF=Math.min(capF, perWeek<=3?3:2);
+    }
+    return perWeek<=3?capF:Math.max(2,capF-1);
   }
-  if(tier==='Doff') return jun?3:(perWeek<=3?4:3);
+  if(tier==='Doff'){
+    var phlDoff=typeof G!=='undefined'&&G&&G.leagueKey==='PHL'&&G.pos==='D'&&G.arch==='OffensiveD';
+    if(phlDoff){
+      var phlD=typeof getUserScoringProxy==='function'?getUserScoringProxy(1,0.94):null;
+      if(phlD&&typeof isPhlGenerationalOffensiveD==='function'&&isPhlGenerationalOffensiveD(phlD,1,0.94)) return perWeek<=3?4:3;
+      if(phlD&&typeof isPhlEliteOffensiveD==='function'&&isPhlEliteOffensiveD(phlD,1,0.94)) return perWeek<=3?4:3;
+      var phlDOvr=phlD?phlD.ovr:(typeof ovr==='function'?ovr(G.attrs,G.pos):70);
+      if(phlDOvr>=92) return perWeek<=3?4:3;
+    }
+    return pace==='rungun'||pace==='high'?3:(perWeek<=3?3:2);
+  }
   if(tier==='Dtwo') return perWeek<=3?3:2;
   if(tier==='Dmin') return 2;
-  return perWeek<=3?3:2;
+  return perWeek<=3?paceKnobs.nightCapD:Math.max(1,paceKnobs.nightCapD-1);
 }
 /** reg | playoff | world — used for XP and PTS multipliers */
 function getXFactorGameContext(){
@@ -225,11 +262,53 @@ function simSkaterGoalAssistSplit(totalPts, perfBias, won){
   var pGoal=typeof getArchetypeGoalPointShare==='function'
     ?getArchetypeGoalPointShare(G.arch,G.pos,{line:line,perf:perf,leagueKey:G.leagueKey})
     :(typeof getLeagueGoalPointShare==='function'?getLeagueGoalPointShare(G.leagueKey):(typeof getDefaultGoalPointShare==='function'?getDefaultGoalPointShare():0.323));
-  if((G.xFactor==='elite_vision'||G.xFactor==='smart_iq') && (G.pos==='F'||G.pos==='D')) pGoal-=0.07;
-  if(G.xFactor==='quick_release' && G.pos==='F') pGoal+=0.08;
-  if(G.xFactor==='good_stick' && G.pos==='D') pGoal-=0.04;
+  var isJuniorPm=(G.leagueKey==='QMJL'||G.leagueKey==='OJL'||G.leagueKey==='WJL'||G.leagueKey==='USJL')&&G.arch==='Playmaker'&&G.pos==='F';
+  if((G.xFactor==='elite_vision'||G.xFactor==='smart_iq') && (G.pos==='F'||G.pos==='D')){
+    pGoal-=(isJuniorPm?0.05:0.11);
+  }
+  if(G.xFactor==='quick_release' && G.pos==='F') pGoal+=0.03;
+  if(G.xFactor==='quick_release' && G.pos==='D'&&G.arch==='OffensiveD') pGoal+=0.08;
+  if(G.xFactor==='good_stick' && G.pos==='D'&&G.arch!=='OffensiveD') pGoal-=0.06;
+  if(G.xFactor==='good_stick' && G.pos==='D'&&G.arch==='OffensiveD') pGoal+=0.02;
+  if(G.arch==='Playmaker' && G.pos==='F') pGoal-=(isJuniorPm?0.03:0.06);
+  if(isJuniorPm&&line<=2) pGoal=cl(pGoal+0.05, 0.16, 0.30);
   if(G.pos!=='G'&&typeof getHandednessGoalBias==='function') pGoal+=getHandednessGoalBias(G.hand);
-  pGoal=cl(pGoal+(won?0.012:-0.015),0.08,0.75);
+  var gCap=(typeof isLocalLeague==='function'&&isLocalLeague(G.leagueKey))?0.68:0.36;
+  if(G.leagueKey==='PHL'&&G.arch==='Sniper'&&G.pos==='F'&&line===1){
+    var phlUser=typeof getUserScoringProxy==='function'?getUserScoringProxy(line, perf):null;
+    if(phlUser&&typeof isPhlGenerationalSniper==='function'&&isPhlGenerationalSniper(phlUser, line, perf)) gCap=0.76;
+    else if(phlUser&&typeof isPhlEliteSniper==='function'&&isPhlEliteSniper(phlUser, line, perf)) gCap=0.66;
+    else {
+      var phlOvr=phlUser?phlUser.ovr:(typeof ovr==='function'?ovr(G.attrs,G.pos):70);
+      if(phlOvr>=94&&totalPts>=3) gCap=0.60;
+      else if(phlOvr>=94) gCap=0.56;
+      else if(phlOvr>=90) gCap=0.50;
+      else gCap=0.42;
+    }
+  }
+  if(G.leagueKey==='PHL'&&G.arch==='Playmaker'&&G.pos==='F'&&line===1){
+    pGoal=cl(pGoal+0.06, 0.16, 0.30);
+  }
+  if(G.leagueKey==='PHL'&&G.arch==='OffensiveD'&&G.pos==='D'&&line<=2){
+    var phlOd=typeof getUserScoringProxy==='function'?getUserScoringProxy(line, perf):null;
+    var odCap=0.46;
+    if(phlOd&&typeof isPhlGenerationalOffensiveD==='function'&&isPhlGenerationalOffensiveD(phlOd, line, perf)) odCap=0.54;
+    else if(phlOd&&typeof isPhlEliteOffensiveD==='function'&&isPhlEliteOffensiveD(phlOd, line, perf)) odCap=0.50;
+    else {
+      var odOvr=phlOd?phlOd.ovr:(typeof ovr==='function'?ovr(G.attrs,G.pos):70);
+      if(odOvr>=94) odCap=0.48;
+      else if(odOvr>=90) odCap=0.44;
+    }
+    pGoal=cl(pGoal+0.10, 0.30, odCap);
+  }
+  if(G.leagueKey==='PHL'&&G.pos==='D'&&(G.arch==='TwoWayD'||G.arch==='StayAtHome'||G.arch==='ShutdownD')&&line<=2){
+    var phlDt=typeof getUserScoringProxy==='function'?getUserScoringProxy(line, perf):null;
+    if(phlDt&&typeof isPhlDualThreatDefenseman==='function'&&isPhlDualThreatDefenseman(phlDt, line, perf)){
+      pGoal=cl(pGoal+0.08, 0.22, G.arch==='TwoWayD'?0.36:0.32);
+    }
+  }
+  if(G.pos==='F') pGoal=cl(pGoal+0.035, 0.06, gCap||0.40);
+  pGoal=cl(pGoal+(won?0.008:-0.018),0.06,gCap);
   for(var p=0;p<totalPts;p++){
     if(Math.random()<pGoal) out.g++;
   }
@@ -257,6 +336,11 @@ function simWeek(){
     }
     if(typeof isLocalScheduleEvent==='function'&&isLocalScheduleEvent(opp)){
       simLocalScheduleEvent(i);
+      teamGamesSimmed++;
+      continue;
+    }
+    if(typeof isUsndtExhibitionEvent==='function'&&isUsndtExhibitionEvent(opp)){
+      simUsndtExhibition(i);
       teamGamesSimmed++;
       continue;
     }
@@ -306,12 +390,19 @@ function simWeek(){
     // Keep sim competitive, but avoid overly punishing team results.
     var teamBase=2.35 + perfBias*0.62 + rd(-1.0,1.1);
     var oppBase=2.35 - perfBias*0.28 + rd(-1.0,1.0);
+    if(G.leagueKey==='USJL'&&typeof isUsndtTeam==='function'&&isUsndtTeam(G.team.n)){
+      var usBoost=typeof getUsndtSimRosterBoost==='function'?getUsndtSimRosterBoost():0.35;
+      teamBase+=usBoost;
+      oppBase-=usBoost*0.45;
+    }
     gameHomeScore=Math.max(0,Math.round(teamBase));
     gameAwayScore=Math.max(0,Math.round(oppBase));
     gameStats={g:0,a:0,sog:0,block:0,sv:0,ga:0,pm:0,pim:0};
     if(G.pos==='G'){
       var totalShots=ri(24,38);
-      var svRate=cl(0.89 + perfBias*0.016 + (leagueDev-1)*0.008 + rd(-0.012,0.01),0.83,0.955);
+      var svRate=typeof computeGoalieSaveRate==='function'
+        ?computeGoalieSaveRate(perfBias,{leagueDev:leagueDev})
+        :cl(0.905+perfBias*0.014+(leagueDev-1)*0.006+rd(-0.01,0.008),0.895,0.968);
       var saves=Math.round(totalShots*svRate);
       var ga=totalShots-saves;
       gameStats.sv=saves;
@@ -329,27 +420,79 @@ function simWeek(){
       var centreBoost=(dTier==='F'&&(G.subPos||'')==='C')?0.28:0;
       var expGamePts;
       if(dTier==='F'){
-        var fwdCore=0.48+ptSkill*0.88+centreBoost+domBoost+rd(0,0.48);
+        var fwdCore=0.44+ptSkill*0.78+centreBoost+domBoost+rd(0,0.42);
         expGamePts=cl(fwdCore,0,maxThisGame);
-        if(ptSkill>=1.15 && Math.random()<cl(0.12+ptSkill*0.1+domBoost*0.12,0.08,0.34)){
+        if(ptSkill>=1.15 && Math.random()<cl(0.08+ptSkill*0.07+domBoost*0.08,0.05,0.24)){
           expGamePts=cl(expGamePts+1,0,maxThisGame);
-        } else if(ptSkill>=0.85 && Math.random()<cl(0.08+ptSkill*0.06,0.05,0.22)){
+        } else if(ptSkill>=0.85 && Math.random()<cl(0.05+ptSkill*0.04,0.03,0.16)){
           expGamePts=cl(expGamePts+1,0,maxThisGame);
         }
       } else if(dTier==='Doff'){
-        var offDCore=0.82+ptSkill*0.44+domBoost*0.34+rd(0,0.55);
+        var offDCore=1.02+ptSkill*0.62+domBoost*0.36+rd(0,0.52);
         expGamePts=cl(offDCore,0,maxThisGame);
-        if(ptSkill>=0.95 && Math.random()<0.22) expGamePts=cl(expGamePts+1,0,maxThisGame);
+        if(ptSkill>=0.85 && Math.random()<0.28) expGamePts=cl(expGamePts+1,0,maxThisGame);
+        if(ptSkill>=1.0 && Math.random()<0.18) expGamePts=cl(expGamePts+1,0,maxThisGame);
+        if(G.leagueKey==='PHL'&&ptSkill>=0.95&&Math.random()<0.16) expGamePts=cl(expGamePts+1,0,maxThisGame);
+        if(G.leagueKey==='PHL'){
+          var phlOdSim=typeof getUserScoringProxy==='function'?getUserScoringProxy(1,0.85+perfBias*0.04):null;
+          if(phlOdSim&&typeof isPhlGenerationalOffensiveD==='function'&&isPhlGenerationalOffensiveD(phlOdSim,1,0.85+perfBias*0.04)){
+            paceMult=Math.max(paceMult, 1.05);
+            expGamePts*=1.12;
+          } else if(phlOdSim&&typeof isPhlEliteOffensiveD==='function'&&isPhlEliteOffensiveD(phlOdSim,1,0.85+perfBias*0.04)){
+            paceMult=Math.max(paceMult, 1.02);
+            expGamePts*=1.08;
+          }
+        }
       } else if(dTier==='Dtwo'){
-        expGamePts=cl(0.55+ptSkill*0.32+domBoost*0.22+rd(0,0.42),0,maxThisGame);
+        expGamePts=cl(0.78+ptSkill*0.48+domBoost*0.30+rd(0,0.48),0,maxThisGame);
+        if(G.leagueKey==='PHL'&&(G.arch==='TwoWayD'||G.arch==='StayAtHome')&&ptSkill>=0.75&&Math.random()<0.14) expGamePts=cl(expGamePts+1,0,maxThisGame);
       } else if(dTier==='Dmin'){
-        expGamePts=cl(0.2+ptSkill*0.16+domBoost*0.1+rd(0,0.28),0,maxThisGame);
+        expGamePts=cl(0.34+ptSkill*0.22+domBoost*0.14+rd(0,0.34),0,maxThisGame);
+        if(G.leagueKey==='PHL'&&G.arch==='ShutdownD'&&ptSkill>=0.7&&Math.random()<0.10) expGamePts=cl(expGamePts+1,0,maxThisGame);
       } else {
         expGamePts=cl(0.32+ptSkill*0.26+domBoost*0.16+rd(0,0.34),0,maxThisGame);
       }
       var wSimFac=getSimWomenLeagueScoringFactor(G.leagueKey,G.league);
       var leagueScFac=typeof getLeagueSimScoringFactor==='function'?getLeagueSimScoringFactor(G.leagueKey):1;
-      var userSimLeagueFac=1+(leagueScFac-1)*0.28;
+      var paceMult=typeof getLeagueUserSimPaceMult==='function'?getLeagueUserSimPaceMult(G.leagueKey):1;
+      var phlSnLine=2, phlSnPerf=0.85+perfBias*0.04;
+      if(G.leagueKey==='PHL'&&G.arch==='Sniper'&&G.pos==='F'){
+        if(typeof ensureTeamRoster==='function'&&typeof getDepthLineFromSlot==='function'){
+          var phlRoster=ensureTeamRoster();
+          if(phlRoster&&phlRoster.players){
+            for(var psi=0;psi<phlRoster.players.length;psi++){
+              if(phlRoster.players[psi].isMe&&phlRoster.players[psi].depthSlot){
+                phlSnLine=getDepthLineFromSlot(phlRoster.players[psi].depthSlot,G.pos);
+                break;
+              }
+            }
+          }
+        }
+        var phlSn=typeof getUserScoringProxy==='function'?getUserScoringProxy(phlSnLine, phlSnPerf):null;
+        if(phlSn&&typeof isPhlGenerationalSniper==='function'&&isPhlGenerationalSniper(phlSn, phlSnLine, phlSnPerf)){
+          paceMult=Math.max(paceMult, 1.0);
+          expGamePts*=1.08;
+        } else if(phlSn&&typeof isPhlEliteSniper==='function'&&isPhlEliteSniper(phlSn, phlSnLine, phlSnPerf)){
+          paceMult=Math.max(paceMult, 0.96);
+          expGamePts*=1.04;
+        } else if(playerOvr>=90) paceMult=Math.max(paceMult, 0.92);
+      }
+      if(G.leagueKey==='PHL'&&G.arch==='Playmaker'&&G.pos==='F'){
+        var phlPmLine=phlSnLine||2;
+        var phlPmPerf=phlSnPerf||0.85+perfBias*0.04;
+        var phlPm=typeof getUserScoringProxy==='function'?getUserScoringProxy(phlPmLine, phlPmPerf):null;
+        if(phlPm&&typeof isPhlGenerationalPlaymaker==='function'&&isPhlGenerationalPlaymaker(phlPm, phlPmLine, phlPmPerf)){
+          paceMult=Math.max(paceMult, 1.06);
+          expGamePts*=1.14;
+        } else if(phlPm&&typeof isPhlElitePlaymaker==='function'&&isPhlElitePlaymaker(phlPm, phlPmLine, phlPmPerf)){
+          paceMult=Math.max(paceMult, 1.03);
+          expGamePts*=1.08;
+        }
+      }
+      if(G.leagueKey==='PHL'&&G.pos==='D'&&dTier==='Doff') expGamePts*=1.06;
+      if(G.pos==='F') expGamePts*=1.07;
+      if(G.leagueKey==='PHL'&&G.pos==='F') expGamePts*=1.04;
+      var userSimLeagueFac=(1+(leagueScFac-1)*0.28)*paceMult;
       var ppgBar=typeof getPpgCaliberOvrThreshold==='function'?getPpgCaliberOvrThreshold(G.leagueKey):72;
       var ppgHurdle=playerOvr>=ppgBar?1:cl(0.32+(playerOvr-(ppgBar-20))/42,0.26,0.86);
       if(playerOvr<ppgBar-10) ppgHurdle*=0.82;
@@ -375,25 +518,45 @@ function simWeek(){
     if(gameAwayScore===gameHomeScore+1 && Math.random()<0.22) gameHomeScore++;
     var won=gameHomeScore>gameAwayScore;
     var tied=gameHomeScore===gameAwayScore;
-    G.gp++;G.cGP++;
-    if(won){G.w++;weeklyStats.w++;} else if(tied){G.otl++;weeklyStats.otl++;} else {G.l++;weeklyStats.l++;}
+    var onCallUpSim=G._callUpCtx&&G._callUpCtx.active;
+    G.cGP++;
+    if(!onCallUpSim){
+      G.gp++;
+      if(won){G.w++;weeklyStats.w++;} else if(tied){G.otl++;weeklyStats.otl++;} else {G.l++;weeklyStats.l++;}
+    } else {
+      if(won) weeklyStats.w++; else if(tied) weeklyStats.otl++; else weeklyStats.l++;
+    }
     applyGameResultStreak(won,tied);
     var gRnd=Math.round(gameStats.g);
     var aRnd=Math.round(gameStats.a);
-    G.goals+=gRnd;G.assists+=aRnd;G.cGoals+=gRnd;G.cAssists+=aRnd;
+    G.cGoals+=gRnd;G.cAssists+=aRnd;
     weeklyStats.g+=gRnd;weeklyStats.a+=aRnd;
-    G.sog+=Math.round(gameStats.sog);G.cSOG+=Math.round(gameStats.sog);
-    G.saves+=gameStats.sv;G.cSaves+=gameStats.sv;
-    if(G.pos==='G'){G.goalsAgainst=(G.goalsAgainst||0)+gameStats.ga;G.cGoalsAgainst=(G.cGoalsAgainst||0)+gameStats.ga; weeklyStats.sv+=gameStats.sv; weeklyStats.ga+=gameStats.ga;}
-    var pm=Math.round(gameStats.pm||0);G.plusminus+=pm;
-    weeklyStats.pm+=pm;
-    if(G.pos!=='G'){
-      var simPim=Math.round(gameStats.pim||0);
-      if(typeof rollSkaterGamePim==='function') simPim+=rollSkaterGamePim(G.pos,G.arch,G.xFactor);
-      G.pim=(G.pim||0)+simPim;
-      weeklyStats.pim=(weeklyStats.pim||0)+simPim;
-      if(simPim>0&&typeof isPhysicalIdentityPlayer==='function'&&isPhysicalIdentityPlayer(G.pos,G.arch,G.xFactor)){
-        G.morale=cl(G.morale+Math.min(2,Math.floor(simPim/4)),0,100);
+    G.cSOG+=Math.round(gameStats.sog);
+    G.cSaves+=gameStats.sv;
+    if(G.pos==='G') G.cGoalsAgainst=(G.cGoalsAgainst||0)+gameStats.ga;
+    if(!onCallUpSim){
+      G.goals+=gRnd;G.assists+=aRnd;
+      G.sog+=Math.round(gameStats.sog);
+      G.saves+=gameStats.sv;
+      if(G.pos==='G'){G.goalsAgainst=(G.goalsAgainst||0)+gameStats.ga; weeklyStats.sv+=gameStats.sv; weeklyStats.ga+=gameStats.ga;}
+      var pm=Math.round(gameStats.pm||0);G.plusminus+=pm;
+      weeklyStats.pm+=pm;
+      if(G.pos!=='G'){
+        var simPim=Math.round(gameStats.pim||0);
+        if(typeof rollSkaterGamePim==='function') simPim+=rollSkaterGamePim(G.pos,G.arch,G.xFactor);
+        G.pim=(G.pim||0)+simPim;
+        weeklyStats.pim=(weeklyStats.pim||0)+simPim;
+        if(simPim>0&&typeof isPhysicalIdentityPlayer==='function'&&isPhysicalIdentityPlayer(G.pos,G.arch,G.xFactor)){
+          G.morale=cl(G.morale+Math.min(2,Math.floor(simPim/4)),0,100);
+        }
+      }
+    } else {
+      weeklyStats.sv+=gameStats.sv; weeklyStats.ga+=gameStats.ga;
+      weeklyStats.pm+=Math.round(gameStats.pm||0);
+      if(G.pos!=='G'){
+        var simPimCu=Math.round(gameStats.pim||0);
+        if(typeof rollSkaterGamePim==='function') simPimCu+=rollSkaterGamePim(G.pos,G.arch,G.xFactor);
+        weeklyStats.pim=(weeklyStats.pim||0)+simPimCu;
       }
     }
     var staminaLoss=ri(5,15);
@@ -415,6 +578,7 @@ function simWeek(){
     var sc=gameHomeScore+'-'+gameAwayScore;
     addNews(G.team.n+' '+sc+' vs '+opp.n+' -- '+(won?'WIN':tied?'OTL':'LOSS')+' [SIMULATED]',(won?'good':tied?'neutral':'bad'));
     if(gRnd>=2) addNews(G.first+' '+G.last+' scores '+gRnd+' -- multi-goal game!','big');
+    if(gRnd>=3&&G.leagueKey==='PHL') addNews(G.first+' '+G.last+' with a '+gRnd+'-goal night — elite finishing!','big');
     if(aRnd>=2) addNews(G.first+' '+G.last+' picks up '+aRnd+' assists -- playmaking night!','big');
     addSimMediaMoment(won, gameStats, opp);
     var svpctSim=gameStats.sv+gameStats.ga>0?gameStats.sv/(gameStats.sv+gameStats.ga):0;
@@ -438,10 +602,16 @@ function simWeek(){
     G.weekGames++;
     teamGamesSimmed++;
     playerGamesSimmed++;
+    var tickPim=0;
+    if(G.pos!=='G'){
+      tickPim=Math.round(gameStats.pim||0);
+      if(typeof rollSkaterGamePim==='function') tickPim+=rollSkaterGamePim(G.pos,G.arch,G.xFactor);
+    }
     if(typeof tickProCallUpAfterGame==='function') tickProCallUpAfterGame({
       g:gRnd,a:aRnd,
       sv:Math.round(gameStats.sv||0),ga:Math.round(gameStats.ga||0),
-      won:won,tied:tied,pm:Math.round(gameStats.pm||0),perfN:simPerfN
+      won:won,tied:tied,pm:Math.round(gameStats.pm||0),perfN:simPerfN,
+      pim:onCallUpSim?tickPim:0,sog:Math.round(gameStats.sog||0)
     });
   }
   if(typeof ensureProCallUpStintComplete==='function') ensureProCallUpStintComplete();
@@ -460,7 +630,7 @@ function simWeek(){
   var weeklyGrade;
   if(G.pos==='G'){
     var avgSvPct= weeklyStats.sv + weeklyStats.ga > 0 ? weeklyStats.sv / (weeklyStats.sv + weeklyStats.ga) : 0;
-    weeklyGrade = avgSvPct >= 0.93 ? 'A+' : avgSvPct >= 0.91 ? 'A' : avgSvPct >= 0.885 ? 'B' : 'C';
+    weeklyGrade = avgSvPct >= 0.93 ? 'A+' : avgSvPct >= 0.915 ? 'A' : avgSvPct >= 0.902 ? 'B' : 'C';
   } else if(G.pos==='D'){
     weeklyGrade = avgPts >= 1.55 ? 'A+' : avgPts >= 1.05 ? 'A' : avgPts >= 0.52 ? 'B' : 'C';
   } else {

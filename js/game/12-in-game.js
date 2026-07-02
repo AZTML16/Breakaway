@@ -5,7 +5,13 @@
 function pickGameMoments(pool, count){
   count=count||4;
   var expanded=[], i, j, m, o, assistN, goalN;
-  var goalHeavy=typeof G!=='undefined'&&G.league&&G.league.tier==='local';
+  var lk=typeof G!=='undefined'&&G?G.leagueKey:'';
+  var goalHeavy=typeof isLocalLeague==='function'&&isLocalLeague(lk);
+  var phlSniperGoalBias=false;
+  if(G&&G.leagueKey==='PHL'&&G.arch==='Sniper'&&G.pos==='F'){
+    var phlMe=typeof getUserScoringProxy==='function'?getUserScoringProxy(1,0.92):null;
+    if(phlMe&&typeof isPhlEliteSniper==='function'&&isPhlEliteSniper(phlMe,1,0.92)) phlSniperGoalBias=true;
+  }
   for(i=0;i<pool.length;i++){
     m=pool[i];
     assistN=0; goalN=0;
@@ -22,10 +28,15 @@ function pickGameMoments(pool, count){
       } else if(goalN>0&&Math.random()<0.35){
         expanded.push(m);
       }
+    } else if(phlSniperGoalBias&&goalN>=assistN&&goalN>0){
+      expanded.push(m);
+      if(goalN>assistN&&Math.random()<0.42) expanded.push(m);
     } else if(assistN>goalN){
       expanded.push(m);
-      if(Math.random()<0.55) expanded.push(m);
-    } else if(assistN>0&&Math.random()<0.35){
+      if(Math.random()<0.82) expanded.push(m);
+    } else if(assistN>0&&Math.random()<0.58){
+      expanded.push(m);
+    } else if(goalN>0&&assistN===0&&Math.random()<0.18){
       expanded.push(m);
     }
   }

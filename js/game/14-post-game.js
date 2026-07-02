@@ -12,6 +12,11 @@ function commitPlayerGamePim(){
   var p=Math.round(gameStats.pim||0);
   if(typeof rollSkaterGamePim==='function') p+=rollSkaterGamePim(G.pos,G.arch,G.xFactor);
   if(p<=0) return;
+  if(G._callUpCtx&&G._callUpCtx.active){
+    if(!G._callUpCtx.stintStats) G._callUpCtx.stintStats={gp:0,g:0,a:0,sv:0,ga:0,w:0,l:0,otl:0,pm:0,sog:0,pim:0};
+    G._callUpCtx.stintStats.pim=(G._callUpCtx.stintStats.pim||0)+p;
+    return;
+  }
   G.pim=(G.pim||0)+p;
   if(typeof isPhysicalIdentityPlayer==='function'&&isPhysicalIdentityPlayer(G.pos,G.arch,G.xFactor)){
     G.morale=cl(G.morale+Math.min(2,Math.floor(p/4)),0,100);
@@ -201,7 +206,10 @@ function endGame(){
     var credited=(gameStats.sv||0)+(gameStats.ga||0);
     var bulkShots=Math.max(0,ri(18,28)-credited);
     if(bulkShots>0){
-      var svRate=cl(0.88+(G.attrs.reflexes+G.attrs.positioning-120)*0.001,0.82,0.96);
+      var attrBonus=((G.attrs.reflexes||60)+(G.attrs.positioning||60)-120)*0.0008;
+      var svRate=typeof computeGoalieSaveRate==='function'
+        ?computeGoalieSaveRate(0,{attrBonus:attrBonus,base:0.902})
+        :cl(0.902+attrBonus,0.895,0.968);
       var bulkSaves=Math.round(bulkShots*svRate);
       var bulkGA=bulkShots-bulkSaves;
       gameStats.sv+=bulkSaves;
@@ -373,17 +381,25 @@ function finalizeEndGameBody(){
     return;
   }
 
-  G.gp++;G.cGP++;
+  var onCallUp=G._callUpCtx&&G._callUpCtx.active;
+  G.cGP++;
   if(typeof G.w==='undefined'){G.w=0;G.l=0;G.otl=0;}
-  if(won){G.w++;} else if(tied){G.otl++;} else {G.l++;}
   applyGameResultStreak(won,tied);
-  syncUserStandingsRow();
-  G.goals+=gRnd;G.assists+=aRnd;G.cGoals+=gRnd;G.cAssists+=aRnd;
-  G.sog+=Math.round(gameStats.sog);G.cSOG+=Math.round(gameStats.sog);
-  G.saves+=gameStats.sv;G.cSaves+=gameStats.sv;
-  if(G.pos==='G'){G.goalsAgainst=(G.goalsAgainst||0)+gameStats.ga;G.cGoalsAgainst=(G.cGoalsAgainst||0)+gameStats.ga;}
-  G.plusminus+=pmTotal;
+  G.cGoals+=gRnd;G.cAssists+=aRnd;
+  G.cSOG+=Math.round(gameStats.sog);
+  G.cSaves+=gameStats.sv;
+  if(G.pos==='G') G.cGoalsAgainst=(G.cGoalsAgainst||0)+gameStats.ga;
+  if(!onCallUp){
+    G.gp++;
+    if(won){G.w++;} else if(tied){G.otl++;} else {G.l++;}
+    G.goals+=gRnd;G.assists+=aRnd;
+    G.sog+=Math.round(gameStats.sog);
+    G.saves+=gameStats.sv;
+    if(G.pos==='G') G.goalsAgainst=(G.goalsAgainst||0)+gameStats.ga;
+    G.plusminus+=pmTotal;
+  }
   commitPlayerGamePim();
+  syncUserStandingsRow();
   G.stamina=cl(G.stamina-ri(6,14),0,100);
   if(typeof updatePlayerConditioning==='function') updatePlayerConditioning();
   G.morale=cl(G.morale+(G.xFactor==='careless'?(won?5:tied?1:-2):(won?5:tied?1:-4)),0,100);
@@ -434,7 +450,8 @@ function finalizeEndGameBody(){
     tickProCallUpAfterGame({
       g:gRnd,a:aRnd,
       sv:Math.round(gameStats.sv||0),ga:Math.round(gameStats.ga||0),
-      won:won,tied:tied,pm:pmTotal,perfN:callUpPerf
+      won:won,tied:tied,pm:pmTotal,perfN:callUpPerf,
+      sog:Math.round(gameStats.sog||0)
     });
   }
   safeEl('pg2-stats').innerHTML=statsHtml;
@@ -446,11 +463,16 @@ function finalizeEndGameBody(){
   var hi, ns;
   for(hi=G._curGameIdx+1; hi<perWeek; hi++){
     ns=G.allOpponents[weekStart+hi];
-    if(ns&&!(typeof isLocalScheduleEvent==='function'&&isLocalScheduleEvent(ns))){ hasMore=true; break; }
+    if(ns&&!(typeof isLocalScheduleEvent==='function'&&isLocalScheduleEvent(ns))&&!(typeof isUsndtExhibitionEvent==='function'&&isUsndtExhibitionEvent(ns))){ hasMore=true; break; }
   }
   if(G.weekGames>=perWeek||!hasMore){
     safeEl('pg2-next-btn').textContent='RETURN TO HUB &gt;';
-    safeEl('pg2-next-btn').onclick=function(){renderHub();show('s-hub');};
+    safeEl('pg2-next-btn').onclick=function(){
+      if(typeof maybeEndRegularSeason==='function') maybeEndRegularSeason();
+      if(G._inOffseason){ if(typeof showOffseasonScreen==='function') showOffseasonScreen(); else show('s-offseason'); return; }
+      if(G._playoffCtx&&G._playoffCtx.active){ renderHub(); show('s-hub'); return; }
+      renderHub();show('s-hub');
+    };
   } else {
     safeEl('pg2-next-btn').textContent='NEXT GAME &gt;';
     safeEl('pg2-next-btn').onclick=function(){preGame(G._curGameIdx+1);};
@@ -459,5 +481,6 @@ function finalizeEndGameBody(){
   maybeTriggerTrade(gRnd,aRnd,won);
   setTimeout(function(){ maybeTriggerPostGamePressOnce(won,gRnd,aRnd); },380);
   if(won) RetroSound.gameWin(); else if(tied) RetroSound.gameTie(); else RetroSound.gameLose();
+  if(typeof maybeRefreshLinesAfterUserGame==='function') maybeRefreshLinesAfterUserGame();
   show('s-postgame');
 }

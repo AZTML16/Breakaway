@@ -27,6 +27,26 @@ function setSubPos(p,btn){
   if(btn) btn.className='btn bp';
 }
 
+function setCreateAttrBudget(pts, btn){
+  var n=parseInt(pts,10);
+  if(n!==0&&n!==100&&n!==200) return;
+  selCreateAttrBudget=n;
+  var btns=document.querySelectorAll('#create-budget-btns button');
+  for(var i=0;i<btns.length;i++) btns[i].className='btn bs';
+  if(btn) btn.className='btn bp';
+  var hint=safeEl('create-budget-hint');
+  if(hint){
+    var label=n===200?'EASY':(n===100?'MEDIUM':'HARD');
+    hint.innerHTML='Selected: <b>'+label+'</b> ('+n+' bonus points)';
+  }
+}
+
+function initCreateAttrBudget(){
+  selCreateAttrBudget=100;
+  var med=safeEl('create-budget-medium')||document.querySelector('#create-budget-btns button:nth-child(2)');
+  setCreateAttrBudget(100, med);
+}
+
 function goToArchetype(){
   var list=safeEl('arch-list');
   var archs=ARCHETYPES[selPos];
@@ -118,7 +138,7 @@ function pickXFactor(id){
 
 function goToAttributes(){
   var gAttr=(safeEl('c-gender')&&safeEl('c-gender').value)||'M';
-  ptsLeft=typeof getCreatePointBudget==='function'?getCreatePointBudget(gAttr):20;
+  ptsLeft=typeof getCreatePointBudget==='function'?getCreatePointBudget(gAttr):100;
   var ptsMaxEl=safeEl('pts-budget-max');
   if(ptsMaxEl) ptsMaxEl.textContent=ptsLeft;
   G._attrClampMin=40;
@@ -168,13 +188,14 @@ function renderAttrDistRow(a){
 function renderAttrDist(){
   var html='';
   var gAttr=(safeEl('c-gender')&&safeEl('c-gender').value)||'M';
-  var budget=typeof getCreatePointBudget==='function'?getCreatePointBudget(gAttr):20;
+  var budget=typeof getCreatePointBudget==='function'?getCreatePointBudget(gAttr):100;
   if(selPos==='G'){
     var attrList=ATTRS.G||[];
+    html+='<div class="vt" style="font-size:12px;color:var(--mut);margin-bottom:8px">Spend <b>'+budget+' bonus points</b> on goalie ratings.</div>';
     for(var gi=0;gi<attrList.length;gi++) html+=renderAttrDistRow(attrList[gi]);
   } else if(typeof SKATER_ATTR_CATEGORIES!=='undefined'){
     var ck, cd, ci, subKey, catAvg;
-    html+='<div class="vt" style="font-size:12px;color:var(--mut);margin-bottom:8px;line-height:1.45">Archetype sets your starting shape. Spend <b>'+budget+' points</b> on sub-ratings below.<br>'+
+    html+='<div class="vt" style="font-size:12px;color:var(--mut);margin-bottom:8px;line-height:1.45">Archetype sets your starting shape. Spend <b>'+budget+' bonus points</b> on sub-ratings below.<br>'+
       '<span style="color:var(--acc)">'+((safeEl('c-hand')&&safeEl('c-hand').value)==='L'?'Left shot: +accuracy/precision':'Right shot: +power')+'</span> (small edge).</div>';
     for(ck in SKATER_ATTR_CATEGORIES){
       if(!SKATER_ATTR_CATEGORIES.hasOwnProperty(ck)) continue;
@@ -196,6 +217,8 @@ function renderAttrDist(){
   safeEl('pts-left').textContent=ptsLeft;
   var ptsMaxEl=safeEl('pts-budget-max');
   if(ptsMaxEl) ptsMaxEl.textContent=budget;
+  var diffLbl=safeEl('pts-difficulty-label');
+  if(diffLbl) diffLbl.textContent=typeof getCreateDifficultyLabel==='function'?getCreateDifficultyLabel(budget):'';
   renderAttrPreview();
 }
 
@@ -293,11 +316,26 @@ function isLocalLeagueBlockedForNat(leagueKey, nat){
   return false;
 }
 
+function isNonHockeyStartLeagueBlocked(leagueKey, nat){
+  return typeof isEstablishedLeagueBlockedForNonHockeyNat==='function'&&isEstablishedLeagueBlockedForNonHockeyNat(leagueKey, nat);
+}
+
+function getNonHockeyStartBlockReason(nat){
+  return typeof getNonHockeyStartLeagueBlockReason==='function'?getNonHockeyStartLeagueBlockReason(nat):'Start in LHL first — scouts need community-league tape.';
+}
+
 function getLocalLeagueBlockReason(nat){
   if(typeof isNatEligibleForLocalHockey==='function'&&!isNatEligibleForLocalHockey(nat)){
     return typeof getLocalBlockedNatHint==='function'?getLocalBlockedNatHint(nat):'Established hockey nation — LHL is for growing markets only.';
   }
   return 'LHL unavailable from '+nat+'.';
+}
+
+var _createChlImport=false;
+
+function pickLeagueImport(k){
+  _createChlImport=true;
+  pickLeague(k);
 }
 
 function goToLeague(){
@@ -307,17 +345,27 @@ function goToLeague(){
   var needBypass=START_LEAGUE_BYPASS_OVR_M;
   var natEl=safeEl('c-nat');
   var homeNat=natEl&&natEl.value?natEl.value:'Canada';
+  var lhlDefault=gender==='F'?'LHLF':'LHCM';
+  if(typeof requiresLhlBeforeScouts==='function'&&requiresLhlBeforeScouts(homeNat)&&startKeys.indexOf(lhlDefault)>=0){
+    selLeague=lhlDefault;
+  }
   var firstUn=null, ui;
   for(ui=0;ui<startKeys.length;ui++){
     if(isStartingCollegeOrPaidSemiProBlocked(startKeys[ui], gender, previewOvr)) continue;
     if(isLocalLeagueBlockedForNat(startKeys[ui], homeNat)) continue;
+    if(isNonHockeyStartLeagueBlocked(startKeys[ui], homeNat)) continue;
     firstUn=startKeys[ui]; break;
   }
   var defaultK=firstUn||startKeys[0];
-  if(!selLeague || startKeys.indexOf(selLeague)<0 || isStartingCollegeOrPaidSemiProBlocked(selLeague, gender, previewOvr)) selLeague=defaultK;
-  if(isLocalLeagueBlockedForNat(selLeague, homeNat)){
+  var territoryLeague=typeof getPlayerTerritoryJuniorLeague==='function'?getPlayerTerritoryJuniorLeague(safeEl('c-hometown')&&safeEl('c-hometown').value.trim(), homeNat, gender):null;
+  if(territoryLeague&&startKeys.indexOf(territoryLeague)>=0&&!isStartingCollegeOrPaidSemiProBlocked(territoryLeague, gender, previewOvr)&&!isNonHockeyStartLeagueBlocked(territoryLeague, homeNat)){
+    selLeague=territoryLeague;
+    _createChlImport=false;
+  }
+  if(!selLeague || startKeys.indexOf(selLeague)<0 || isStartingCollegeOrPaidSemiProBlocked(selLeague, gender, previewOvr) || isNonHockeyStartLeagueBlocked(selLeague, homeNat)) selLeague=defaultK;
+  if(isLocalLeagueBlockedForNat(selLeague, homeNat)||isNonHockeyStartLeagueBlocked(selLeague, homeNat)){
     for(ui=0;ui<startKeys.length;ui++){
-      if(!isLocalLeagueBlockedForNat(startKeys[ui], homeNat)&&!isStartingCollegeOrPaidSemiProBlocked(startKeys[ui], gender, previewOvr)){
+      if(!isLocalLeagueBlockedForNat(startKeys[ui], homeNat)&&!isNonHockeyStartLeagueBlocked(startKeys[ui], homeNat)&&!isStartingCollegeOrPaidSemiProBlocked(startKeys[ui], gender, previewOvr)){
         selLeague=startKeys[ui]; break;
       }
     }
@@ -325,9 +373,12 @@ function goToLeague(){
   var html='';
   for(var i=0;i<startKeys.length;i++){
     var k=startKeys[i]; var l=LEAGUES[k];
+    var lName=typeof getLeagueDisplayName==='function'?getLeagueDisplayName(k,'name'):l.name;
+    var lShort=typeof getLeagueDisplayName==='function'?getLeagueDisplayName(k,'short'):l.short;
     var blocked=isStartingCollegeOrPaidSemiProBlocked(k, gender, previewOvr);
     if(!blocked) blocked=isJuniorLeagueBlockedForAge(k, 16);
     if(!blocked) blocked=isLocalLeagueBlockedForNat(k, homeNat);
+    if(!blocked) blocked=isNonHockeyStartLeagueBlocked(k, homeNat);
     var tierColor=l.tier==='local'?'var(--green)':l.tier==='junior'?'var(--acc)':l.tier==='college'?'var(--pur)':l.tier==='euro'?'var(--gold)':'var(--blue)';
     var isSel=selLeague===k?'sel':'';
     var localNote='';
@@ -342,10 +393,16 @@ function goToLeague(){
         if(typeof getLocalLeagueEntryHint==='function') localNote+=' '+getLocalLeagueEntryHint(homeNat);
       }
     }
-    html+='<div class="lcard '+isSel+(blocked?' locked':'')+'" id="lc-'+k+'" onclick="pickLeague(\''+k+'\')">';
+    var territoryNote='';
+    if(typeof getPlayerTerritoryJuniorLeague==='function'&&typeof isChlTerritoryLeague==='function'&&isChlTerritoryLeague(k)){
+      var homeLg=getPlayerTerritoryJuniorLeague(safeEl('c-hometown')&&safeEl('c-hometown').value.trim(), homeNat, gender);
+      if(homeLg===k) territoryNote=' <span style="color:var(--green)"><b>YOUR TERRITORY</b> — home league path.</span>';
+      else if(homeLg) territoryNote=' <span style="color:var(--gold)">Import path — home territory is '+stripBracketIcons(LEAGUES[homeLg]&&LEAGUES[homeLg].short||homeLg)+'. Click again to sign as import.</span>';
+    }
+    html+='<div class="lcard '+isSel+(blocked?' locked':'')+'" id="lc-'+k+'" onclick="'+(typeof isChlTerritoryMismatch==='function'&&isChlTerritoryMismatch(k, safeEl('c-hometown')&&safeEl('c-hometown').value.trim(), homeNat, gender)?('pickLeagueImport(\''+k+'\')'):('pickLeague(\''+k+'\')'))+'">';
     html+='<div class="ltier" style="color:'+tierColor+'">'+l.tier.toUpperCase()+'</div>';
-    html+='<div class="lname">'+stripBracketIcons(l.short)+' -- '+l.name+'</div>';
-    html+='<div class="ldesc">'+l.desc+(l.tier==='junior'?' <span style="color:var(--acc)">[Ages 16–19 only]</span>':'')+(l.tier==='local'?' <span style="color:var(--green)">[12 games + 6 events]</span>':'')+localNote+'  ['+(l.tier==='local'?'12 G + 6 EVENTS':l.games+' GAMES/SEASON')+']'+(blocked&&l.tier!=='local'&&l.tier!=='junior'?' <span style="color:var(--gold)"> // At 16: '+needBypass+'+ preview OVR to jump here.</span>':'')+(blocked&&l.tier==='local'?' <span style="color:var(--red)"> // '+escHtml(getLocalLeagueBlockReason(homeNat))+'</span>':'')+'</div>';
+    html+='<div class="lname">'+stripBracketIcons(lShort)+' -- '+lName+'</div>';
+    html+='<div class="ldesc">'+l.desc+(l.tier==='junior'?' <span style="color:var(--acc)">'+(typeof getJuniorLeagueAgeTag==='function'?getJuniorLeagueAgeTag(k):'[Ages 16–19 only]')+'</span>':'')+(l.tier==='local'?' <span style="color:var(--green)">[12 games + 6 events]</span>':'')+localNote+territoryNote+'  ['+(l.tier==='local'?'12 G + 6 EVENTS':l.games+' GAMES/SEASON')+']'+(blocked&&l.tier!=='local'&&l.tier!=='junior'&&!isNonHockeyStartLeagueBlocked(k, homeNat)?' <span style="color:var(--gold)"> // At 16: '+needBypass+'+ preview OVR to jump here.</span>':'')+(blocked&&isNonHockeyStartLeagueBlocked(k, homeNat)?' <span style="color:var(--red)"> // '+escHtml(getNonHockeyStartBlockReason(homeNat))+'</span>':'')+(blocked&&l.tier==='local'?' <span style="color:var(--red)"> // '+escHtml(getLocalLeagueBlockReason(homeNat))+'</span>':'')+'</div>';
     html+='</div>';
   }
   safeEl('league-list').innerHTML=html;
@@ -365,11 +422,21 @@ function pickLeague(k){
     notify(getLocalLeagueBlockReason(nat),'gold');
     return;
   }
+  if(isNonHockeyStartLeagueBlocked(k, nat)){
+    notify(getNonHockeyStartBlockReason(nat),'gold');
+    return;
+  }
   if(isJuniorLeagueBlockedForAge(k, 16)){
     notify('Junior leagues are ages 16–19 only.','gold');
     return;
   }
+  if(typeof isChlTerritoryMismatch==='function'&&isChlTerritoryMismatch(k, safeEl('c-hometown')&&safeEl('c-hometown').value.trim(), nat, gender)&&!_createChlImport){
+    var homeLg=typeof getPlayerTerritoryJuniorLeague==='function'?getPlayerTerritoryJuniorLeague(safeEl('c-hometown')&&safeEl('c-hometown').value.trim(), nat, gender):'';
+    notify('Home territory is '+stripBracketIcons(LEAGUES[homeLg]&&LEAGUES[homeLg].short||homeLg)+'. Select again to sign as an import.','gold');
+    return;
+  }
   selLeague=k;
+  _createChlImport=!!(typeof isChlTerritoryMismatch==='function'&&isChlTerritoryMismatch(k, safeEl('c-hometown')&&safeEl('c-hometown').value.trim(), nat, gender));
   var cards=document.querySelectorAll('#league-list .lcard');
   for(var i=0;i<cards.length;i++) cards[i].classList.remove('sel');
   var el=safeEl('lc-'+k);

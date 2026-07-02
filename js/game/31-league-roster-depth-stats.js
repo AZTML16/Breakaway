@@ -36,6 +36,82 @@ function isEstablishedProLeague(leagueKey){
   return tier==='pro'||tier==='minor'||tier==='euro'||tier==='asia';
 }
 
+function hashTeamSeed(leagueKey, teamName){
+  var h=0, s=String(teamName)+'|'+String(leagueKey||'');
+  for(var i=0;i<s.length;i++) h=((h<<5)-h)+s.charCodeAt(i)|0;
+  return Math.abs(h);
+}
+
+/** Persistent team identity — offense, defense, depth, star power vary by club. */
+function ensureTeamProfile(leagueKey, teamName){
+  if(typeof G==='undefined'||!G) return {offense:1,defense:1,depth:1,starPower:1,composite:1};
+  if(!G._teamProfiles) G._teamProfiles={};
+  var ck=String(leagueKey||'')+'|'+String(teamName||'');
+  if(G._teamProfiles[ck]) return G._teamProfiles[ck];
+  var h=hashTeamSeed(leagueKey, teamName);
+  var r1=(h%997)/997, r2=((h*7)%997)/997, r3=((h*13)%997)/997, r4=((h*19)%997)/997;
+  var offense=0.86+r1*0.26;
+  var defense=0.86+r2*0.26;
+  var depth=0.86+r3*0.26;
+  var starPower=0.86+r4*0.26;
+  if(typeof isMajorJuniorEliteOrg==='function'&&isMajorJuniorEliteOrg(leagueKey, teamName)){
+    starPower=Math.min(1.14, starPower+0.07);
+    offense=Math.min(1.10, offense+0.04);
+    depth=Math.min(1.08, depth+0.03);
+  }
+  var composite=offense*0.32+defense*0.28+depth*0.24+starPower*0.16;
+  G._teamProfiles[ck]={offense:offense,defense:defense,depth:depth,starPower:starPower,composite:composite};
+  return G._teamProfiles[ck];
+}
+
+function getTeamProfileOvrMod(leagueKey, teamName, rank){
+  if(!teamName) return 0;
+  var p=ensureTeamProfile(leagueKey, teamName);
+  var r=rank||0;
+  if(r<=1) return (p.starPower-1)*5+(p.offense-1)*2;
+  if(r<=5) return (p.offense-1)*2+(p.depth-1)*1;
+  if(r>=10) return (p.depth-1)*3;
+  return (p.depth-1)*1.5;
+}
+
+function getTeamStandingsStrengthFromProfile(leagueKey, teamName){
+  if(leagueKey==='USJL'&&typeof isUsndtOrgStandingsTeam==='function'&&isUsndtOrgStandingsTeam(teamName)){
+    if(typeof getUsndtStandingsStrength==='function') return getUsndtStandingsStrength(teamName);
+  }
+  var p=ensureTeamProfile(leagueKey, teamName);
+  var base=0.24+(p.composite-0.88)*0.52;
+  if(typeof getMajorJuniorEliteOrgStandingsBonus==='function'){
+    base+=getMajorJuniorEliteOrgStandingsBonus(leagueKey, teamName);
+  }
+  return cl(base, 0.15, 0.76);
+}
+
+function assignNpcCareerProfile(p, leagueKey, rank, teamName){
+  if(!p||p.isMe) return;
+  var age=p.age||22;
+  var r=rank||0;
+  if(isEliteProLeagueKey(leagueKey)){
+    if(p.ovrCeiling==null){
+      var prof=ensureTeamProfile(leagueKey, teamName);
+      var roll=Math.random()+((r<=1)?(prof.starPower-1)*0.14:0);
+      if(r===0&&roll<0.035){ p.npcTier='franchise'; p.ovrCeiling=ri(90,95); p.devRate=0.45; }
+      else if(r<=2&&roll<0.12){ p.npcTier='star'; p.ovrCeiling=ri(85,89); p.devRate=0.55; }
+      else if(r<=6){ p.npcTier='everyday'; p.ovrCeiling=ri(82,86); p.devRate=0.48; }
+      else { p.npcTier='depth'; p.ovrCeiling=ri(80,83); p.devRate=0.26; }
+    }
+    var ceiling=p.ovrCeiling||84;
+    if(r<=3&&age<=25){
+      var youthGap=Math.round(Math.max(1, (27-age)*0.32)+(p.npcTier==='franchise'?3:(p.npcTier==='star'?2:1)));
+      p.ovr=Math.round(cl(Math.min(p.ovr||80, ceiling-youthGap), 80, ceiling));
+    } else {
+      p.ovr=Math.round(cl(p.ovr||80, 80, ceiling));
+    }
+  } else if(isMinorProLeagueKey(leagueKey)){
+    if(p.ovrCeiling==null){ p.ovrCeiling=ri(78,84); p.devRate=0.32; p.npcTier='prospect'; }
+    p.ovr=Math.round(cl(p.ovr||72, 72, p.ovrCeiling));
+  }
+}
+
 function rollNpcAgeForLeague(leagueKey, pos){
   var tier=(LEAGUES[leagueKey]||{}).tier||'junior';
   var maxA=getLeagueNpcMaxAge(leagueKey);
@@ -69,11 +145,12 @@ function applyProAgeOvrModifier(age){
   return 0;
 }
 
-/** Junior skill ladder — OJL > WJL > NEJC > QMJL > ARJC > CEJC (weakest). */
+/** Junior skill ladder (16–20): OJL best CHL > WJL (slightly behind, balanced) >> QMJL (weakest CHL) > USJL clubs > NEJC … */
 function getLeagueRosterSkillOffset(leagueKey){
   var map={
-    OJL:2, CWHL:2, WJL:1, NEJC:0, QMJL:-1, USJL:-1, USWDL:-1,
-    ARJC:-2, EWJC:-2, AWJC:-3, CEJC:-4,
+    OJL:2, CWHL:2, WJL:1, USJL:1, USWDL:1, NEJC:-1,
+    ARJC:-2, QMJL:-4, CEJC:-5,
+    EWJC:-2, AWJC:-4,
     NCHA:1, NWCHA:0,
     NEHL:1, FHL:-1, CEHL:-7, SDHL:0, FWHL:-1, AWHL:0, ARHL:1,
     NAML:0, PWDL:0, PHL:1, PWL:1
@@ -81,27 +158,42 @@ function getLeagueRosterSkillOffset(leagueKey){
   return map[leagueKey]!=null?map[leagueKey]:0;
 }
 
-/** OVR band per circuit — same standards for men's and women's leagues. */
+function isFinnishNejcTeam(teamName){
+  if(!teamName) return false;
+  return /Turku|Tampere|Helsinki/i.test(teamName);
+}
+
+function getJuniorRegionalOvrOffset(leagueKey, teamName){
+  if(leagueKey==='NEJC'&&isFinnishNejcTeam(teamName)) return -2;
+  if(isMajorJuniorEliteOrg(leagueKey, teamName)){
+    if(leagueKey==='OJL') return 2.5;
+    if(leagueKey==='WJL') return 1.5;
+    return 1;
+  }
+  return 0;
+}
+
+/** OVR band per circuit — PHL roster core is 80–88; stars above. NAML tops out below PHL regulars. */
 var MEN_LEAGUE_OVR_BANDS={
-  PHL:{cap:99,floor:72,baseline:86,spread:12},
-  NAML:{cap:83,floor:54,baseline:68,spread:10},
+  PHL:{cap:99,floor:76,baseline:83,spread:5},
+  NAML:{cap:84,floor:72,baseline:77,spread:5},
   NEHL:{cap:87,floor:58,baseline:74,spread:11},
   FHL:{cap:76,floor:48,baseline:60,spread:10},
   CEHL:{cap:66,floor:42,baseline:48,spread:7},
   ARHL:{cap:88,floor:58,baseline:75,spread:12},
-  OJL:{cap:80,floor:58,baseline:64,spread:12},
-  CWHL:{cap:80,floor:58,baseline:63,spread:12},
-  QMJL:{cap:80,floor:57,baseline:59,spread:12},
-  WJL:{cap:80,floor:57,baseline:62,spread:12},
-  USJL:{cap:79,floor:56,baseline:57,spread:11},
-  USWDL:{cap:79,floor:56,baseline:57,spread:11},
+  OJL:{cap:74,floor:52,baseline:58,spread:10},
+  CWHL:{cap:74,floor:52,baseline:57,spread:10},
+  USJL:{cap:72,floor:50,baseline:56,spread:9},
+  USWDL:{cap:72,floor:50,baseline:56,spread:9},
+  WJL:{cap:73,floor:51,baseline:57,spread:10},
+  NEJC:{cap:70,floor:49,baseline:54,spread:9},
+  ARJC:{cap:69,floor:48,baseline:53,spread:9},
+  QMJL:{cap:65,floor:47,baseline:50,spread:8},
+  CEJC:{cap:65,floor:46,baseline:49,spread:8},
+  EWJC:{cap:68,floor:48,baseline:52,spread:8},
+  AWJC:{cap:66,floor:46,baseline:50,spread:8},
   NCHA:{cap:84,floor:55,baseline:64,spread:12},
   NWCHA:{cap:84,floor:55,baseline:63,spread:12},
-  NEJC:{cap:78,floor:52,baseline:60,spread:10},
-  CEJC:{cap:74,floor:46,baseline:52,spread:9},
-  ARJC:{cap:77,floor:50,baseline:55,spread:10},
-  EWJC:{cap:78,floor:52,baseline:56,spread:10},
-  AWJC:{cap:78,floor:51,baseline:55,spread:10},
   LHCM:{cap:72,floor:46,baseline:52,spread:9},
   LHLF:{cap:72,floor:45,baseline:51,spread:9}
 };
@@ -120,11 +212,12 @@ function getMenAnalogLeagueKey(leagueKey){
 
 function getTierFallbackOvrBand(tier){
   if(tier==='local') return {cap:72,floor:46,baseline:52,spread:9};
-  if(tier==='junior') return {cap:80,floor:58,baseline:60,spread:12};
+  if(tier==='junior') return {cap:74,floor:52,baseline:58,spread:10};
   if(tier==='college') return {cap:84,floor:55,baseline:64,spread:12};
   if(tier==='euro'||tier==='asia') return {cap:87,floor:58,baseline:73,spread:11};
   if(tier==='minor') return {cap:83,floor:54,baseline:68,spread:10};
-  if(tier==='pro') return {cap:99,floor:72,baseline:86,spread:12};
+  if(tier==='pro') return {cap:99,floor:76,baseline:83,spread:5};
+  if(tier==='minor') return {cap:84,floor:72,baseline:77,spread:5};
   return {cap:80,floor:52,baseline:62,spread:11};
 }
 
@@ -201,6 +294,137 @@ function getCombinedCareerLeagueStats(p, leagueKey){
   return out;
 }
 
+function getLeagueSeasonGameCount(leagueKey){
+  var L=LEAGUES[leagueKey]||{};
+  if(L.games) return L.games;
+  return getLeagueScoringProfile(leagueKey).games||68;
+}
+
+function getNpcDebutAgeForLeague(leagueKey){
+  var tier=(LEAGUES[leagueKey]||{}).tier||'junior';
+  if(tier==='junior') return 16;
+  if(tier==='college') return 18;
+  if(tier==='pro'||tier==='minor') return 21;
+  if(tier==='euro'||tier==='asia') return 20;
+  if(tier==='local') return 16;
+  return 18;
+}
+
+function rankToEstDepthLine(rank, pos){
+  if(pos==='G') return (rank||0)===0?1:2;
+  var r=rank||0;
+  if(r<=2) return 1;
+  if(r<=5) return 2;
+  if(r<=8) return 3;
+  return 4;
+}
+
+/** Completed league seasons before the current year (for pre-user career volume). */
+function estimateNpcLeagueSeasons(player, leagueKey, rank){
+  if(!player||player.rookie) return 0;
+  if(player.juniorMate) return Math.max(0, Math.min(2, (player.age||17)-getNpcDebutAgeForLeague(leagueKey)));
+  var age=player.age||20;
+  var debut=getNpcDebutAgeForLeague(leagueKey);
+  var span=Math.max(0, age-debut);
+  if(span<=0) return 0;
+  if(player.proProspect&&age<=debut+2) return Math.max(0, span-1);
+  var line=rankToEstDepthLine(rank, player.pos);
+  var tenure=span;
+  if(line>=4) tenure=Math.max(1, Math.round(span*0.42+rd(-0.4,0.4)));
+  else if(line===3) tenure=Math.max(1, Math.round(span*0.65+rd(-0.4,0.4)));
+  else if(line===2) tenure=Math.max(1, Math.round(span*0.8+rd(-0.4,0.4)));
+  if(line===1&&age>=26) tenure=Math.max(tenure, Math.round(span*0.86));
+  if(line===1&&age>=30&&(player.ovr||0)>=88) tenure=Math.max(tenure, span-1);
+  return Math.max(0, Math.min(span, tenure)-1);
+}
+
+function estimatePriorSeasonPpg(player, leagueKey, rank){
+  var saveSlot=player.depthSlot;
+  var line=rankToEstDepthLine(rank, player.pos);
+  var fakeSlot=player.pos==='G'?(line===1?'G1':'G2'):
+    (player.pos==='D'?(line===1?'LD1':line===2?'LD2':line===3?'LD3':'LD4'):
+     (line===1?'C1':line===2?'C2':line===3?'C3':'C4'));
+  player.depthSlot=fakeSlot;
+  var ppg=getNpcTargetPpg(player, leagueKey);
+  player.depthSlot=saveSlot;
+  if((player.age||20)>=28&&(player.ovr||0)>=90) ppg*=rd(1.02,1.12);
+  else if((player.age||20)>=24) ppg*=rd(0.9,1.04);
+  else ppg*=rd(0.8,0.95);
+  return ppg;
+}
+
+function synthesizeNpcPriorCareerBlock(player, leagueKey, rank, seasons){
+  if(seasons<=0) return emptyPlayerStats();
+  var gpPer=getLeagueSeasonGameCount(leagueKey);
+  var line=rankToEstDepthLine(rank, player.pos);
+  var avail=player.pos==='G'?(line===1?0.58:0.22):(line<=2?0.88:line===3?0.72:0.55);
+  var gp=Math.round(seasons*gpPer*avail*rd(0.92,1.04));
+  if(gp<12&&seasons>=1) gp=Math.max(12, Math.round(seasons*gpPer*0.42));
+  var out=emptyPlayerStats();
+  out.gp=gp;
+  if(player.pos==='G'){
+    var starts=Math.max(1, Math.round(gp*0.95));
+    out.sv=Math.round(starts*ri(24,32)*rd(0.94,1.06));
+    out.ga=Math.round(starts*rd(2.4,3.6));
+    out.w=Math.round(starts*cl(0.46+((player.ovr||72)-72)/130, 0.36, 0.66));
+    return out;
+  }
+  var ppg=estimatePriorSeasonPpg(player, leagueKey, rank);
+  var pts=Math.max(0, Math.round(gp*ppg));
+  var arch=player.arch||'TwoWay';
+  var gShare=0.42;
+  if(arch==='Sniper') gShare=0.62;
+  else if(arch==='Playmaker') gShare=0.34;
+  else if(arch==='Grinder') gShare=0.38;
+  else if(player.pos==='D'&&arch==='OffensiveD') gShare=0.46;
+  else if(player.pos==='D') gShare=0.38;
+  out.g=Math.round(pts*gShare);
+  out.a=Math.max(0, pts-out.g);
+  out.pts=out.g+out.a;
+  out.pm=Math.round((out.g+out.a*0.5-line*2.2)*rd(0.35,0.85));
+  out.pim=Math.round(gp*rd(0.08,0.2)*(arch==='Grinder'?1.55:1));
+  return out;
+}
+
+function seedNpcPriorCareerStatsIfNeeded(player, leagueKey, rank){
+  if(!player||player.isMe||player._priorCareerSeeded) return;
+  var career=ensureCareerLeagueStats(player, leagueKey);
+  var gpPer=getLeagueSeasonGameCount(leagueKey)||72;
+  var targetSeasons=estimateNpcLeagueSeasons(player, leagueKey, rank);
+  var simSeasons=gpPer>0?Math.floor((career.gp||0)/Math.max(1, Math.round(gpPer*0.82))):0;
+  var priorSeasons=Math.max(0, targetSeasons-simSeasons);
+  if(priorSeasons<=0){
+    player._priorCareerSeeded=true;
+    return;
+  }
+  var block=synthesizeNpcPriorCareerBlock(player, leagueKey, rank, priorSeasons);
+  career.gp+=block.gp||0;
+  career.g+=block.g||0;
+  career.a+=block.a||0;
+  career.pts+=block.pts||0;
+  career.pm+=block.pm||0;
+  career.pim=(career.pim||0)+(block.pim||0);
+  career.sv=(career.sv||0)+(block.sv||0);
+  career.ga=(career.ga||0)+(block.ga||0);
+  career.w=(career.w||0)+(block.w||0);
+  player._priorCareerSeeded=true;
+}
+
+function seedRosterPriorCareerStats(roster){
+  if(!roster||!roster.players||!roster.leagueKey) return;
+  var lk=roster.leagueKey;
+  var byPos={F:[],D:[],G:[]}, pos;
+  roster.players.forEach(function(p){
+    if(p.isMe) return;
+    if(byPos[p.pos]) byPos[p.pos].push(p);
+  });
+  for(pos in byPos){
+    if(!byPos.hasOwnProperty(pos)) continue;
+    byPos[pos].sort(function(a,b){return (b.ovr||0)-(a.ovr||0);});
+    byPos[pos].forEach(function(p,i){ seedNpcPriorCareerStatsIfNeeded(p, lk, i); });
+  }
+}
+
 function healPlayerSeasonStats(p, leagueKey){
   if(!p||p.isMe) return;
   var s=ensurePlayerStats(p);
@@ -208,6 +432,10 @@ function healPlayerSeasonStats(p, leagueKey){
   var cal=typeof getLeagueCalendarGamesPlayed==='function'?getLeagueCalendarGamesPlayed(leagueKey):0;
   var staleSeason=(typeof p._statsSeason==='number'&&p._statsSeason!==curSeason);
   var npcExpected=cal;
+  if(leagueKey==='USJL'&&p.team&&typeof getUsndtNpcLeagueGpCap==='function'){
+    var usCap=getUsndtNpcLeagueGpCap(p.team);
+    if(usCap!=null) npcExpected=Math.min(npcExpected, usCap);
+  }
   if(typeof isLocalLeague==='function'&&isLocalLeague(leagueKey)&&typeof countLocalGamesThroughWeek==='function'){
     var syncWk=Math.max(0, typeof G._npcStatsSyncedWeek==='number'?G._npcStatsSyncedWeek:((G.week||1)-1));
     npcExpected=countLocalGamesThroughWeek(syncWk);
@@ -221,7 +449,27 @@ function healPlayerSeasonStats(p, leagueKey){
     p.seasonStats=emptyPlayerStats();
     s=ensurePlayerStats(p);
   }
+  if(typeof clampUsndtPlayerSeasonStatsInPlace==='function') clampUsndtPlayerSeasonStatsInPlace(p, leagueKey);
   p._statsSeason=curSeason;
+}
+
+function clampUsndtPlayerSeasonStatsInPlace(p, leagueKey){
+  if(!p||p.isMe||leagueKey!=='USJL'||!p.team) return;
+  if(typeof getUsndtNpcLeagueGpCap!=='function') return;
+  var cap=getUsndtNpcLeagueGpCap(p.team);
+  if(cap==null) return;
+  var s=ensurePlayerStats(p);
+  if((s.gp||0)<=cap) return;
+  var ratio=cap/(s.gp||1);
+  s.gp=cap;
+  s.g=Math.round((s.g||0)*ratio);
+  s.a=Math.round((s.a||0)*ratio);
+  s.pts=(s.g||0)+(s.a||0);
+  s.pm=Math.round((s.pm||0)*ratio);
+  s.pim=Math.round((s.pim||0)*ratio);
+  s.sv=Math.round((s.sv||0)*ratio);
+  s.ga=Math.round((s.ga||0)*ratio);
+  s.w=Math.min(cap, Math.round((s.w||0)*ratio));
 }
 
 function finalizeLeagueSeasonBeforeReset(leagueKey, endedSeason){
@@ -257,10 +505,14 @@ function mergeUserSeasonIntoCareerLeagueStats(){
   var ck=G.leagueKey;
   if(!G.careerLeagueStats[ck]) G.careerLeagueStats[ck]=emptyPlayerStats();
   var c=G.careerLeagueStats[ck];
-  if((G.gp||0)<1) return;
+  if((G.gp||0)<1){
+    if(typeof mergeCallUpSeasonsIntoCareerLeagueStats==='function') mergeCallUpSeasonsIntoCareerLeagueStats();
+    return;
+  }
   c.gp+=G.gp||0; c.g+=G.goals||0; c.a+=G.assists||0; c.pts+=(G.goals||0)+(G.assists||0);
   c.pm+=G.plusminus||0; c.pim=(c.pim||0)+(G.pim||0);
   c.sv=(c.sv||0)+(G.saves||0); c.ga=(c.ga||0)+(G.goalsAgainst||0); c.w=(c.w||0)+(G.w||0);
+  if(typeof mergeCallUpSeasonsIntoCareerLeagueStats==='function') mergeCallUpSeasonsIntoCareerLeagueStats();
 }
 
 function ensurePlayerStats(p){
@@ -280,90 +532,372 @@ function invalidateLeagueRosterCaches(){
   G.leaguePlayerStats=null;
 }
 
+/**
+ * Scoring pace / playstyle:
+ * OJL — transition, quick, skilled, dynamic | WJL — structured, physical
+ * QMJL — flashy skill entertainment | USJL — skill-based but structured
+ * NEJC/CEJC/ARJC/EWJC/AWJC — technical eurasian academies
+ */
+function getLeagueScoringPaceClass(leagueKey){
+  var lk=leagueKey||'';
+  if(lk==='OJL'||lk==='CJL') return 'rungun';
+  if(lk==='WJL') return 'structured';
+  if(lk==='QMJL') return 'high';
+  if(lk==='USJL'||lk==='USWDL') return 'structured';
+  if(lk==='NEJC'||lk==='CEJC'||lk==='ARJC'||lk==='EWJC'||lk==='AWJC') return 'high';
+  if(typeof isLocalLeague==='function'&&isLocalLeague(lk)) return 'rungun';
+  if(lk==='PHL') return 'tight';
+  if(lk==='CWHL') return 'high';
+  if(lk==='NAML'||lk==='PWDL'||lk==='ARHL') return 'structured';
+  if(lk==='NCHA'||lk==='NWCHA'||lk==='NEHL'||lk==='FHL'||lk==='SDHL'||lk==='FWHL'||lk==='PWL') return 'tight';
+  if(lk==='CEHL'||lk==='AWHL') return 'lowskill';
+  var tier=(LEAGUES[lk]||{}).tier||'junior';
+  if(tier==='local'||tier==='pro') return 'rungun';
+  if(tier==='junior') return 'high';
+  if(tier==='college') return 'tight';
+  if(tier==='minor') return 'structured';
+  if(tier==='euro'||tier==='asia') return 'tight';
+  return 'structured';
+}
+
+function getLeagueScoringPaceKnobs(paceClass){
+  var knobs={
+    rungun:   {npcScale:1.12, tierBoost:1.07, ppgCap:1.78, userSim:1.08, nightCapF:4, nightCapD:3},
+    high:     {npcScale:1.06, tierBoost:1.03, ppgCap:1.52, userSim:1.02, nightCapF:4, nightCapD:3},
+    structured:{npcScale:0.91, tierBoost:0.92, ppgCap:1.26, userSim:0.90, nightCapF:3, nightCapD:2},
+    tight:    {npcScale:0.84, tierBoost:0.88, ppgCap:1.10, userSim:0.82, nightCapF:3, nightCapD:2},
+    lowskill: {npcScale:0.76, tierBoost:0.84, ppgCap:0.96, userSim:0.74, nightCapF:2, nightCapD:2}
+  };
+  return knobs[paceClass]||knobs.structured;
+}
+
+/** Per-league pace tweaks on top of playstyle class. */
+function getLeaguePaceKnobsForLeague(leagueKey){
+  var lk=leagueKey||'';
+  var k=getLeagueScoringPaceKnobs(getLeagueScoringPaceClass(lk));
+  if(lk==='OJL') return {npcScale:1.14, tierBoost:1.08, ppgCap:1.82, userSim:1.10, nightCapF:4, nightCapD:3};
+  if(lk==='WJL') return {npcScale:0.88, tierBoost:0.90, ppgCap:1.20, userSim:0.86, nightCapF:3, nightCapD:2};
+  if(lk==='QMJL') return {npcScale:1.05, tierBoost:1.04, ppgCap:1.55, userSim:1.06, nightCapF:4, nightCapD:2};
+  if(lk==='USJL') return {npcScale:0.93, tierBoost:0.94, ppgCap:1.30, userSim:0.92, nightCapF:3, nightCapD:2};
+  if(lk==='NEJC'||lk==='CEJC'||lk==='ARJC'||lk==='EWJC'||lk==='AWJC'){
+    var eurasian=lk==='ARJC'||lk==='EWJC';
+    return {
+      npcScale:eurasian?1.20:1.14,
+      tierBoost:eurasian?1.10:1.06,
+      ppgCap:eurasian?1.75:1.68,
+      userSim:eurasian?1.14:1.10,
+      nightCapF:4, nightCapD:3
+    };
+  }
+  if(lk==='PHL'){
+    return {npcScale:0.84, tierBoost:0.88, ppgCap:1.02, userSim:0.86, nightCapF:2, nightCapD:2};
+  }
+  if(lk==='NEHL'||lk==='FHL'||lk==='CEHL'||lk==='ARHL'||lk==='SDHL'||lk==='FWHL'||lk==='AWHL'){
+    return {npcScale:0.76, tierBoost:0.82, ppgCap:0.90, userSim:0.78, nightCapF:2, nightCapD:2};
+  }
+  return k;
+}
+
+/** User SIM WEEK pace multiplier (per-game offensive environment). */
+function getLeagueUserSimPaceMult(leagueKey){
+  return getLeaguePaceKnobsForLeague(leagueKey).userSim;
+}
+
 function getLeagueScoringProfile(leagueKey){
   var L=LEAGUES[leagueKey]||{};
   var g=L.games||68;
-  var tier=L.tier||'junior';
-  /** Season-total targets for the league scoring leader (Art Ross pace), not an average player. */
-  var pts=88, gl=32, al=56;
-  if(leagueKey==='PHL'){ pts=118; gl=46; al=72; }
-  else if(leagueKey==='PWL'){ pts=42; gl=18; al=24; }
-  else if(tier==='minor'){ pts=92; gl=34; al=58; }
-  else if(tier==='college'){
-    if(leagueKey==='NWCHA'){ pts=48; gl=20; al=28; }
-    else { pts=52; gl=22; al=30; }
+  /** Season totals for scoring leader (Art Ross pace). */
+  var pts=78, gl=28, al=50;
+  if(leagueKey==='PHL'){ pts=82; gl=28; al=54; }
+  else if(leagueKey==='PWL'){ pts=38; gl=14; al=24; }
+  else if(leagueKey==='OJL'||leagueKey==='CWHL'){ pts=leagueKey==='CWHL'?56:94; gl=leagueKey==='CWHL'?22:38; al=leagueKey==='CWHL'?34:52; }
+  else if(leagueKey==='WJL'){ pts=86; gl=34; al=48; }
+  else if(leagueKey==='CJL'){ pts=110; gl=44; al=66; }
+  else if(leagueKey==='USJL'){ pts=70; gl=26; al=42; }
+  else if(leagueKey==='QMJL'){ pts=66; gl=24; al=40; }
+  else if(leagueKey==='NAML'||leagueKey==='PWDL'){ pts=leagueKey==='PWDL'?58:72; gl=leagueKey==='PWDL'?18:24; al=leagueKey==='PWDL'?40:48; }
+  else if(leagueKey==='USWDL'){ pts=62; gl=20; al=42; }
+  else if(leagueKey==='NCHA'){ pts=44; gl=14; al=30; }
+  else if(leagueKey==='NWCHA'){ pts=40; gl=12; al=28; }
+  else if(leagueKey==='NEHL'){ pts=46; gl=14; al=32; }
+  else if(leagueKey==='FHL'){ pts=52; gl=16; al=36; }
+  else if(leagueKey==='CEHL'){ pts=38; gl=12; al=26; }
+  else if(leagueKey==='ARHL'){ pts=62; gl=20; al=42; }
+  else if(leagueKey==='SDHL'){ pts=30; gl=10; al=20; }
+  else if(leagueKey==='FWHL'){ pts=28; gl=9; al=19; }
+  else if(leagueKey==='AWHL'){ pts=26; gl=8; al=18; }
+  else if(leagueKey==='NEJC'){ pts=68; gl=24; al=44; }
+  else if(leagueKey==='CEJC'){ pts=64; gl=22; al=42; }
+  else if(leagueKey==='ARJC'){ pts=76; gl=28; al=48; }
+  else if(leagueKey==='EWJC'){ pts=54; gl=18; al=36; }
+  else if(leagueKey==='AWJC'){ pts=50; gl=16; al=34; }
+  else if(typeof isLocalLeague==='function'&&isLocalLeague(leagueKey)){ pts=22; gl=14; al=8; }
+  else {
+    var pace=getLeagueScoringPaceClass(leagueKey);
+    if(pace==='rungun'){ pts=90; gl=34; al=56; }
+    else if(pace==='high'){ pts=82; gl=30; al=52; }
+    else if(pace==='tight'){ pts=46; gl=14; al=32; }
+    else if(pace==='lowskill'){ pts=28; gl=8; al=20; }
+    else { pts=72; gl=24; al=48; }
   }
-  else if(tier==='euro'||tier==='asia'){
-    if(leagueKey==='ARHL'){ pts=72; gl=26; al=46; }
-    else if(leagueKey==='NEHL'){ pts=64; gl=24; al=40; }
-    else if(leagueKey==='FHL'){ pts=48; gl=16; al=32; }
-    else if(leagueKey==='CEHL'){ pts=20; gl=8; al=12; }
-    else if(leagueKey==='SDHL'||leagueKey==='FWHL'){ pts=46; gl=18; al=28; }
-    else if(leagueKey==='AWHL'){ pts=42; gl=16; al=26; }
-    else { pts=58; gl=22; al=36; }
-  }
-  else if(leagueKey==='OJL'||leagueKey==='CWHL'){ pts=92; gl=36; al=56; }
-  else if(leagueKey==='QMJL'){ pts=90; gl=35; al=55; }
-  else if(leagueKey==='WJL'){ pts=88; gl=34; al=54; }
-  else if(leagueKey==='USJL'){ pts=82; gl=32; al=50; }
-  else if(leagueKey==='USWDL'){ pts=68; gl=26; al=42; }
-  else if(leagueKey==='NEJC'){ pts=62; gl=26; al=36; }
-  else if(leagueKey==='CEJC'){ pts=54; gl=22; al=32; }
-  else if(leagueKey==='ARJC'){ pts=60; gl=24; al=36; }
-  else if(leagueKey==='EWJC'){ pts=52; gl=20; al=32; }
-  else if(leagueKey==='AWJC'){ pts=48; gl=18; al=30; }
-  else if(tier==='local'){ pts=22; gl=14; al=8; }
-  else if(tier==='junior'){ pts=84; gl=32; al=52; }
-  return {games:g, ptsLeader:pts, gLeader:gl, aLeader:al};
+  return {games:g, ptsLeader:pts, gLeader:gl, aLeader:al, paceClass:getLeagueScoringPaceClass(leagueKey)};
 }
 
 /** Global dampener — tuned so league leaders land near ptsLeader after line/archetype mults. */
 function getLeagueNpcScoringScale(leagueKey){
-  var tier=(LEAGUES[leagueKey]||{}).tier||'junior';
-  if(tier==='local') return 1.05;
-  if(tier==='junior') return 1.12;
-  if(tier==='college') return 1.04;
-  if(tier==='euro'||tier==='asia') return 1;
-  if(tier==='minor') return 0.98;
-  if(tier==='pro') return 1;
-  return 0.95;
+  return getLeaguePaceKnobsForLeague(leagueKey).npcScale;
 }
 
-function getNpcTargetPpgCap(leagueKey){
-  var tier=(LEAGUES[leagueKey]||{}).tier||'junior';
-  if(tier==='local') return 1.08;
-  if(tier==='junior') return 1.55;
-  if(tier==='college') return 1.72;
-  if(tier==='minor') return 1.95;
-  if(tier==='pro') return 2.2;
-  if(tier==='euro'||tier==='asia') return 1.45;
-  return 1.35;
+function getNpcTargetPpgCap(leagueKey, player){
+  var cap=getLeaguePaceKnobsForLeague(leagueKey).ppgCap;
+  if(leagueKey==='PHL'){
+    if(player&&player.pos==='D'&&player.arch==='OffensiveD'){
+      if(typeof isPhlGenerationalOffensiveD==='function'&&isPhlGenerationalOffensiveD(player)) return 1.18;
+      if(typeof isPhlEliteOffensiveD==='function'&&isPhlEliteOffensiveD(player)) return 1.10;
+      return 1.06;
+    }
+    if(player&&player.pos==='D'&&player.arch==='TwoWayD'&&typeof isPhlDualThreatDefenseman==='function'&&isPhlDualThreatDefenseman(player)) return 0.82;
+    if(player&&player.pos==='F'&&player.arch==='Playmaker'&&typeof isPhlGenerationalPlaymaker==='function'&&isPhlGenerationalPlaymaker(player)) return 1.22;
+    if(player&&player.pos==='F'&&player.arch==='Playmaker'&&typeof isPhlElitePlaymaker==='function'&&isPhlElitePlaymaker(player)) return 1.10;
+    if(player&&typeof isPhlGenerationalSniper==='function'&&isPhlGenerationalSniper(player)) return 1.22;
+    if(player&&typeof isPhlEliteSniper==='function'&&isPhlEliteSniper(player)) return 1.1;
+    return Math.min(cap, 0.88);
+  }
+  if(leagueKey==='ARJC'||leagueKey==='EWJC'||leagueKey==='NEJC'||leagueKey==='CEJC'||leagueKey==='AWJC'){
+    if(player&&player.pos==='F'&&(player.arch==='Sniper'||player.arch==='Playmaker')) return Math.max(cap, 1.62);
+  }
+  return cap;
+}
+
+/** User player stub for PHL sniper / scoring helpers (shared with sim + playable). */
+function getUserScoringProxy(line, perf){
+  if(typeof G==='undefined'||!G) return null;
+  return {
+    isMe:true, pos:G.pos, arch:G.arch,
+    ovr:typeof ovr==='function'?ovr(G.attrs,G.pos):0,
+    depthSlot:null,
+    scoringPulse:typeof G._scoringPulse==='number'?G._scoringPulse:1
+  };
+}
+
+/** Season-to-season finishing variance — rare hot years can chase 60–70 goals in PHL. */
+function ensureUserScoringPulse(){
+  if(!G||G.pos==='G') return 1;
+  var uOvr=typeof ovr==='function'?ovr(G.attrs,G.pos):70;
+  if(typeof G._scoringPulse!=='number'){
+    G._scoringPulse=rd(0.88, Math.min(1.06, 0.78+uOvr/125));
+    if(G.leagueKey==='PHL'&&G.arch==='Sniper'&&G.pos==='F'&&uOvr>95&&Math.random()<0.22){
+      G._scoringPulse=rd(1.02, 1.1);
+    } else if(G.leagueKey==='PHL'&&G.arch==='Playmaker'&&G.pos==='F'&&uOvr>93&&Math.random()<0.2){
+      G._scoringPulse=rd(1.0, 1.08);
+    }
+  } else if(Math.random()<0.36){
+    G._scoringPulse=cl(G._scoringPulse+rd(-0.1, 0.1), 0.84, 1.12);
+  }
+  return G._scoringPulse;
+}
+
+/** PHL L1 sniper — elite finishing pace (still rare to average 1 G/GP). */
+function isPhlEliteSniper(player, line, perf){
+  if(!player||player.pos!=='F'||player.arch!=='Sniper') return false;
+  if(line==null&&player.depthSlot&&typeof getDepthLineFromSlot==='function') line=getDepthLineFromSlot(player.depthSlot, player.pos);
+  if(line==null) line=3;
+  if(perf==null&&typeof getOvrPerformanceMult==='function') perf=getOvrPerformanceMult(player,'PHL');
+  if(perf==null) perf=0.85;
+  var ovrN=player.ovr;
+  if(ovrN==null&&player.isMe&&typeof G!=='undefined'&&G&&typeof ovr==='function') ovrN=ovr(G.attrs,G.pos);
+  ovrN=ovrN||0;
+  var pulse=typeof player.scoringPulse==='number'?player.scoringPulse:1;
+  return line===1&&perf>=0.91&&ovrN>=89&&(pulse>=0.97||ovrN>=92);
+}
+
+/** Once-in-a-generation PHL goal scorer — elite sniper at 96+ OVR; can chase ~70 goals. */
+function isPhlGenerationalSniper(player, line, perf){
+  if(!isPhlEliteSniper(player, line, perf)) return false;
+  var ovrN=player.ovr;
+  if(ovrN==null&&player.isMe&&typeof G!=='undefined'&&G&&typeof ovr==='function') ovrN=ovr(G.attrs,G.pos);
+  return (ovrN||0)>=96;
+}
+
+/** PHL top-pair offensive D — Norris pace (~0.9–1.0 PPG), goals not just assists. */
+function isPhlEliteOffensiveD(player, line, perf){
+  if(!player||player.pos!=='D'||player.arch!=='OffensiveD') return false;
+  if(line==null&&player.depthSlot&&typeof getDepthLineFromSlot==='function') line=getDepthLineFromSlot(player.depthSlot, player.pos);
+  if(line==null) line=3;
+  if(perf==null&&typeof getOvrPerformanceMult==='function') perf=getOvrPerformanceMult(player,'PHL');
+  if(perf==null) perf=0.85;
+  var ovrN=player.ovr;
+  if(ovrN==null&&player.isMe&&typeof G!=='undefined'&&G&&typeof ovr==='function') ovrN=ovr(G.attrs,G.pos);
+  ovrN=ovrN||0;
+  var pulse=typeof player.scoringPulse==='number'?player.scoringPulse:1;
+  return line<=2&&perf>=0.90&&ovrN>=88&&(pulse>=0.96||ovrN>=91);
+}
+
+function isPhlGenerationalOffensiveD(player, line, perf){
+  if(!isPhlEliteOffensiveD(player, line, perf)) return false;
+  var ovrN=player.ovr;
+  if(ovrN==null&&player.isMe&&typeof G!=='undefined'&&G&&typeof ovr==='function') ovrN=ovr(G.attrs,G.pos);
+  return (ovrN||0)>=96;
+}
+
+/** PHL stay-at-home / two-way D with enough offense to show up on the scoresheet. */
+function isPhlDualThreatDefenseman(player, line, perf){
+  if(!player||player.pos!=='D') return false;
+  if(player.arch!=='TwoWayD'&&player.arch!=='StayAtHome'&&player.arch!=='ShutdownD') return false;
+  if(line==null&&player.depthSlot&&typeof getDepthLineFromSlot==='function') line=getDepthLineFromSlot(player.depthSlot, player.pos);
+  if(line==null) line=3;
+  if(perf==null&&typeof getOvrPerformanceMult==='function') perf=getOvrPerformanceMult(player,'PHL');
+  if(perf==null) perf=0.85;
+  var ovrN=player.ovr;
+  if(ovrN==null&&player.isMe&&typeof G!=='undefined'&&G&&typeof ovr==='function') ovrN=ovr(G.attrs,G.pos);
+  return line<=2&&perf>=0.86&&(ovrN||0)>=84;
+}
+
+/** PHL L1 playmaker — drives Art Ross pace. */
+function isPhlElitePlaymaker(player, line, perf){
+  if(!player||player.pos!=='F'||player.arch!=='Playmaker') return false;
+  if(line==null&&player.depthSlot&&typeof getDepthLineFromSlot==='function') line=getDepthLineFromSlot(player.depthSlot, player.pos);
+  if(line==null) line=3;
+  if(perf==null&&typeof getOvrPerformanceMult==='function') perf=getOvrPerformanceMult(player,'PHL');
+  if(perf==null) perf=0.85;
+  var ovrN=player.ovr;
+  if(ovrN==null&&player.isMe&&typeof G!=='undefined'&&G&&typeof ovr==='function') ovrN=ovr(G.attrs,G.pos);
+  ovrN=ovrN||0;
+  var pulse=typeof player.scoringPulse==='number'?player.scoringPulse:1;
+  return line===1&&perf>=0.93&&ovrN>=92&&(pulse>=0.98||ovrN>=95);
+}
+
+/** Once-in-a-generation PHL playmaker — 96+ OVR; can chase ~100 assists. */
+function isPhlGenerationalPlaymaker(player, line, perf){
+  if(!isPhlElitePlaymaker(player, line, perf)) return false;
+  var ovrN=player.ovr;
+  if(ovrN==null&&player.isMe&&typeof G!=='undefined'&&G&&typeof ovr==='function') ovrN=ovr(G.attrs,G.pos);
+  return (ovrN||0)>=96;
+}
+
+function getPhlNpcGoalPpg(player, line, perf, leagueKey){
+  var prof=getLeagueScoringProfile(leagueKey);
+  var lineShare=getNpcLineScoringShare(line, player.pos, leagueKey);
+  var formMult=0.94+((player.form||50)/320);
+  var teamOff=getTeamOffenseFactor(leagueKey, player.team);
+  var pulse=ensureScoringPulse(player);
+  var scale=getLeagueNpcScoringScale(leagueKey);
+  var gPpg=(prof.gLeader/prof.games)*lineShare*perf*formMult*teamOff*pulse*scale;
+  var ovrN=player.ovr||50;
+  if(player.arch==='Sniper'){
+    if(typeof isPhlGenerationalSniper==='function'&&isPhlGenerationalSniper(player,line,perf)) gPpg*=1.22;
+    else if(typeof isPhlEliteSniper==='function'&&isPhlEliteSniper(player,line,perf)) gPpg*=1.10;
+    else if(line===1&&ovrN>=92) gPpg*=0.92;
+    else if(line===1&&ovrN>=88) gPpg*=0.72;
+    else if(line===2&&ovrN>=86) gPpg*=0.48;
+    else if(line<=2) gPpg*=0.38;
+    else gPpg*=0.18;
+  } else if(player.arch==='Playmaker'){
+    if(typeof isPhlGenerationalPlaymaker==='function'&&isPhlGenerationalPlaymaker(player,line,perf)) gPpg*=0.68;
+    else if(typeof isPhlElitePlaymaker==='function'&&isPhlElitePlaymaker(player,line,perf)) gPpg*=0.58;
+    else if(line===1&&ovrN>=88) gPpg*=0.42;
+    else gPpg*=0.26;
+  } else {
+    if(line===1&&ovrN>=90) gPpg*=0.78;
+    else if(line<=2) gPpg*=0.52;
+    else gPpg*=0.28;
+  }
+  return cl(gPpg, 0, 0.78);
+}
+
+function getPhlNpcAssistPpg(player, line, perf, leagueKey){
+  var prof=getLeagueScoringProfile(leagueKey);
+  var lineShare=getNpcLineScoringShare(line, player.pos, leagueKey);
+  var formMult=0.94+((player.form||50)/320);
+  var teamOff=getTeamOffenseFactor(leagueKey, player.team);
+  var pulse=ensureScoringPulse(player);
+  var scale=getLeagueNpcScoringScale(leagueKey);
+  var aPpg=(prof.aLeader/prof.games)*lineShare*perf*formMult*teamOff*pulse*scale;
+  var ovrN=player.ovr||50;
+  if(player.arch==='Playmaker'){
+    if(typeof isPhlGenerationalPlaymaker==='function'&&isPhlGenerationalPlaymaker(player,line,perf)) aPpg*=1.26;
+    else if(typeof isPhlElitePlaymaker==='function'&&isPhlElitePlaymaker(player,line,perf)) aPpg*=1.10;
+    else if(line===1&&ovrN>=90) aPpg*=0.96;
+    else if(line===1&&ovrN>=86) aPpg*=0.78;
+    else if(line===2&&ovrN>=84) aPpg*=0.54;
+    else if(line<=2) aPpg*=0.40;
+    else aPpg*=0.20;
+  } else if(player.arch==='Sniper'){
+    if(typeof isPhlGenerationalSniper==='function'&&isPhlGenerationalSniper(player,line,perf)) aPpg*=0.50;
+    else if(typeof isPhlEliteSniper==='function'&&isPhlEliteSniper(player,line,perf)) aPpg*=0.44;
+    else aPpg*=0.30;
+  } else {
+    if(line===1&&ovrN>=88) aPpg*=0.72;
+    else if(line<=2) aPpg*=0.48;
+    else aPpg*=0.26;
+  }
+  return cl(aPpg, 0, 1.55);
+}
+
+function ensurePhlDualThreatSplit(split, player, totalPts){
+  if(!split||totalPts<=0) return split||{g:0,a:0};
+  if(totalPts>=1&&split.g===0&&split.a===0){ split.a=1; return split; }
+  if(totalPts>=2){
+    if(player.arch==='Playmaker'&&split.g===0){ split.g=1; if(split.a>1) split.a--; }
+    else if(player.arch==='Sniper'&&split.a===0){ split.a=1; if(split.g>1) split.g--; }
+    else if(player.pos==='D'&&(player.arch==='OffensiveD'||player.arch==='TwoWayD')&&split.g===0&&Math.random()<0.62){ split.g=1; if(split.a>1) split.a--; }
+    else if(split.g===0&&split.a>0&&Math.random()<0.28){ split.g=1; if(split.a>1) split.a--; }
+  }
+  return split;
+}
+
+function splitPhlForwardNight(player, line, perf, leagueKey, nightPtsCap){
+  var gPpg=getPhlNpcGoalPpg(player,line,perf,leagueKey);
+  var aPpg=getPhlNpcAssistPpg(player,line,perf,leagueKey);
+  var exp=Math.max(0, Math.min(nightPtsCap, Math.round((gPpg+aPpg)*rd(0.72,1.28))));
+  if(exp<=0&&Math.random()<0.14) exp=1;
+  if(exp<=0) return {g:0,a:0};
+  var gShare=typeof getArchetypeGoalPointShare==='function'?getArchetypeGoalPointShare(player.arch, player.pos, {line:line, perf:perf, leagueKey:'PHL'}):0.3;
+  if(player.arch==='Playmaker') gShare=cl(gShare,0.20,0.38);
+  else if(player.arch==='Sniper') gShare=cl(gShare,0.46,0.68);
+  else gShare=cl(gShare,0.28,0.50);
+  var split=typeof splitGoalsAssistsFromPoints==='function'?splitGoalsAssistsFromPoints(exp, gShare):{g:Math.round(exp*gShare),a:exp-Math.round(exp*gShare)};
+  split=ensurePhlDualThreatSplit(split, player, exp);
+  if(player.arch==='Sniper'&&typeof isPhlGenerationalSniper==='function'&&isPhlGenerationalSniper(player,line,perf)&&Math.random()<0.08) split.g=Math.min(nightPtsCap, split.g+1);
+  if(player.arch==='Playmaker'&&typeof isPhlGenerationalPlaymaker==='function'&&isPhlGenerationalPlaymaker(player,line,perf)&&Math.random()<0.08) split.a=Math.min(nightPtsCap, split.a+1);
+  return split;
+}
+
+function splitPhlOffensiveDNight(player, line, perf, leagueKey, targetPpg, nightPtsCap){
+  var mult=1;
+  if(typeof isPhlGenerationalOffensiveD==='function'&&isPhlGenerationalOffensiveD(player,line,perf)) mult=1.22;
+  else if(typeof isPhlEliteOffensiveD==='function'&&isPhlEliteOffensiveD(player,line,perf)) mult=1.12;
+  else if(line===1) mult=1.06;
+  var exp=Math.max(0, Math.min(nightPtsCap, Math.round(targetPpg*mult*rd(0.78,1.22))));
+  if(exp<=0&&Math.random()<0.18) exp=1;
+  if(exp<=0) return {g:0,a:0};
+  var gShare=0.40;
+  if(typeof isPhlGenerationalOffensiveD==='function'&&isPhlGenerationalOffensiveD(player,line,perf)) gShare=0.44;
+  var split=typeof splitGoalsAssistsFromPoints==='function'?splitGoalsAssistsFromPoints(exp, gShare):{g:0,a:exp};
+  return ensurePhlDualThreatSplit(split, player, exp);
 }
 
 function getLeagueSimScoringFactor(leagueKey){
   var p=getLeagueScoringProfile(leagueKey);
-  var ref=88;
-  return cl(p.ptsLeader/ref, 0.38, 1.05);
+  var ref=p.ptsLeader||92;
+  return cl(p.ptsLeader/ref, 0.88, 1.12);
 }
 
-/** Juniors/college score a bit more freely than pro; kept modest so totals stay realistic. */
+/** Per-league offensive environment vs baseline (OJL transition pace). */
 function getLeagueTierScoringBoost(leagueKey){
-  var tier=(LEAGUES[leagueKey]||{}).tier||'junior';
-  if(tier==='local') return 1.04;
-  if(tier==='junior') return 1.06;
-  if(tier==='college') return 1.02;
-  if(tier==='euro'||tier==='asia') return 0.98;
-  if(tier==='minor') return 0.96;
-  if(tier==='pro') return 0.94;
-  return 1;
+  return getLeaguePaceKnobsForLeague(leagueKey).tierBoost;
 }
 
-function getNpcLineScoringShare(line, pos){
+function getNpcLineScoringShare(line, pos, leagueKey){
   if(pos==='G'||line>=5) return 0;
-  if(line===1) return pos==='D'?0.3:0.56;
-  if(line===2) return pos==='D'?0.2:0.24;
-  if(line===3) return pos==='D'?0.12:0.15;
-  return pos==='D'?0.07:0.09;
+  var lk=leagueKey||'';
+  var dBoost=(lk==='PHL'||lk==='PWL')&&pos==='D'?1.42:
+    (lk==='WJL'&&pos==='D')?1.24:
+    ((lk==='OJL'||lk==='CWHL'||lk==='NAML')&&pos==='D')?1.06:1;
+  if(line===1) return (pos==='D'?0.40:0.56)*dBoost;
+  if(line===2) return (pos==='D'?0.24:0.24)*dBoost;
+  if(line===3) return (pos==='D'?0.14:0.15)*dBoost;
+  return (pos==='D'?0.08:0.09)*dBoost;
 }
 
 function getNpcTargetPpg(player, leagueKey){
@@ -373,19 +907,34 @@ function getNpcTargetPpg(player, leagueKey){
   var leaderPpg=prof.ptsLeader/prof.games;
   var perf=getOvrPerformanceMult(player, leagueKey);
   var arch=getArchetypeStatMods(player.arch, player.pos);
-  var posPts=getPosScoringMult(player.pos, player.arch);
+  var posPts=getPosScoringMult(player.pos, player.arch, leagueKey);
   var formMult=0.94+((player.form||50)/320);
   var teamOff=getTeamOffenseFactor(leagueKey, player.team);
   var leagueFac=getLeagueSimScoringFactor(leagueKey);
   var tierBoost=getLeagueTierScoringBoost(leagueKey);
   var scale=getLeagueNpcScoringScale(leagueKey);
   var pulse=ensureScoringPulse(player);
-  var lineShare=getNpcLineScoringShare(line, player.pos);
+  var lineShare=getNpcLineScoringShare(line, player.pos, leagueKey);
   var archBlend=0.64+arch.g*0.2+arch.a*0.16;
   var target=leaderPpg*lineShare*perf*posPts*formMult*teamOff*leagueFac*tierBoost*scale*pulse*archBlend;
   if(player.pos==='F'&&(player.pref||'C')==='C') target*=1.04;
   if(line===1&&perf>=0.92&&(player.arch==='Sniper'||player.arch==='Playmaker')) target*=1.05;
-  return cl(target, 0.03, getNpcTargetPpgCap(leagueKey));
+  if(leagueKey==='PHL'&&player.pos==='D'&&player.arch==='OffensiveD'&&line===1&&perf>=0.9) target*=1.32;
+  if(leagueKey==='PHL'&&player.pos==='D'&&player.arch==='OffensiveD'&&typeof isPhlGenerationalOffensiveD==='function'&&isPhlGenerationalOffensiveD(player, line, perf)) target*=1.10;
+  else if(leagueKey==='PHL'&&player.pos==='D'&&player.arch==='OffensiveD'&&typeof isPhlEliteOffensiveD==='function'&&isPhlEliteOffensiveD(player, line, perf)) target*=1.06;
+  if(leagueKey==='PHL'&&player.pos==='D'&&player.arch==='TwoWayD'&&line<=2&&perf>=0.88) target*=1.14;
+  if(leagueKey==='PHL'&&player.pos==='D'&&(player.arch==='StayAtHome'||player.arch==='ShutdownD')&&typeof isPhlDualThreatDefenseman==='function'&&isPhlDualThreatDefenseman(player, line, perf)) target*=1.08;
+  if(leagueKey==='PHL'&&player.pos==='F'&&player.arch==='Sniper'&&line===1){
+    if(typeof isPhlGenerationalSniper==='function'&&isPhlGenerationalSniper(player, line, perf)) target*=1.08;
+    else if(typeof isPhlEliteSniper==='function'&&isPhlEliteSniper(player, line, perf)) target*=1.04;
+  }
+  if(leagueKey==='PHL'&&player.pos==='F'&&player.arch==='Playmaker'&&line===1){
+    if(typeof isPhlGenerationalPlaymaker==='function'&&isPhlGenerationalPlaymaker(player, line, perf)) target*=1.12;
+    else if(typeof isPhlElitePlaymaker==='function'&&isPhlElitePlaymaker(player, line, perf)) target*=1.06;
+  }
+  if(leagueKey==='QMJL'&&player.pos==='F'&&player.arch==='Playmaker'&&line<=2) target*=1.03;
+  if(leagueKey==='QMJL'&&player.pos==='F'&&player.arch==='Sniper'&&line<=2) target*=1.04;
+  return cl(target, 0.03, getNpcTargetPpgCap(leagueKey, player));
 }
 
 function makeRookieProspect(pos, leagueKey, teamName){
@@ -422,7 +971,133 @@ function injectRookieProspects(players, leagueKey, teamName){
   }
 }
 
+function isCanadianJuniorLeague(leagueKey){
+  return leagueKey==='OJL'||leagueKey==='QMJL'||leagueKey==='WJL'||leagueKey==='CWHL';
+}
+
+/** Traditional powerhouse junior orgs — a few clubs carry most of each league's title equity. */
+var MAJOR_JUNIOR_ELITE_ORGS={
+  OJL:{
+    'Kitchener Hounds':1,
+    'London Mustangs':1,
+    'Windsor Fury':1,
+    'Sarnia Ramparts':1,
+    'Flint Forge':1
+  },
+  QMJL:{
+    'Québec Ramparts':1,
+    'Saint John Tide':1
+  }
+};
+
+function isMajorJuniorEliteOrg(leagueKey, teamName){
+  var map=MAJOR_JUNIOR_ELITE_ORGS[leagueKey];
+  return !!(map&&teamName&&map[teamName]);
+}
+
+function getMajorJuniorEliteOrgStandingsBonus(leagueKey, teamName){
+  if(!isMajorJuniorEliteOrg(leagueKey, teamName)) return 0;
+  if(leagueKey==='OJL') return 0.058;
+  if(leagueKey==='QMJL') return 0.048;
+  return 0;
+}
+
+function getMajorJuniorPlayoffPowerBonus(teamRow){
+  if(!teamRow||!teamRow.team) return 0;
+  var tn=teamRow.team.n;
+  var lk=teamRow.leagueKey||(typeof G!=='undefined'&&G&&G._playoffCtx&&G._playoffCtx.memorialCup?null:G&&G.leagueKey);
+  if(!lk&&typeof G!=='undefined'&&G&&G._cjlSeason&&G._cjlSeason.champions){
+    var ck, ch;
+    for(ck in G._cjlSeason.champions){
+      if(G._cjlSeason.champions[ck]&&G._cjlSeason.champions[ck].n===tn){ lk=ck; break; }
+    }
+  }
+  if(!lk) return 0;
+  if(!isMajorJuniorEliteOrg(lk, tn)) return 0;
+  if(lk==='OJL') return 0.12;
+  if(lk==='QMJL') return 0.08;
+  return 0;
+}
+
+/** Regular-season juggernauts face extra playoff resistance (especially young leagues). */
+function getPlayoffRegularSeasonRegression(teamRow){
+  if(!teamRow||!(teamRow.gp>0)) return 0;
+  if(typeof G==='undefined'||!G||!G.league) return 0;
+  var tier=G.league.tier||'';
+  if(tier!=='junior'&&tier!=='college'&&tier!=='minor') return 0;
+  var ppg=teamRow.pts/teamRow.gp;
+  if(ppg>=2.35) return -0.16;
+  if(ppg>=2.05) return -0.10;
+  if(ppg>=1.85) return -0.06;
+  return 0;
+}
+
+function getMajorJuniorGoalieOvrAdjust(leagueKey, teamName, rank){
+  var r=rank||0;
+  if(leagueKey==='OJL'){
+    var adj=r===0?rd(2.5,5.5):(r<3?rd(1.5,3.5):rd(0.5,2));
+    if(isMajorJuniorEliteOrg(leagueKey, teamName)&&r===0) adj+=rd(1,2.5);
+    return adj;
+  }
+  if(leagueKey==='WJL'){
+    return r===0?rd(1,3.5):(r<3?rd(0.5,2):rd(0,1));
+  }
+  if(leagueKey==='QMJL'){
+    if(isMajorJuniorEliteOrg(leagueKey, teamName)) return r===0?rd(0,1.5):-rd(0,1);
+    return -rd(2,4.5);
+  }
+  if(leagueKey==='CWHL') return -rd(0.5,2);
+  return 0;
+}
+
+function getRegionalPositionOvrMod(leagueKey, nat, pos, subPos, rank){
+  var r=rank||0, mod=0;
+  if(r>=12) return 0;
+  var isCan=nat==='Canada', isUsa=nat==='United States', isSwe=nat==='Sweden', isRus=nat==='Russia';
+  if(leagueKey==='USJL'&&pos==='F'&&subPos==='LW'&&(isUsa||(!isCan&&Math.random()<0.3))) mod+=rd(1,3);
+  if(leagueKey==='USJL'&&pos==='D'&&subPos==='RD'&&isUsa) mod+=rd(1,2.5);
+  if(isCanadianJuniorLeague(leagueKey)&&pos==='F'&&subPos==='C'&&isCan) mod+=rd(1,3);
+  if(isCanadianJuniorLeague(leagueKey)&&pos==='D'&&subPos==='LD'&&isCan) mod+=rd(1,2.5);
+  if(leagueKey==='ARJC'&&pos==='F'&&subPos==='RW'&&(isRus||Math.random()<0.35)) mod+=rd(1,3);
+  if(leagueKey==='NEJC'&&pos==='F'&&(subPos==='LW'||subPos==='RW')&&isSwe) mod+=rd(1,2.5);
+  if(leagueKey==='NEJC'&&pos==='D'&&isSwe) mod+=rd(0.5,2);
+  if(pos==='F'&&subPos==='C'&&r<7&&Math.random()<0.32) mod+=rd(0.5,1.5);
+  return mod;
+}
+
+function balanceTeamForwardArchetypes(players){
+  var fw=players.filter(function(p){return p.pos==='F';});
+  if(fw.length<6) return;
+  var sorted=fw.slice().sort(function(a,b){return (b.ovr||0)-(a.ovr||0);});
+  var eliteOvr=(sorted[2]&&sorted[2].ovr)||(sorted[0]&&sorted[0].ovr)||60;
+  var hasPm=false, hasSn=false, i;
+  for(i=0;i<fw.length;i++){
+    if(fw[i].arch==='Playmaker'&&(fw[i].ovr||0)>=eliteOvr-4) hasPm=true;
+    if(fw[i].arch==='Sniper'&&(fw[i].ovr||0)>=eliteOvr-4) hasSn=true;
+  }
+  if(!hasPm){
+    var pmCand=sorted.find(function(p){return p.pref==='C'||p.arch==='TwoWay'||p.arch==='PowerForward';})||sorted[1]||sorted[0];
+    if(pmCand) pmCand.arch='Playmaker';
+  }
+  if(!hasSn){
+    var snCand=sorted.find(function(p){return p.arch!=='Playmaker'&&(p.pref==='LW'||p.pref==='RW'||p.arch==='PowerForward');})||sorted[0];
+    if(snCand&&snCand.arch==='Playmaker'&&sorted.length>2) snCand=sorted[2];
+    if(snCand) snCand.arch='Sniper';
+  }
+  var pmRanked=sorted.filter(function(p){return p.arch==='Playmaker';});
+  for(i=1;i<pmRanked.length;i++){
+    if((pmRanked[i].ovr||0)<(pmRanked[0].ovr||0)-6){
+      pmRanked[i].arch=Math.random()<0.5?'TwoWay':'PowerForward';
+    } else if(i>=2&&(pmRanked[i].ovr||0)<eliteOvr+2){
+      pmRanked[i].arch='TwoWay';
+    }
+  }
+}
+
 function rollPlayerHand(pos, subPos, leagueKey){
+  if(pos==='G'){
+    return Math.random()<0.84?'L':'R';
+  }
   var euro=isEuropeanStyleLeague(leagueKey);
   var local=typeof isLocalLeague==='function'&&isLocalLeague(leagueKey);
   var leftPct=euro?0.68:(local?0.38:0.60);
@@ -454,8 +1129,8 @@ function pickNpcArchetype(pos, subPos){
   }
   var sp=subPos||'C', r=Math.random();
   if(sp==='C'){
-    if(r<0.24) return 'Playmaker';
-    if(r<0.44) return 'Sniper';
+    if(r<0.18) return 'Playmaker';
+    if(r<0.40) return 'Sniper';
     if(r<0.64) return 'PowerForward';
     if(r<0.84) return 'TwoWay';
     return 'Grinder';
@@ -472,6 +1147,13 @@ function pickNpcArchetypeForRank(pos, subPos, leagueKey, rank){
   var r=rank||0;
   if(pos==='G') return 'Goalie';
   if(pos==='D'){
+    if(r===0){
+      var dr=Math.random();
+      if(dr<0.34) return 'OffensiveD';
+      if(dr<0.68) return 'TwoWayD';
+      if(dr<0.86) return 'ShutdownD';
+      return 'StayAtHome';
+    }
     if(r<4) return pickNpcArchetype(pos, subPos);
     if(r<8) return Math.random()<0.48?'StayAtHome':'TwoWayD';
     return Math.random()<0.55?'ShutdownD':'StayAtHome';
@@ -541,27 +1223,201 @@ function getForwardPositionOvrMod(subPos, rank){
   return 0;
 }
 
-function genNpcOvr(pos, leagueKey, rank, playerAge, subPos, teamName){
+function isEliteProLeagueKey(leagueKey){
+  var analog=getMenAnalogLeagueKey(leagueKey);
+  return analog==='PHL'||leagueKey==='PHL'||leagueKey==='PWL';
+}
+
+function isMinorProLeagueKey(leagueKey){
+  return leagueKey==='NAML'||leagueKey==='PWDL';
+}
+
+/** 99 OVR = legendary peak; PHL regulars sit 80–88, 4th liners ~80, scratches rare sub-80. */
+function applyEliteProOvrRankCaps(leagueKey, pos, rank, o, playerAge){
+  if(!isEliteProLeagueKey(leagueKey)) return Math.round(o);
+  var r=rank||0;
+  var age=playerAge!=null?playerAge:28;
+  if(pos==='G'){
+    o=Math.max(o, r===0?76:74);
+    if(r>=1) o=Math.min(o, 84);
+    if(r===0){
+      if(age>=28&&age<=33&&o>=90&&Math.random()<0.012) o=99;
+      else o=Math.min(o, 91);
+    }
+    return Math.round(cl(o, 74, 99));
+  }
+  if(r===0){
+    if(age>=28&&age<=33&&o>=90&&Math.random()<0.012) o=99;
+    else if(o>=93) o=ri(88,91);
+  } else if(r>=1&&o>=91) o=ri(85,89);
+  else if(r>=2&&o>=88) o=Math.min(o, ri(84,87));
+  else if(r>=4&&o>=86) o=Math.min(o, ri(82,85));
+  else if(r>=6&&o>=84) o=Math.min(o, ri(81,84));
+  else if(r>=9&&o>=82) o=Math.min(o, ri(80,83));
+  else if(r>=12) o=Math.min(Math.max(o, 80), 82);
+  else if(r>=14) o=Math.min(Math.max(o, 76), 81);
+  return Math.round(cl(o, 76, 99));
+}
+
+function genMinorProNpcOvr(pos, leagueKey, rank, playerAge, subPos){
+  var ceiling=typeof getMinorLeagueOvrCeiling==='function'?getMinorLeagueOvrCeiling():84;
+  var floor=typeof getMinorLeagueOvrFloor==='function'?getMinorLeagueOvrFloor():72;
+  var r=rank||0;
+  var t=cl(1-(r/18), 0, 1);
+  var o=floor+Math.pow(t, 1.15)*(ceiling-floor-2)+rd(-2,2);
+  if(pos==='G'){
+    if(r===0) o+=rd(1,4);
+    else o-=rd(2,5);
+  } else if(r<=2) o+=rd(0,2);
+  else if(r>=10) o-=rd(1,3);
+  if(playerAge!=null) o+=applyProAgeOvrModifier(playerAge)*0.4;
+  if(r===0) o=Math.min(o, ceiling);
+  else if(r>=1) o=Math.min(o, ceiling-1);
+  return Math.round(cl(o, floor, ceiling));
+}
+
+function clampMinorProRosterOvrSpread(players, leagueKey){
+  if(!isMinorProLeagueKey(leagueKey)||!players||!players.length) return;
+  var ceiling=typeof getMinorLeagueOvrCeiling==='function'?getMinorLeagueOvrCeiling():84;
+  var floor=typeof getMinorLeagueOvrFloor==='function'?getMinorLeagueOvrFloor():72;
+  var skaters=players.filter(function(p){return !p.isMe&&p.pos!=='G';});
+  var goalies=players.filter(function(p){return !p.isMe&&p.pos==='G';});
+  skaters.sort(function(a,b){return (b.ovr||0)-(a.ovr||0);});
+  goalies.sort(function(a,b){return (b.ovr||0)-(a.ovr||0);});
+  var i, p;
+  for(i=0;i<skaters.length;i++){
+    p=skaters[i];
+    if((p.ovr||0)>ceiling) p.ovr=ceiling;
+    if(i<16&&(p.ovr||0)<floor+2) p.ovr=Math.max(p.ovr||0, floor+2);
+  }
+  for(i=0;i<goalies.length;i++){
+    p=goalies[i];
+    if((p.ovr||0)>ceiling-1) p.ovr=ceiling-1;
+    if((p.ovr||0)<floor) p.ovr=floor;
+  }
+}
+
+function genEliteProNpcOvr(pos, leagueKey, rank, playerAge, subPos, teamName){
+  var base=83;
+  var r=rank||0;
+  var t=cl(1-(r/20), 0, 1);
+  var o=80+Math.pow(t, 1.28)*(base+4-80)+rd(-1.2,1.2);
+  if(teamName) o+=getTeamProfileOvrMod(leagueKey, teamName, rank);
+  if(playerAge!=null&&playerAge<=24&&r<=3) o-=rd(1,3.5);
+  if(pos==='D'){
+    if(r===0) o+=rd(0,2);
+    else if(r<=2) o+=rd(0,1.5);
+    else if(r>=10) o-=rd(1,3);
+  } else if(pos==='G'){
+    if(r===0) o+=rd(1,4);
+    else o-=rd(2,5);
+  } else {
+    if(r===0) o+=rd(0,2.5);
+    else if(r<=2) o+=rd(0,1);
+    else if(r>=10) o-=rd(1,3);
+    if(pos==='F') o+=getForwardPositionOvrMod(subPos, rank)*0.45;
+  }
+  if(playerAge!=null) o+=applyProAgeOvrModifier(playerAge)*0.55;
+  return applyEliteProOvrRankCaps(leagueKey, pos, rank, o, playerAge);
+}
+
+function clampEliteProRosterOvrSpread(players, leagueKey){
+  if(!isEliteProLeagueKey(leagueKey)||!players||!players.length) return;
+  var skaters=players.filter(function(p){return !p.isMe&&p.pos!=='G';});
+  var goalies=players.filter(function(p){return !p.isMe&&p.pos==='G';});
+  skaters.sort(function(a,b){return (b.ovr||0)-(a.ovr||0);});
+  goalies.sort(function(a,b){return (b.ovr||0)-(a.ovr||0);});
+  var i, p, capByRank, floorByRank;
+  for(i=0;i<skaters.length;i++){
+    p=skaters[i];
+    if(i===0){ capByRank=92; floorByRank=86; }
+    else if(i<=2){ capByRank=90; floorByRank=84; }
+    else if(i<=5){ capByRank=88; floorByRank=82; }
+    else if(i<=8){ capByRank=86; floorByRank=81; }
+    else if(i<=12){ capByRank=84; floorByRank=80; }
+    else if(i<=16){ capByRank=82; floorByRank=80; }
+    else { capByRank=80; floorByRank=76; }
+    if(p.ovrCeiling!=null) capByRank=Math.min(capByRank, p.ovrCeiling);
+    if((p.ovr||0)>capByRank) p.ovr=capByRank;
+    if(i<=16&&(p.ovr||0)<floorByRank) p.ovr=floorByRank;
+  }
+  for(i=0;i<goalies.length;i++){
+    p=goalies[i];
+    capByRank=i===0?90:82;
+    floorByRank=i===0?76:74;
+    if(p.ovrCeiling!=null) capByRank=Math.min(capByRank, p.ovrCeiling);
+    if((p.ovr||0)>capByRank) p.ovr=capByRank;
+    if((p.ovr||0)<floorByRank) p.ovr=floorByRank;
+  }
+}
+
+function genNpcOvr(pos, leagueKey, rank, playerAge, subPos, teamName, nat){
   var tier=(LEAGUES[leagueKey]||{}).tier||'junior';
   var bands=getLeagueOvrBands(leagueKey);
   var floor=bands.floor;
   var cap=bands.cap;
   if(tier==='junior'){
-    var midMap={OJL:64, CWHL:63, WJL:62, NEJC:60, QMJL:58, USJL:57, USWDL:57, ARJC:55, EWJC:55, AWJC:54, CEJC:52};
+    var midMap={OJL:58,CWHL:57,WJL:57,USJL:56,USWDL:56,NEJC:54,ARJC:53,QMJL:50,CEJC:49,EWJC:51,AWJC:50};
+    var depthCapMap={OJL:66,CWHL:66,WJL:65,USJL:64,USWDL:64,NEJC:62,ARJC:61,QMJL:58,CEJC:58,EWJC:59,AWJC:58};
+    var starCapMap={OJL:74,CWHL:74,WJL:72,USJL:72,USWDL:72,NEJC:70,ARJC:69,QMJL:64,CEJC:65,EWJC:68,AWJC:66};
+    var prospectChanceMap={OJL:0.22,CWHL:0.22,WJL:0.18,USJL:0.16,USWDL:0.16,NEJC:0.14,ARJC:0.12,QMJL:0.08,CEJC:0.08,EWJC:0.10,AWJC:0.08};
     var mid=midMap[leagueKey]!=null?midMap[leagueKey]:bands.baseline;
     var rankT=cl(1-((rank||0)/20), 0, 1);
-    var rankBonus=Math.pow(rankT, 1.42)*14;
+    var rankBonus=Math.pow(rankT, 1.55)*10;
     var ageBonus=getJuniorAgeOvrBonus(playerAge);
-    var prospect=(rank||0)<2&&Math.random()<0.32?rd(1,4):0;
-    var o=mid+rankBonus+ageBonus+prospect+rd(-5,5);
+    var prospect=(rank||0)<1&&Math.random()<(prospectChanceMap[leagueKey]!=null?prospectChanceMap[leagueKey]:0.12)?rd(1,3):0;
+    var o=mid+rankBonus+ageBonus+prospect+rd(-4,4);
     if(pos==='F') o+=getForwardPositionOvrMod(subPos, rank);
-    if(pos==='D'&&(rank||0)<6) o+=rd(-1,2);
-    if((rank||0)>=8) o-=rd(3,9);
+    if(pos==='D'&&(rank||0)<4) o+=rd(-1,1);
+    if((rank||0)>=2) o-=rd(1,4);
+    if((rank||0)>=5) o-=rd(3,8);
+    if((rank||0)>=8) o-=rd(4,10);
     if((rank||0)>=12) o-=rd(4,10);
     if((rank||0)>=16) o-=rd(2,7);
-    if(playerAge<=16&&Math.random()<0.38) o-=rd(2,5);
-    if((rank||0)>=6&&Math.random()<0.3) o=ri(58,62)+Math.round(rankBonus*0.12);
+    if(playerAge<=16&&Math.random()<0.42) o-=rd(2,6);
+    var depthCap=depthCapMap[leagueKey]!=null?depthCapMap[leagueKey]:64;
+    if((rank||0)>=3) o=Math.min(o, depthCap);
+    if((rank||0)>=6&&Math.random()<0.35) o=ri(floor+2, floor+8)+Math.round(rankBonus*0.08);
+    if((rank||0)===0){
+      var starCap=starCapMap[leagueKey]!=null?starCapMap[leagueKey]:74;
+      if(Math.random()<0.16) o+=rd(2,4);
+      else if(Math.random()<0.38) o+=rd(1,2);
+      o=Math.min(o, starCap);
+    }
+    o+=getJuniorRegionalOvrOffset(leagueKey, teamName);
+    o+=getRegionalPositionOvrMod(leagueKey, nat, pos, subPos, rank);
+    if(pos==='G'&&isCanadianJuniorLeague(leagueKey)){
+      o+=getMajorJuniorGoalieOvrAdjust(leagueKey, teamName, rank);
+      if(leagueKey==='OJL') cap=Math.max(cap, isMajorJuniorEliteOrg(leagueKey, teamName)?70:69);
+      else if(leagueKey==='WJL') cap=Math.max(cap, 68);
+      else if(leagueKey==='QMJL') cap=Math.min(cap, isMajorJuniorEliteOrg(leagueKey, teamName)?64:62);
+    } else if(pos==='G'&&(leagueKey==='USJL'||leagueKey==='NEJC'||leagueKey==='ARJC')){
+      cap=Math.max(cap, leagueKey==='USJL'?72:71);
+    }
+    var usndtSquad=leagueKey==='USJL'&&teamName&&typeof isUsndtTeam==='function'&&isUsndtTeam(teamName);
+    if(usndtSquad){
+      cap=typeof isUsndtU18Team==='function'&&isUsndtU18Team(teamName)?76:74;
+    }
+    if(leagueKey==='USJL'&&teamName&&typeof isUsndtU18Team==='function'&&isUsndtU18Team(teamName)){
+      o+=5+(rankT*7);
+      if((rank||0)<4) o+=rd(1,4);
+      if((rank||0)<8) o+=rd(0,2);
+      if((rank||0)===0&&Math.random()<0.12) o+=rd(1,2);
+    } else if(leagueKey==='USJL'&&teamName&&typeof isUsndtU17Team==='function'&&isUsndtU17Team(teamName)){
+      o+=4+(rankT*6);
+      if((rank||0)<4) o+=rd(1,3);
+      if((rank||0)<8) o+=rd(0,1);
+    } else if(usndtSquad){
+      o+=4+(rankT*5);
+      if((rank||0)<4) o+=rd(1,3);
+    }
     return Math.round(cl(o, floor, cap));
+  }
+  if(isEliteProLeagueKey(leagueKey)){
+    return genEliteProNpcOvr(pos, leagueKey, rank, playerAge, subPos, teamName);
+  }
+  if(isMinorProLeagueKey(leagueKey)){
+    return genMinorProNpcOvr(pos, leagueKey, rank, playerAge, subPos);
   }
   var base=bands.baseline+getLeagueRosterSkillOffset(leagueKey)*0.35;
   var spread=bands.spread||(pos==='G'?10:12);
@@ -576,6 +1432,10 @@ function genNpcOvr(pos, leagueKey, rank, playerAge, subPos, teamName){
   if(playerAge!=null) o+=applyProAgeOvrModifier(playerAge);
   if(leagueKey==='ARHL'&&teamName&&typeof getArhlTeamSkillBonus==='function'){
     o+=getArhlTeamSkillBonus(typeof getArhlTeamRegion==='function'?getArhlTeamRegion(teamName):'russia');
+  }
+  if(pos==='G'&&isEstablishedProLeague(leagueKey)){
+    o=Math.max(o, (rank||0)===0?70:68);
+    if((rank||0)>=1) o=Math.min(o, 85);
   }
   return Math.round(cl(o, floor, cap));
 }
@@ -596,8 +1456,9 @@ function ensureScoringPulse(p){
 
 function getPositionScoringBias(player){
   if(player.pos==='D'){
-    if(player.arch==='OffensiveD') return rd(1.1,1.28);
-    if(player.arch==='TwoWayD') return rd(0.98,1.12);
+    if(player.arch==='OffensiveD') return rd(1.16,1.32);
+    if(player.arch==='TwoWayD') return rd(1.02,1.16);
+    if(player.arch==='StayAtHome'||player.arch==='ShutdownD') return rd(0.92,1.06);
     return rd(0.86,1.0);
   }
   if(player.pos==='F'){
@@ -610,8 +1471,13 @@ function getPositionScoringBias(player){
 
 function rollWeeklyGames(perWeek, line, pos, player){
   if(pos==='G'){
-    if(line!==1) return Math.random()<0.14?1:0;
-    return perWeek;
+    if(line!==1&&line!==2) return 0;
+    var ovrN=player?player.ovr||50:50;
+    var startShare=line===1?cl(0.58+(ovrN-66)/95, 0.45, 0.82):cl(0.10+(ovrN-66)/110, 0.05, 0.38);
+    if(Math.random()<startShare) return perWeek;
+    if(line===1&&Math.random()<0.22) return Math.max(0, perWeek-1);
+    if(line===2&&Math.random()<0.35) return 1;
+    return 0;
   }
   if(player&&player.injured&&(player.injWks||0)>0){
     player.injWks--;
@@ -658,7 +1524,11 @@ function getLeagueCalendarGamesPlayed(leagueKey){
 
 function formatLeaderGpCell(row, calendarGp){
   var gp=row.gp;
-  var missed=Math.max(0, calendarGp-gp);
+  var cal=calendarGp;
+  if(row.player&&typeof getUsndtLeaderCalendarGp==='function'){
+    cal=getUsndtLeaderCalendarGp(row.player, G&&G.leagueKey, calendarGp);
+  }
+  var missed=Math.max(0, cal-gp);
   if(missed<1) return String(gp);
   var title='Missed '+missed+' game'+(missed>1?'s':'');
   if(row.player.isMe&&G.isInjured) title+=' (injury)';
@@ -684,10 +1554,11 @@ function makeNpcPlayer(pos, leagueKey, rank, carry, teamName){
     else ovrN+=applyProAgeOvrModifier(aged);
     if(aged>=30) ovrN=Math.round(ovrN-rd(0.5,2.8));
     if(aged>=35) ovrN=Math.round(ovrN-rd(1,4));
-    ovrN=cl(ovrN, floor, cap);
+    var ovrCap=carry.ovrCeiling!=null?Math.min(cap, carry.ovrCeiling):cap;
+    ovrN=cl(ovrN, floor, ovrCap);
     if(aged>=38&&ovrN<52&&Math.random()<0.55) return null;
     mergeSeasonIntoCareerLeagueStats(carry, leagueKey);
-    return {
+    var npc={
       id:carry.id, first:carry.first, last:carry.last, pos:carry.pos,
       pref:carry.pref||carry.subPos, hand:carry.hand, age:aged, arch:carry.arch,
       ovr:ovrN, isMe:false, team:carry.team, leadership:carry.leadership||'',
@@ -698,8 +1569,11 @@ function makeNpcPlayer(pos, leagueKey, rank, carry, teamName){
       seasonStats:emptyPlayerStats(),
       _statsSeason:G?G.season:1,
       form:typeof carry.form==='number'?carry.form:50,
-      scoringPulse:typeof carry.scoringPulse==='number'?carry.scoringPulse:rd(0.76,1.24)
+      scoringPulse:typeof carry.scoringPulse==='number'?carry.scoringPulse:rd(0.76,1.24),
+      ovrCeiling:carry.ovrCeiling, npcTier:carry.npcTier, devRate:carry.devRate
     };
+    assignNpcCareerProfile(npc, leagueKey, rank, teamName);
+    return npc;
   }
   var subPos;
   if(pos==='F'){
@@ -715,20 +1589,37 @@ function makeNpcPlayer(pos, leagueKey, rank, carry, teamName){
   var age=rollNpcAgeForLeague(leagueKey, pos);
   var nat=typeof rollNpcNationality==='function'?rollNpcNationality(leagueKey, teamName):null;
   var nm=rollNpcName(leagueKey, nat);
-  return {
+  var ovrN=genNpcOvr(pos, leagueKey, rank, age, subPos, teamName, nat||nm.nat);
+  if(leagueKey==='USJL'&&teamName&&typeof isUsndtTeam==='function'&&!isUsndtTeam(teamName)&&(nat||nm.nat)==='United States'&&(rank||0)<6){
+    ovrN=Math.round(ovrN-rd(1,4));
+  }
+  var archPick=pickNpcArchetypeForRank(pos, subPos, leagueKey, rank);
+  if(leagueKey==='USJL'&&teamName&&typeof isUsndtTeam==='function'&&isUsndtTeam(teamName)&&(rank||0)<6){
+    if(pos==='F'&&Math.random()<0.58) archPick=['Sniper','Playmaker','PowerForward'][ri(0,2)];
+    if(pos==='D'&&(rank||0)<4&&Math.random()<0.48) archPick='OffensiveD';
+  }
+  var pulse=rd(0.78,1.22);
+  if(leagueKey==='USJL'&&teamName&&typeof isUsndtTeam==='function'&&isUsndtTeam(teamName)&&(rank||0)<6) pulse=rd(0.92,1.18);
+  if(leagueKey==='PHL'&&pos==='F'&&archPick==='Sniper'&&(rank||0)===0&&ovrN>=86&&Math.random()<0.14) pulse=rd(1.02,1.12);
+  var npc={
     id:'npc_'+ri(10000,99999)+'_'+Date.now().toString(36).slice(-4),
     first:nm.first, last:nm.last, nat:nat||nm.nat||rollNpcNationality(leagueKey, teamName),
     pos:pos, pref:subPos, hand:hand,
     age:age,
-    arch:pickNpcArchetypeForRank(pos, subPos, leagueKey, rank),
-    ovr:genNpcOvr(pos, leagueKey, rank, age, subPos, teamName),
+    arch:archPick,
+    ovr:ovrN,
     isMe:false, team:null, leadership:'',
-    proProspect:tier==='junior'&&(rank||0)<4&&Math.random()<0.42,
+    proProspect:tier==='junior'&&(
+      (leagueKey==='USJL'&&teamName&&typeof isUsndtTeam==='function'&&isUsndtTeam(teamName)&&(rank||0)<5)?Math.random()<0.72:
+      ((rank||0)<4&&Math.random()<0.42)
+    ),
     alumniFrom:'', juniorMate:false,
     seasonStats:emptyPlayerStats(), form:48+ri(0,14),
     _statsSeason:G?G.season:1,
-    scoringPulse:rd(0.78,1.22)
+    scoringPulse:pulse
   };
+  assignNpcCareerProfile(npc, leagueKey, rank, teamName);
+  return npc;
 }
 
 function pickCoach(teamName, leagueKey, prevCoach){
@@ -744,8 +1635,10 @@ function pickCoach(teamName, leagueKey, prevCoach){
 function lineComplementScore(a, b){
   if(!a||!b) return 0;
   var s=0;
-  if(a.arch==='Playmaker'&&(b.arch==='Sniper'||b.arch==='PowerForward')) s+=3;
-  if(b.arch==='Playmaker'&&(a.arch==='Sniper'||a.arch==='PowerForward')) s+=3;
+  if(a.arch==='Playmaker'&&(b.arch==='Sniper'||b.arch==='PowerForward')) s+=5;
+  if(b.arch==='Playmaker'&&(a.arch==='Sniper'||a.arch==='PowerForward')) s+=5;
+  if(a.arch==='Sniper'&&b.arch==='Playmaker') s+=4;
+  if(b.arch==='Sniper'&&a.arch==='Playmaker') s+=4;
   if(a.arch==='Grinder'&&b.arch==='Sniper') s+=1.5;
   if(a.hand!==b.hand) s+=0.8;
   if(a.pref==='C'||b.pref==='C') s+=0.4;
@@ -770,6 +1663,11 @@ function assignForwardLine(fwd, slots, start){
   for(i=0;i<4;i++){
     var lwS=slots[start+i*3], cS=slots[start+i*3+1], rwS=slots[start+i*3+2];
     cP=pickBestForDepthSlot(pool, used, 'C')||pickBestForDepthSlot(pool, used, null);
+    if(i===0&&cP){
+      var pmPool=pool.filter(function(p){return !used[p.id]&&(p.arch==='Playmaker'||p.pref==='C');});
+      pmPool.sort(function(a,b){return getWeeklyDepthScore(b)-getWeeklyDepthScore(a);});
+      if(pmPool[0]&&(pmPool[0].ovr||0)>=(cP.ovr||0)-5) cP=pmPool[0];
+    }
     if(!cP) break;
     used[cP.id]=true;
     cS.player=cP; cP.depthSlot=cS.slot;
@@ -777,6 +1675,7 @@ function assignForwardLine(fwd, slots, start){
     best=null; bestSc=-99;
     for(j=0;j<rem.length;j++){
       var sc=lineComplementScore(cP, rem[j]);
+      if(i===0&&rem[j].arch==='Sniper') sc+=3;
       if((rem[j].pref==='LW'||rem[j].hand==='L')&&rem[j].pref!=='RW') sc+=0.5;
       sc+=getWeeklyDepthScore(rem[j])*0.04;
       if(sc>bestSc){ bestSc=sc; best=rem[j]; }
@@ -787,6 +1686,7 @@ function assignForwardLine(fwd, slots, start){
     best=null; bestSc=-99;
     for(j=0;j<rem.length;j++){
       var sc2=lineComplementScore(cP, rem[j]);
+      if(i===0&&rem[j].arch==='Sniper') sc2+=3;
       if((rem[j].pref==='RW'||rem[j].hand==='R')&&rem[j].pref!=='LW') sc2+=0.5;
       sc2+=getWeeklyDepthScore(rem[j])*0.04;
       if(sc2>bestSc){ bestSc=sc2; best=rem[j]; }
@@ -834,7 +1734,7 @@ function getPowerPlayScore(p){
   if(p.pos==='G') return -999;
   if(p.pos==='D'){
     if(p.arch==='OffensiveD') return base+14;
-    if(p.arch==='TwoWayD') return base+6;
+    if(p.arch==='TwoWayD') return base+8;
     if(p.arch==='StayAtHome') return base-4;
     if(p.arch==='ShutdownD') return base-8;
     return base;
@@ -842,7 +1742,7 @@ function getPowerPlayScore(p){
   if(p.arch==='Sniper') return base+12;
   if(p.arch==='Playmaker') return base+10;
   if(p.arch==='PowerForward') return base+8;
-  if(p.arch==='TwoWay') return base+3;
+  if(p.arch==='TwoWay') return base+5;
   if(p.arch==='Grinder') return base-6;
   return base;
 }
@@ -854,8 +1754,8 @@ function getPenaltyKillScore(p){
   if(p.pos==='D'){
     if(p.arch==='ShutdownD') return base+14;
     if(p.arch==='StayAtHome') return base+12;
-    if(p.arch==='TwoWayD') return base+8;
-    if(p.arch==='OffensiveD') return base-6;
+    if(p.arch==='TwoWayD') return base+10;
+    if(p.arch==='OffensiveD') return base-4;
     return base;
   }
   if(p.arch==='Grinder') return base+10;
@@ -876,11 +1776,19 @@ function pickBestForSpecial(pool, used, scoreFn){
 
 function assignPowerPlayUnit(pool, used, unitSlots){
   var picked=[], p, i;
-  p=pickBestForSpecial(pool, used, function(pl){return pl.pos==='D'?getPowerPlayScore(pl):-999;});
-  if(p){ used[p.id]=true; picked.push(p); }
+  var avail=pool.filter(function(pl){return pl.pos!=='G'&&!used[pl.id];});
+  avail.sort(function(a,b){return getPowerPlayScore(b)-getPowerPlayScore(a);});
+  var dCand=avail.filter(function(pl){return pl.pos==='D';});
+  if(dCand.length){
+    p=dCand[0];
+    used[p.id]=true;
+    picked.push(p);
+  }
   while(picked.length<5){
-    p=pickBestForSpecial(pool, used, getPowerPlayScore);
-    if(!p) break;
+    avail=pool.filter(function(pl){return pl.pos!=='G'&&!used[pl.id];});
+    if(!avail.length) break;
+    avail.sort(function(a,b){return getPowerPlayScore(b)-getPowerPlayScore(a);});
+    p=avail[0];
     used[p.id]=true;
     picked.push(p);
   }
@@ -893,17 +1801,26 @@ function assignPowerPlayUnit(pool, used, unitSlots){
 
 function assignPenaltyKillUnit(pool, used, unitSlots){
   var picked=[], p, i, n;
-  for(n=0;n<2;n++){
-    p=pickBestForSpecial(pool, used, function(pl){return pl.pos==='D'?getPenaltyKillScore(pl):-999;});
-    if(p){ used[p.id]=true; picked.push(p); }
+  var avail=pool.filter(function(pl){return pl.pos!=='G'&&!used[pl.id];});
+  avail.sort(function(a,b){return getPenaltyKillScore(b)-getPenaltyKillScore(a);});
+  var dCand=avail.filter(function(pl){return pl.pos==='D';});
+  for(n=0;n<2&&n<dCand.length;n++){
+    p=dCand[n];
+    if(used[p.id]) continue;
+    used[p.id]=true;
+    picked.push(p);
   }
-  for(n=0;n<2;n++){
-    p=pickBestForSpecial(pool, used, function(pl){return pl.pos==='F'?getPenaltyKillScore(pl):-999;});
-    if(p){ used[p.id]=true; picked.push(p); }
+  var fCand=avail.filter(function(pl){return pl.pos==='F'&&!used[pl.id];});
+  for(n=0;n<2&&n<fCand.length;n++){
+    p=fCand[n];
+    used[p.id]=true;
+    picked.push(p);
   }
   while(picked.length<4){
-    p=pickBestForSpecial(pool, used, getPenaltyKillScore);
-    if(!p) break;
+    avail=pool.filter(function(pl){return pl.pos!=='G'&&!used[pl.id];});
+    if(!avail.length) break;
+    avail.sort(function(a,b){return getPenaltyKillScore(b)-getPenaltyKillScore(a);});
+    p=avail[0];
     used[p.id]=true;
     picked.push(p);
   }
@@ -915,16 +1832,22 @@ function assignPenaltyKillUnit(pool, used, unitSlots){
 }
 
 function assignSpecialTeams(skaters, slots){
-  var used={}, pool=skaters.slice();
-  assignPowerPlayUnit(pool, used, slots.pp1);
-  assignPowerPlayUnit(pool, used, slots.pp2);
-  assignPenaltyKillUnit(pool, used, slots.pk1);
-  assignPenaltyKillUnit(pool, used, slots.pk2);
+  var ppUsed={}, pkUsed={};
+  assignPowerPlayUnit(skaters, ppUsed, slots.pp1);
+  assignPowerPlayUnit(skaters, ppUsed, slots.pp2);
+  assignPenaltyKillUnit(skaters, pkUsed, slots.pk1);
+  assignPenaltyKillUnit(skaters, pkUsed, slots.pk2);
 }
 
 function getDepthSortScore(p){
   var form=typeof p.form==='number'?p.form:50;
-  return p.ovr*0.5+form*0.5;
+  var ovrN=p.ovr||50;
+  var score=ovrN*0.80+form*0.20;
+  if(ovrN>=95) score=Math.max(score, 95+form*0.04);
+  else if(ovrN>=92) score=Math.max(score, 93+form*0.05);
+  else if(ovrN>=88) score=Math.max(score, 89+form*0.07);
+  else if(ovrN>=84) score=Math.max(score, 85+form*0.09);
+  return score;
 }
 
 /** Higher = deserves to dress; lower = healthy-scratch candidate. Talent + recent form + season box score. */
@@ -944,7 +1867,8 @@ function getHealthyScratchScore(p){
   } else {
     prod=ovr*0.1+form*0.06;
   }
-  return ovr*0.38+form*0.37+prod*0.25;
+  var score=ovr*0.38+form*0.37+prod*0.25;
+  return score;
 }
 
 var _depthAssignLeagueKey='';
@@ -952,8 +1876,11 @@ var _depthAssignLeagueKey='';
 function getWeeklyDepthScore(p){
   var base=getDepthSortScore(p);
   if(p.isMe&&typeof getCoachRelationDepthBonus==='function') base+=getCoachRelationDepthBonus();
-  if(isEstablishedProLeague(_depthAssignLeagueKey)) return base+rd(-2,2);
-  return base+rd(-5,5);
+  var ovrN=p.ovr||50;
+  if(ovrN>=92) return base+rd(-0.8,0.8);
+  if(ovrN>=88) return base+rd(-1.2,1.2);
+  if(isEstablishedProLeague(_depthAssignLeagueKey)) return base+rd(-1.5,1.5);
+  return base+rd(-2.5,2.5);
 }
 
 function avgNpcForm(players){
@@ -1107,12 +2034,12 @@ function maybeProDepthAdjust(roster){
   if(!roster||!roster.depth||!isEstablishedProLeague(roster.leagueKey||'')) return;
   var d=roster.depth;
   var moved=false;
-  if(Math.random()<0.22) moved=trySwapForwardLinesIfWarranted(d, 3, 4, 8)||moved;
-  if(Math.random()<0.14) moved=trySwapForwardLinesIfWarranted(d, 2, 3, 10)||moved;
-  if(Math.random()<0.07) moved=trySwapForwardLinesIfWarranted(d, 1, 2, 14)||moved;
-  if(!moved&&Math.random()<0.16) tryPromoteHotForward(d, 4, 3);
-  if(Math.random()<0.15) trySwapDefensePairsIfWarranted(d, 2, 3, 9);
-  if(Math.random()<0.08) trySwapDefensePairsIfWarranted(d, 1, 2, 13);
+  if(Math.random()<0.16) moved=trySwapForwardLinesIfWarranted(d, 3, 4, 11)||moved;
+  if(Math.random()<0.10) moved=trySwapForwardLinesIfWarranted(d, 2, 3, 14)||moved;
+  if(Math.random()<0.04) moved=trySwapForwardLinesIfWarranted(d, 1, 2, 22)||moved;
+  if(!moved&&Math.random()<0.12) tryPromoteHotForward(d, 4, 3);
+  if(Math.random()<0.11) trySwapDefensePairsIfWarranted(d, 2, 3, 12);
+  if(Math.random()<0.05) trySwapDefensePairsIfWarranted(d, 1, 2, 20);
   if(Math.random()<0.18) refreshProSpecialUnit(roster, 'pp2');
   if(Math.random()<0.1) trySwapOneSpecialSpot(roster, d.pp1, getPowerPlayScore, 'ppSlot');
   if(Math.random()<0.12) refreshProSpecialUnit(roster, 'pk2');
@@ -1132,8 +2059,88 @@ function pickBestForDepthSlot(pool, used, prefer){
     });
     if(pref.length) avail=pref;
   }
-  avail.sort(function(a,b){return getWeeklyDepthScore(b)-getWeeklyDepthScore(a);});
+  avail.sort(function(a,b){
+    var sa=getWeeklyDepthScore(a), sb=getWeeklyDepthScore(b);
+    if(prefer){
+      sa+=getDepthPrefSlotBonus(a, prefer);
+      sb+=getDepthPrefSlotBonus(b, prefer);
+    }
+    return sb-sa;
+  });
   return avail[0];
+}
+
+function getDepthPrefSlotBonus(player, slotPref){
+  if(!player||!slotPref) return 0;
+  var pref=player.pref;
+  if(player.isMe&&typeof G!=='undefined'&&G&&(G.subPos||G.pos!=='G')) pref=G.subPos||pref;
+  if(!pref) return 0;
+  var match=false;
+  if(slotPref==='C') match=pref==='C';
+  else if(slotPref==='LW') match=pref==='LW';
+  else if(slotPref==='RW') match=pref==='RW';
+  else if(slotPref==='LD') match=pref==='LD';
+  else if(slotPref==='RD') match=pref==='RD';
+  if(!match) return 0;
+  var ovrN=player.ovr||50;
+  if(player.isMe&&typeof ovr==='function') ovrN=ovr(G.attrs,G.pos);
+  return cl(2+(ovrN-58)/8, 1.5, 8);
+}
+
+function prefDepthSlotName(pos, pref, line){
+  line=line||1;
+  if(pos==='F'){
+    if(pref==='C') return 'C'+line;
+    if(pref==='LW') return 'LW'+line;
+    if(pref==='RW') return 'RW'+line;
+  }
+  if(pos==='D'){
+    if(pref==='LD') return 'LD'+line;
+    if(pref==='RD') return 'RD'+line;
+  }
+  return null;
+}
+
+function getUserPreferredDepthChance(me, peers){
+  var uOvr=me.ovr||0;
+  if(me.isMe&&typeof ovr==='function') uOvr=ovr(G.attrs,G.pos);
+  var better=0, i;
+  for(i=0;i<peers.length;i++){ if((peers[i].ovr||0)>uOvr+1) better++; }
+  var chance=cl(0.40+(uOvr-55)/75, 0.36, 0.94);
+  if(better===0) chance=Math.max(chance, 0.84);
+  else if(better===1) chance=Math.max(chance, 0.66);
+  else if(better===2) chance=Math.max(chance, 0.50);
+  return {chance:chance, better:better, uOvr:uOvr};
+}
+
+function ensureUserPreferredDepthSlot(roster){
+  if(!G||!roster||!roster.depth) return;
+  var me=null, i;
+  for(i=0;i<roster.players.length;i++){ if(roster.players[i].isMe) me=roster.players[i]; }
+  if(!me||me.pos==='G') return;
+  var pref=G.subPos||me.pref;
+  if(!pref||pref==='G') return;
+  var peers=roster.players.filter(function(p){return p.pos===me.pos&&!p.isMe;});
+  var placement=getUserPreferredDepthChance(me, peers);
+  if(Math.random()>placement.chance) return;
+  var line=Math.min(4, 1+placement.better);
+  if(placement.better>0&&peers.length){
+    peers.sort(function(a,b){return (b.ovr||0)-(a.ovr||0);});
+    if(placement.uOvr>=(peers[0].ovr||0)-3) line=Math.max(1, line-1);
+  }
+  var want=prefDepthSlotName(me.pos, pref, line);
+  if(!want) return;
+  var unit=me.pos==='F'?roster.depth.forwards:roster.depth.defense;
+  var target=null, myEntry=null;
+  for(i=0;i<unit.length;i++){
+    if(unit[i].slot===want) target=unit[i];
+    if(unit[i].player&&unit[i].player.isMe) myEntry=unit[i];
+  }
+  if(!target||!myEntry||target===myEntry||!target.player) return;
+  if(!target.player.isMe&&(target.player.ovr||0)>placement.uOvr+6) return;
+  var other=target.player, mySlot=myEntry.slot;
+  myEntry.player=me; me.depthSlot=want;
+  target.player=other; other.depthSlot=mySlot;
 }
 
 function fillEmptyDepthSlots(pool, slots, used){
@@ -1183,11 +2190,13 @@ function restoreDepthUnit(oldUnit, newUnit, byId, used, slotField){
 }
 
 function fillSpecialSlots(pool, used, unitSlots, scoreFn, slotField){
-  var i, p;
+  var i, p, avail;
   for(i=0;i<unitSlots.length;i++){
     if(unitSlots[i].player) continue;
-    p=pickBestForSpecial(pool, used, scoreFn);
-    if(!p) break;
+    avail=pool.filter(function(pl){return pl.pos!=='G'&&!used[pl.id];});
+    if(!avail.length) break;
+    avail.sort(function(a,b){return scoreFn(b)-scoreFn(a);});
+    p=avail[0];
     used[p.id]=true;
     unitSlots[i].player=p;
     p[slotField]=unitSlots[i].slot;
@@ -1218,18 +2227,18 @@ function assignDepthChartSticky(roster){
     }
   }
   var skaters=roster.players.filter(function(p){return p.pos==='F'||p.pos==='D';});
-  var stUsed={};
-  Object.keys(used).forEach(function(k){ stUsed[k]=true; });
-  restoreDepthUnit(old.pp1, slots.pp1, byId, stUsed, 'ppSlot');
-  restoreDepthUnit(old.pp2, slots.pp2, byId, stUsed, 'ppSlot');
-  restoreDepthUnit(old.pk1, slots.pk1, byId, stUsed, 'pkSlot');
-  restoreDepthUnit(old.pk2, slots.pk2, byId, stUsed, 'pkSlot');
-  fillSpecialSlots(skaters, stUsed, slots.pp1, getPowerPlayScore, 'ppSlot');
-  fillSpecialSlots(skaters, stUsed, slots.pp2, getPowerPlayScore, 'ppSlot');
-  fillSpecialSlots(skaters, stUsed, slots.pk1, getPenaltyKillScore, 'pkSlot');
-  fillSpecialSlots(skaters, stUsed, slots.pk2, getPenaltyKillScore, 'pkSlot');
+  var ppUsed={}, pkUsed={};
+  restoreDepthUnit(old.pp1, slots.pp1, byId, ppUsed, 'ppSlot');
+  restoreDepthUnit(old.pp2, slots.pp2, byId, ppUsed, 'ppSlot');
+  restoreDepthUnit(old.pk1, slots.pk1, byId, pkUsed, 'pkSlot');
+  restoreDepthUnit(old.pk2, slots.pk2, byId, pkUsed, 'pkSlot');
+  fillSpecialSlots(skaters, ppUsed, slots.pp1, getPowerPlayScore, 'ppSlot');
+  fillSpecialSlots(skaters, ppUsed, slots.pp2, getPowerPlayScore, 'ppSlot');
+  fillSpecialSlots(skaters, pkUsed, slots.pk1, getPenaltyKillScore, 'pkSlot');
+  fillSpecialSlots(skaters, pkUsed, slots.pk2, getPenaltyKillScore, 'pkSlot');
   if(typeof assignHealthyScratches==='function') assignHealthyScratches(roster, slots);
   roster.depth=slots;
+  if(typeof ensureUserPreferredDepthSlot==='function') ensureUserPreferredDepthSlot(roster);
   stampProRoleLabels(roster);
   return true;
 }
@@ -1240,11 +2249,12 @@ function assignDepthChart(roster, opts){
   _depthAssignLeagueKey=lk;
   var established=isEstablishedProLeague(lk);
   ensureRosterPositionCounts(roster, lk);
-  if(established&&roster._depthLocked&&!opts.forceRebuild&&assignDepthChartSticky(roster)){
+  if(roster._depthLocked&&!opts.forceRebuild&&assignDepthChartSticky(roster)){
     if(typeof ensureTeamRelations==='function') ensureTeamRelations(roster);
     _depthAssignLeagueKey='';
     return;
   }
+  if(opts.forceRebuild) roster._depthLocked=false;
   roster.players.forEach(function(p){ p.depthSlot=null; p.ppSlot=null; p.pkSlot=null; });
   var slots=buildDepthChartSlots();
   var fwd=roster.players.filter(function(p){return p.pos==='F';});
@@ -1261,6 +2271,8 @@ function assignDepthChart(roster, opts){
   if(typeof ensureTeamRelations==='function') ensureTeamRelations(roster);
   roster.depth=slots;
   if(established) roster._depthLocked=true;
+  else roster._depthLocked=true;
+  if(typeof ensureUserPreferredDepthSlot==='function') ensureUserPreferredDepthSlot(roster);
   stampProRoleLabels(roster);
   _depthAssignLeagueKey='';
 }
@@ -1378,10 +2390,14 @@ function buildTeamRoster(leagueKey, teamName, prevRoster){
   fillPos('D', 7);
   fillPos('G', 2);
   injectRookieProspects(players, leagueKey, teamName);
+  balanceTeamForwardArchetypes(players);
+  if(isEliteProLeagueKey(leagueKey)) clampEliteProRosterOvrSpread(players, leagueKey);
+  if(isMinorProLeagueKey(leagueKey)) clampMinorProRosterOvrSpread(players, leagueKey);
   assignTeamLeadership(players);
   var roster={teamName:teamName, leagueKey:leagueKey, coach:coach, players:players, depth:null};
   syncUserPlayerIntoRoster(roster);
   assignDepthChart(roster);
+  seedRosterPriorCareerStats(roster);
   return roster;
 }
 
@@ -1389,6 +2405,7 @@ function syncUserPlayerIntoRoster(roster){
   if(!G||!roster||!roster.players) return;
   roster.players=roster.players.filter(function(p){return !p.isMe&&p.id!=='user';});
   if(!G.team||roster.teamName!==G.team.n||roster.leagueKey!==(G.leagueKey||'')) return;
+  if(typeof ensureUserScoringPulse==='function') ensureUserScoringPulse();
   var uOvr=ovr(G.attrs,G.pos);
   var me={
     id:'user', first:G.first, last:G.last, pos:G.pos,
@@ -1426,7 +2443,8 @@ function ensureTeamRoster(){
   var key=(G.leagueKey||'')+'|'+G.team.n+'|'+(G.season||1);
   if(G._teamRosterKey===key&&G.teamRoster){
     syncUserPlayerIntoRoster(G.teamRoster);
-    assignDepthChart(G.teamRoster);
+    if(G.teamRoster.depth&&G.teamRoster._depthLocked) assignDepthChartSticky(G.teamRoster);
+    else assignDepthChart(G.teamRoster);
     return G.teamRoster;
   }
   var prev=null;
@@ -1478,10 +2496,10 @@ function getArchetypeStatMods(arch, pos){
     PowerForward:{g:1.08,a:0.85,pim:1.2},
     TwoWay:{g:0.88,a:0.92,pim:1.0},
     Grinder:{g:0.48,a:0.52,pim:1.9},
-    OffensiveD:{g:0.8,a:1.08,pim:0.95},
-    TwoWayD:{g:0.62,a:0.78,pim:1.15},
-    StayAtHome:{g:0.42,a:0.52,pim:1.35},
-    ShutdownD:{g:0.35,a:0.45,pim:1.6}
+    OffensiveD:{g:1.24,a:1.02,pim:0.95},
+    TwoWayD:{g:0.96,a:0.94,pim:1.12},
+    StayAtHome:{g:0.62,a:0.72,pim:1.28},
+    ShutdownD:{g:0.52,a:0.66,pim:1.45}
   };
   return m[arch]||{g:0.9,a:0.9,pim:1};
 }
@@ -1493,13 +2511,34 @@ function getOvrPerformanceMult(player, leagueKey){
   var rosterMid=base-spread*0.12;
   var tier=(LEAGUES[leagueKey]||{}).tier||'junior';
   var cap=tier==='junior'?1.06:(tier==='college'?1.1:1.14);
-  return cl(0.64+(player.ovr-rosterMid)/30, 0.52, cap);
+  var ovrN=player.ovr||50;
+  if(ovrN>=96) return cl(1.10+(ovrN-96)*0.028, 1.10, 1.15);
+  if(ovrN>=93) return cl(1.03+(ovrN-93)*0.023, 1.03, 1.10);
+  if(ovrN>=90) return cl(0.97+(ovrN-90)*0.02, 0.97, 1.03);
+  return cl(0.64+(ovrN-rosterMid)/30, 0.52, cap);
 }
 
 function getTeamOffenseFactor(leagueKey, teamName){
   if(!G._teamOffenseFactors) G._teamOffenseFactors={};
   var ck=String(leagueKey||'')+'|'+String(teamName||'')+'|'+(G.season||1);
-  if(G._teamOffenseFactors[ck]==null) G._teamOffenseFactors[ck]=rd(0.9, 1.1);
+  if(G._teamOffenseFactors[ck]==null){
+    var base=1;
+    if(typeof ensureTeamProfile==='function'&&teamName){
+      base=ensureTeamProfile(leagueKey, teamName).offense;
+    }
+    if(leagueKey==='USJL'&&teamName&&typeof isUsndtU18Team==='function'&&isUsndtU18Team(teamName)){
+      base=Math.max(base, 1.14);
+    } else if(leagueKey==='USJL'&&teamName&&typeof isUsndtU17Team==='function'&&isUsndtU17Team(teamName)){
+      base=Math.max(base, 1.10);
+    } else if(leagueKey==='USJL'&&teamName&&typeof isUsndtTeam==='function'&&isUsndtTeam(teamName)){
+      base=Math.max(base, 1.12);
+    } else if(isMajorJuniorEliteOrg(leagueKey, teamName)){
+      base=Math.max(base, leagueKey==='OJL'?1.06:1.04);
+    } else if(!teamName){
+      base=rd(0.9,1.1);
+    }
+    G._teamOffenseFactors[ck]=cl(base*rd(0.97,1.03), 0.82, 1.18);
+  }
   return G._teamOffenseFactors[ck];
 }
 
@@ -1511,20 +2550,60 @@ function getDepthUsageForLine(line, pos){
   return rd(0.1,0.26);
 }
 
-function getPosScoringMult(pos, arch){
+function getLeagueGoalieSimKnobs(leagueKey, teamName){
+  if(leagueKey==='OJL'){
+    var elite=teamName&&isMajorJuniorEliteOrg('OJL', teamName);
+    return {base:elite?0.912:0.908, floor:elite?0.900:0.896, ceil:elite?0.956:0.952, ovrScale:elite?0.99:0.96};
+  }
+  if(leagueKey==='WJL'){
+    return {base:0.902, floor:0.890, ceil:0.946, ovrScale:0.92};
+  }
+  if(leagueKey==='QMJL'){
+    var qElite=teamName&&isMajorJuniorEliteOrg('QMJL', teamName);
+    return {base:qElite?0.888:0.882, floor:qElite?0.876:0.870, ceil:qElite?0.936:0.930, ovrScale:qElite?0.82:0.76};
+  }
+  if(leagueKey==='CWHL') return {base:0.896, floor:0.884, ceil:0.942, ovrScale:0.88};
+  if(leagueKey==='USJL'||leagueKey==='NEJC'||leagueKey==='ARJC'||leagueKey==='CEJC') return {base:0.902, floor:0.890, ceil:0.948, ovrScale:0.94};
+  if(leagueKey==='PHL'||leagueKey==='NAML'||leagueKey==='PWL') return {base:0.906, floor:0.894, ceil:0.954, ovrScale:1};
+  return {base:0.900, floor:0.888, ceil:0.950, ovrScale:0.92};
+}
+
+function getLeagueGoalieLeaderMinGp(leagueKey){
+  var L=LEAGUES[leagueKey]||{};
+  var g=L.games||68;
+  if(leagueKey==='PHL') return Math.max(22, Math.round(g*0.30));
+  if(L.tier==='pro') return Math.max(14, Math.round(g*0.24));
+  if(L.tier==='minor') return Math.max(12, Math.round(g*0.22));
+  if(L.tier==='junior'||L.tier==='college') return Math.max(8, Math.round(g*0.16));
+  return Math.max(10, Math.round(g*0.20));
+}
+
+function getPosScoringMult(pos, arch, leagueKey){
   if(pos==='F') return 1;
-  if(pos==='D') return arch==='OffensiveD'?0.64:(arch==='TwoWayD'?0.4:0.28);
+  var lk=leagueKey||'';
+  if(pos==='D'){
+    if(arch==='OffensiveD') return (lk==='PHL'||lk==='PWL')?1.38:(lk==='OJL'||lk==='CWHL'||lk==='WJL'||lk==='NAML')?1.02:
+      (lk==='ARJC'||lk==='NEJC'||lk==='CEJC'||lk==='EWJC'||lk==='AWJC')?1.18:1.12;
+    if(arch==='TwoWayD') return (lk==='PHL'||lk==='PWL')?0.88:0.78;
+    if(arch==='StayAtHome'||arch==='ShutdownD') return (lk==='PHL'||lk==='PWL')?0.58:0.48;
+    return 0.52;
+  }
   return 0.15;
 }
 
 function getPosPlusMinusMult(pos, arch){
   if(pos==='D'){
-    if(arch==='StayAtHome'||arch==='ShutdownD') return 0.85;
-    if(arch==='TwoWayD') return 0.68;
-    return 0.5;
+    if(arch==='StayAtHome'||arch==='ShutdownD') return 1.28;
+    if(arch==='TwoWayD') return 1.05;
+    if(arch==='OffensiveD') return 0.88;
+    return 1.0;
   }
-  if(pos==='F') return 0.42;
-  return 0.28;
+  if(pos==='F'){
+    if(arch==='TwoWay') return 0.38;
+    if(arch==='Grinder') return 0.32;
+    return 0.26;
+  }
+  return 0.22;
 }
 
 function simWeeklyStatBlock(player, leagueKey, games){
@@ -1534,45 +2613,94 @@ function simWeeklyStatBlock(player, leagueKey, games){
   var arch=getArchetypeStatMods(player.arch, player.pos);
   var line=getDepthLineFromSlot(player.depthSlot, player.pos);
   if(player.pos==='G'){
+    var gKnobs=getLeagueGoalieSimKnobs(leagueKey, player.team);
     var sa=0, sv=0, ga=0, w=0, gi, shots, svPct, svR;
+    var gPerf=getOvrPerformanceMult(player, leagueKey)*gKnobs.ovrScale;
     for(gi=0;gi<games;gi++){
       shots=Math.round(rd(24, 36));
-      svPct=cl(0.868+perf*0.022+rd(-0.028,0.018), 0.845, 0.942);
+      svPct=cl(gKnobs.base+gPerf*0.018+rd(-0.020,0.014), gKnobs.floor, gKnobs.ceil);
       svR=Math.round(shots*svPct);
       sa+=shots; sv+=svR; ga+=shots-svR;
-      if(Math.random()<cl(0.3+perf*0.12+rd(-0.08,0.08),0.15,0.72)) w++;
+      if(Math.random()<cl(0.28+gPerf*0.10+rd(-0.06,0.06),0.12,0.68)) w++;
     }
     return {gp:games,g:0,a:0,pts:0,pm:0,pim:0,sv:sv,ga:ga,w:w};
   }
   var targetPpg=getNpcTargetPpg(player, leagueKey);
-  var tier=(LEAGUES[leagueKey]||{}).tier||'junior';
-  var nightPtsCap=tier==='junior'?3:(tier==='college'?4:5);
+    var paceKnobs=typeof getLeaguePaceKnobsForLeague==='function'?getLeaguePaceKnobsForLeague(leagueKey):{nightCapF:3,nightCapD:2};
+  var nightPtsCap=player.pos==='D'?paceKnobs.nightCapD:paceKnobs.nightCapF;
+  if(leagueKey==='PHL'&&player.pos==='F'){
+    if(typeof isPhlGenerationalSniper==='function'&&isPhlGenerationalSniper(player, line, perf)) nightPtsCap=4;
+    else if(typeof isPhlEliteSniper==='function'&&isPhlEliteSniper(player, line, perf)) nightPtsCap=3;
+    else if(typeof isPhlGenerationalPlaymaker==='function'&&isPhlGenerationalPlaymaker(player, line, perf)) nightPtsCap=4;
+    else if(typeof isPhlElitePlaymaker==='function'&&isPhlElitePlaymaker(player, line, perf)) nightPtsCap=3;
+    else nightPtsCap=Math.min(nightPtsCap,3);
+  } else if(leagueKey==='PHL'&&player.pos==='D'&&player.arch==='OffensiveD'){
+    if(typeof isPhlGenerationalOffensiveD==='function'&&isPhlGenerationalOffensiveD(player, line, perf)) nightPtsCap=4;
+    else if(typeof isPhlEliteOffensiveD==='function'&&isPhlEliteOffensiveD(player, line, perf)) nightPtsCap=3;
+    else nightPtsCap=Math.min(nightPtsCap,3);
+  }
   var g=0, a=0, pts=0, pim=0, pm=0, gi;
   for(gi=0;gi<games;gi++){
     var nightG=0, nightA=0;
+    if(leagueKey==='PHL'&&player.pos==='F'){
+      var phlSplit=splitPhlForwardNight(player,line,perf,leagueKey,nightPtsCap);
+      nightG=phlSplit.g; nightA=phlSplit.a;
+      g+=nightG; a+=nightA;
+    } else if(leagueKey==='PHL'&&player.pos==='D'&&player.arch==='OffensiveD'&&line<=2){
+      var odSplit=splitPhlOffensiveDNight(player,line,perf,leagueKey,targetPpg,nightPtsCap);
+      nightG=odSplit.g; nightA=odSplit.a;
+      g+=nightG; a+=nightA;
+    } else if(leagueKey==='PHL'&&player.pos==='D'&&(player.arch==='TwoWayD'||player.arch==='StayAtHome'||player.arch==='ShutdownD')&&typeof isPhlDualThreatDefenseman==='function'&&isPhlDualThreatDefenseman(player,line,perf)){
+      var dtPts=Math.max(0, Math.min(3, Math.round(targetPpg*rd(0.82,1.28))));
+      if(dtPts>0){
+        var dtGWt=player.arch==='TwoWayD'?0.38:(player.arch==='StayAtHome'?0.32:0.28);
+        var dtSplit=typeof splitGoalsAssistsFromPoints==='function'?splitGoalsAssistsFromPoints(dtPts, dtGWt):{g:0,a:dtPts};
+        dtSplit=ensurePhlDualThreatSplit(dtSplit, player, dtPts);
+        g+=dtSplit.g; a+=dtSplit.a;
+      }
+    } else {
     var expPts=targetPpg*rd(0.82,1.22);
     if(Math.random()<0.16) expPts+=rd(0.35,1.05);
-    if(line===1&&perf>=0.94&&player.arch==='Sniper'&&Math.random()<0.12) expPts+=1;
+    if(line===1&&perf>=0.94&&player.arch==='Sniper'&&Math.random()<(leagueKey==='PHL'&&typeof isPhlGenerationalSniper==='function'&&isPhlGenerationalSniper(player,line,perf)?0.2:0.12)) expPts+=1;
     var nightPts=Math.max(0, Math.min(nightPtsCap, Math.round(expPts)));
     if(nightPts>0){
       var gWt=typeof getArchetypeGoalPointShare==='function'
         ?getArchetypeGoalPointShare(player.arch, player.pos, {line:line, perf:perf, leagueKey:leagueKey})
         :(typeof getLeagueGoalPointShare==='function'?getLeagueGoalPointShare(leagueKey):(typeof getDefaultGoalPointShare==='function'?getDefaultGoalPointShare():0.323));
-      if(player.arch==='Sniper'&&line===1&&nightPts>=2&&Math.random()<0.14) gWt=cl(gWt+0.08, 0.08, 0.78);
+      if(player.arch==='Sniper'&&line===1&&nightPts>=2){
+        var snCap=(typeof isLocalLeague==='function'&&isLocalLeague(leagueKey))?0.68:(leagueKey==='PHL'||leagueKey==='PWL'?0.52:0.44);
+        if(leagueKey==='PHL'&&typeof isPhlGenerationalSniper==='function'&&isPhlGenerationalSniper(player,line,perf)) snCap=0.62;
+        else if(leagueKey==='PHL'&&typeof isPhlEliteSniper==='function'&&isPhlEliteSniper(player,line,perf)) snCap=0.56;
+        gWt=cl(gWt+0.12, 0.48, snCap);
+      }
       var split=typeof splitGoalsAssistsFromPoints==='function'?splitGoalsAssistsFromPoints(nightPts, gWt):{g:nightPts,a:0};
       nightG=split.g; nightA=split.a;
+      if(player.pos==='D'&&player.arch==='OffensiveD'&&nightA>nightG+1&&nightG+nightA>=2) nightG=Math.min(nightPtsCap, nightG+1);
+      if(player.pos==='D'&&(player.arch==='TwoWayD'||player.arch==='StayAtHome')&&nightPts>=1&&nightG===0&&Math.random()<0.28) nightG=1;
       g+=nightG; a+=nightA;
+    }
     }
     if(Math.random()<0.16*arch.pim) pim+=ri(0,2);
     if(typeof rollSkaterGamePim==='function') pim+=rollSkaterGamePim(player.pos, player.arch, null);
     var depthPm=line===1?1:(line===2?0.78:(line===3?0.52:0.28));
     var teamPm=getTeamOffenseFactor(leagueKey, player.team);
+    var ovrN=player.ovr||50;
     var winChance=cl(0.44+(teamPm-1)*0.18+(perf-0.85)*0.12,0.28,0.62);
+    if(player.pos==='D'&&line<=2&&ovrN>=88) winChance+=0.05;
+    else if(player.pos==='D'&&line===1&&(player.arch==='ShutdownD'||player.arch==='StayAtHome'||player.arch==='TwoWayD')&&ovrN>=84) winChance+=0.03;
+    if(player.pos==='F'&&ovrN<80&&line>=3) winChance-=0.03;
     var nightWon=Math.random()<winChance;
     var nightTied=!nightWon&&Math.random()<0.07;
     if(typeof computeSkaterGamePlusMinus==='function'&&player.pos!=='G'){
       var nightPm=computeSkaterGamePlusMinus(nightWon, nightTied, nightG, nightA, nightG+nightA>0?1:0, player.pos, player.arch, 0);
       if(!nightWon&&!nightTied&&nightPm===0) nightPm=-1;
+    if(player.pos==='D'){
+        var dQual=cl((ovrN-68)/28,0,1)*cl(line<=2?1:0.55,0.35,1);
+        nightPm=Math.round(nightPm*(0.82+dQual*0.55));
+        if(line===1&&ovrN>=88) nightPm+=(nightWon?1:(nightTied?0:-1));
+        if(line===1&&(player.arch==='ShutdownD'||player.arch==='StayAtHome'||player.arch==='TwoWayD')&&ovrN>=84) nightPm+=(nightWon?1:(nightTied?0:-1));
+        else if(line===1&&player.arch==='OffensiveD'&&ovrN>=90) nightPm+=(nightWon?1:0);
+      } else if(player.pos==='F') nightPm=Math.round(nightPm*0.58);
       pm+=Math.round(nightPm*depthPm);
     } else {
       var pmSign=nightWon?1:(nightTied?0:-1);
@@ -1618,17 +2746,26 @@ function developNpcRoster(players, leagueKey){
       else if((p.form||50)>=58&&Math.random()<0.18) p.ovr=cl(p.ovr+1, floor, cap);
       else if((p.form||50)<38&&Math.random()<0.12) p.ovr=cl(p.ovr-1, floor, cap);
     } else if(established){
-      if(p.age<=27&&st.gp>=16&&ppg>=0.82&&Math.random()<0.24) p.ovr=cl(p.ovr+1, floor, cap);
-      else if(p.age<=27&&st.gp>=12&&ppg>=0.62&&(p.form||50)>=56&&Math.random()<0.18) p.ovr=cl(p.ovr+1, floor, cap);
-      else if(p.age<=30&&st.gp>=20&&ppg>=0.55&&Math.random()<0.14) p.ovr=cl(p.ovr+1, floor, cap);
-      else if((p.form||50)>=60&&p.age<=32&&Math.random()<0.12) p.ovr=cl(p.ovr+1, floor, cap);
+      var ceiling=p.ovrCeiling!=null?p.ovrCeiling:cap;
+      var dev=p.devRate!=null?p.devRate:(isEliteProLeagueKey(leagueKey)?0.1:0.18);
+      var upChance=0.24*dev;
+      if(isEliteProLeagueKey(leagueKey)) upChance=Math.min(0.14, upChance);
+      if((p.ovr||0)>=ceiling) upChance*=0.15;
+      else if(p.age<=26) upChance*=1.15;
+      if(p.age<=27&&st.gp>=16&&ppg>=0.82&&Math.random()<upChance) p.ovr=cl(p.ovr+1, floor, ceiling);
+      else if(p.age<=27&&st.gp>=12&&ppg>=0.62&&(p.form||50)>=56&&Math.random()<upChance*0.75) p.ovr=cl(p.ovr+1, floor, ceiling);
+      else if(p.age<=30&&st.gp>=20&&ppg>=0.55&&Math.random()<upChance*0.58) p.ovr=cl(p.ovr+1, floor, ceiling);
+      else if((p.form||50)>=60&&p.age<=32&&(p.ovr||0)<ceiling&&Math.random()<upChance*0.45) p.ovr=cl(p.ovr+1, floor, ceiling);
       else if(st.gp>=18&&ppg<0.18&&p.age>=27&&Math.random()<0.14) p.ovr=cl(p.ovr-1, floor, cap);
-      else if(p.age>=35&&Math.random()<0.18) p.ovr=cl(p.ovr-1, floor, cap);
-      else if(p.age>=32&&Math.random()<0.1) p.ovr=cl(p.ovr-1, floor, cap);
+      else if(p.age>=35&&Math.random()<0.28) p.ovr=cl(p.ovr-1, floor, cap);
+      else if(p.age>=32&&Math.random()<0.16) p.ovr=cl(p.ovr-1, floor, cap);
+      else if(p.age>=30&&st.gp>=14&&ppg<0.22&&Math.random()<0.12) p.ovr=cl(p.ovr-1, floor, cap);
     } else if(p.age<=24&&st.gp>=12&&ppg>=0.55&&Math.random()<0.14) p.ovr=cl(p.ovr+1, floor, cap);
     else if(p.age<=24&&Math.random()<0.08) p.ovr=cl(p.ovr+1, floor, cap);
     else if(p.age>=31&&Math.random()<0.14) p.ovr=cl(p.ovr-1, floor, cap);
   });
+  if(isEliteProLeagueKey(leagueKey)) clampEliteProRosterOvrSpread(players, leagueKey);
+  if(isMinorProLeagueKey(leagueKey)) clampMinorProRosterOvrSpread(players, leagueKey);
 }
 
 function maybeShuffleAlternates(players, leagueKey){
@@ -1649,12 +2786,15 @@ function maybeShuffleAlternates(players, leagueKey){
 function advanceRosterOneWeek(roster, leagueKey, weekNum){
   if(!roster||!roster.players) return;
   var established=isEstablishedProLeague(leagueKey);
-  assignDepthChart(roster);
+  if(roster._depthLocked) assignDepthChartSticky(roster);
+  else assignDepthChart(roster);
   var perWeek=getGamesPerWeek(leagueKey);
   var weekGameCap=perWeek;
   if(typeof isLocalLeague==='function'&&isLocalLeague(leagueKey)&&typeof getLocalGamesForWeek==='function'){
     weekGameCap=getLocalGamesForWeek(weekNum||1);
   }
+  var usndtGpCap=(leagueKey==='USJL'&&roster.teamName&&typeof getUsndtNpcLeagueGpCap==='function')
+    ?getUsndtNpcLeagueGpCap(roster.teamName):null;
   var pi, p, line, games, block;
   for(pi=0;pi<roster.players.length;pi++){
     p=roster.players[pi];
@@ -1665,15 +2805,23 @@ function advanceRosterOneWeek(roster, leagueKey, weekNum){
     }
     line=getDepthLineFromSlot(p.depthSlot, p.pos);
     games=rollWeeklyGames(weekGameCap, line, p.pos, p);
+    if(usndtGpCap!=null){
+      var curGp=ensurePlayerStats(p).gp||0;
+      if(curGp>=usndtGpCap) continue;
+      games=Math.min(games, usndtGpCap-curGp);
+    }
+    if(games<1) continue;
     block=simWeeklyStatBlock(p, leagueKey, games);
     accumulatePlayerStats(p, block);
+    if(typeof clampUsndtPlayerSeasonStatsInPlace==='function') clampUsndtPlayerSeasonStatsInPlace(p, leagueKey);
     updateNpcFormFromWeek(p, block, leagueKey);
   }
   developNpcRoster(roster.players, leagueKey);
   maybeShuffleAlternates(roster.players, leagueKey);
   if(!established){
-    assignDepthChart(roster);
-  } else if(Math.random()<0.1){
+    if(roster._depthLocked) assignDepthChartSticky(roster);
+    else assignDepthChart(roster);
+  } else if(Math.random()<0.08){
     roster._depthLocked=false;
     assignDepthChart(roster, {forceRebuild:true});
   } else {
@@ -1739,7 +2887,8 @@ function catchUpLeagueNpcStats(){
 }
 
 function playerToStatRow(player, leagueKey){
-  var mode=G&&G._leadersViewMode==='career'?'career':'season';
+  var view=G&&G._leadersViewMode;
+  var mode=typeof isCareerLeadersViewMode==='function'&&isCareerLeadersViewMode(view)?'career':'season';
   if(player.isMe){
     if(mode==='career'){
       var cs=emptyPlayerStats();
@@ -1756,6 +2905,7 @@ function playerToStatRow(player, leagueKey){
     };
   }
   healPlayerSeasonStats(player, leagueKey);
+  if(typeof clampUsndtPlayerSeasonStatsInPlace==='function') clampUsndtPlayerSeasonStatsInPlace(player, leagueKey);
   var s=mode==='career'?getCombinedCareerLeagueStats(player, leagueKey):ensurePlayerStats(player);
   return {gp:s.gp,g:s.g,a:s.a,pts:s.pts,pm:s.pm,pim:s.pim||0,sv:s.sv||0,ga:s.ga||0,w:s.w||0,player:player};
 }
@@ -1772,6 +2922,7 @@ function buildLeaguePlayerStats(leagueKey){
   ensureTeamRoster();
   for(t=0;t<teams.length;t++){
     roster=getLeagueTeamRoster(leagueKey, teams[t].n);
+    seedRosterPriorCareerStats(roster);
     for(pi=0;pi<roster.players.length;pi++){
       p=roster.players[pi];
       if(p.isMe){
@@ -1780,6 +2931,13 @@ function buildLeaguePlayerStats(leagueKey){
       }
       rows.push(playerToStatRow(p, leagueKey));
     }
+  }
+  var view=G&&G._leadersViewMode;
+  if(typeof mergeCareerLeaderRows==='function'&&typeof isCareerLeadersViewMode==='function'&&isCareerLeadersViewMode(view)){
+    rows=mergeCareerLeaderRows(rows, leagueKey, {
+      includeRetired:view==='career_all'||view==='career',
+      activeOnly:view==='career_active'
+    });
   }
   return rows;
 }
@@ -1797,6 +2955,10 @@ function ensureLeaguePlayerStats(){
 
 function getFinalLeaguePlayerStats(){
   if(!G||!G.leagueKey) return [];
+  if(typeof isLocalLeague==='function'&&isLocalLeague(G.leagueKey)){
+    if(typeof ensureLeaguePlayerStats==='function') return ensureLeaguePlayerStats();
+    return [];
+  }
   var totalWeeks=typeof getSeasonWeekCount==='function'
     ? getSeasonWeekCount(G.leagueKey)
     : Math.ceil((G.league.games||68)/Math.max(1,getGamesPerWeek(G.leagueKey)));
@@ -1896,11 +3058,18 @@ function renderLeadersControls(){
   var stat=G._leadersFilter||'pts';
   var posF=G._leadersPosFilter||'all';
   var view=G._leadersViewMode||'live';
+  var goalieView=posF==='G';
   var html='<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-family:VT323,monospace;font-size:14px">';
   html+='<span style="color:var(--mut);margin-right:4px">SORT:</span>';
-  ['pts','g','a','pm','pim'].forEach(function(s){
-    html+='<button type="button" class="btn '+(stat===s?'bp':'bs')+'" style="padding:4px 10px;font-size:13px" onclick="setLeadersFilter(\''+s+'\')">'+s.toUpperCase()+'</button>';
-  });
+  if(goalieView){
+    [{id:'svpct',lbl:'SV%'},{id:'gaa',lbl:'GAA'},{id:'w',lbl:'W'},{id:'sv',lbl:'SV'},{id:'ga',lbl:'GA'}].forEach(function(s){
+      html+='<button type="button" class="btn '+(stat===s.id?'bp':'bs')+'" style="padding:4px 10px;font-size:13px" onclick="setLeadersFilter(\''+s.id+'\')">'+s.lbl+'</button>';
+    });
+  } else {
+    ['pts','g','a','pm','pim'].forEach(function(s){
+      html+='<button type="button" class="btn '+(stat===s?'bp':'bs')+'" style="padding:4px 10px;font-size:13px" onclick="setLeadersFilter(\''+s+'\')">'+s.toUpperCase()+'</button>';
+    });
+  }
   html+='<span style="color:var(--mut);margin:0 4px 0 10px">POS:</span>';
   ['all','F','D','G'].forEach(function(p){
     html+='<button type="button" class="btn '+(posF===p?'bp':'bs')+'" style="padding:4px 10px;font-size:13px" onclick="setLeadersPosFilter(\''+p+'\')">'+p+'</button>';
@@ -1908,7 +3077,8 @@ function renderLeadersControls(){
   html+='<button type="button" class="btn bg2 bw" style="margin-left:10px;padding:4px 12px;font-size:13px" onclick="pinLeagueStatsSnapshot()">PIN SNAPSHOT</button>';
   html+='<select class="btn bs" style="margin-left:6px;padding:4px 8px;font-size:13px" onchange="setLeadersArchiveView(this.value)" title="This season = current year only. All-time = career totals in this league.">';
   html+='<option value="live"'+(view==='live'?' selected':'')+'>THIS SEASON ONLY</option>';
-  html+='<option value="career"'+(view==='career'?' selected':'')+'>ALL-TIME (THIS LEAGUE)</option>';
+  html+='<option value="career_active"'+(view==='career_active'?' selected':'')+'>ALL-TIME ACTIVE</option>';
+  html+='<option value="career_all"'+(view==='career_all'||view==='career'?' selected':'')+'>ALL-TIME (+ LEGENDS)</option>';
   if(G.leagueStatsArchive&&G.leagueStatsArchive.length){
     G.leagueStatsArchive.forEach(function(snap, idx){
       var lbl='S'+snap.season+' '+snap.leagueShort+' ('+(snap.statFilter||'pts').toUpperCase()+')';
@@ -1929,6 +3099,10 @@ function setLeadersFilter(stat){
 
 function setLeadersPosFilter(pos){
   if(!G) return;
+  var skaterStats=['pts','g','a','pm','pim'];
+  var goalieStats=['svpct','gaa','w','sv','ga'];
+  if(pos==='G'&&skaterStats.indexOf(G._leadersFilter||'pts')>=0) G._leadersFilter='svpct';
+  if(pos!=='G'&&goalieStats.indexOf(G._leadersFilter||'')>=0) G._leadersFilter='pts';
   G._leadersPosFilter=pos;
   renderLeadersControls();
   renderLeagueLeadersTab();
@@ -1939,8 +3113,11 @@ function setLeadersArchiveView(val){
   if(val==='live'){
     G._leadersViewMode='live';
     G._leadersArchiveIdx=null;
-  } else if(val==='career'){
-    G._leadersViewMode='career';
+  } else if(val==='career_active'){
+    G._leadersViewMode='career_active';
+    G._leadersArchiveIdx=null;
+  } else if(val==='career_all'||val==='career'){
+    G._leadersViewMode='career_all';
     G._leadersArchiveIdx=null;
   } else {
     G._leadersViewMode='archive';
@@ -1966,36 +3143,45 @@ function pinLeagueStatsSnapshot(){
   renderLeadersControls();
 }
 
+function maybeRefreshLinesAfterUserGame(){
+  if(!G||!G.teamRoster) return;
+  var roster=G.teamRoster, lk=G.leagueKey||'';
+  if(roster._depthChartGp===G.gp&&roster._depthChartWeek===G.week) return;
+  roster._depthChartGp=G.gp;
+  roster._depthChartWeek=G.week;
+  if(isEstablishedProLeague(lk)){
+    if(Math.random()<0.28) maybeProDepthAdjust(roster);
+    else assignDepthChartSticky(roster);
+  } else if(Math.random()<0.14){
+    assignDepthChart(roster);
+  }
+  if(G.leagueRostersCache&&roster.teamName) G.leagueRostersCache[rosterCacheKey(lk, roster.teamName)]=roster;
+}
+
+function maybeRefreshLinesAfterWeek(){
+  if(!G||!G.teamRoster) return;
+  var roster=G.teamRoster, lk=G.leagueKey||'';
+  roster._depthChartGp=G.gp;
+  roster._depthChartWeek=G.week;
+  if(isEstablishedProLeague(lk)){
+    if(Math.random()<0.32) maybeProDepthAdjust(roster);
+    else if(roster._depthLocked) assignDepthChartSticky(roster);
+    else assignDepthChart(roster);
+  } else if(Math.random()<0.22){
+    assignDepthChart(roster);
+  }
+  if(G.leagueRostersCache&&roster.teamName) G.leagueRostersCache[rosterCacheKey(lk, roster.teamName)]=roster;
+}
+
 function refreshHubDepthChartForDisplay(roster){
   if(!roster||!roster.players) return;
-  var lk=roster.leagueKey||(typeof G!=='undefined'&&G?G.leagueKey:'')||'';
   syncUserPlayerIntoRoster(roster);
-  roster.players.forEach(function(p){
-    if(p.isMe) return;
-    p.form=cl((p.form||50)+rd(-4,6),12,96);
-  });
-  var d=roster.depth;
-  if(isEstablishedProLeague(lk)){
-    maybeProDepthAdjust(roster);
-    if(d){
-      trySwapForwardLinesIfWarranted(d,2,3,3);
-      trySwapForwardLinesIfWarranted(d,3,4,3);
-      trySwapDefensePairsIfWarranted(d,2,3,3);
-      trySwapDefensePairsIfWarranted(d,1,2,5);
-      tryPromoteHotForward(d,4,3);
-      refreshProSpecialUnit(roster, Math.random()<0.55?'pp2':'pp1');
-      refreshProSpecialUnit(roster, Math.random()<0.55?'pk2':'pk1');
-      trySwapOneSpecialSpot(roster, d.pp1, getPowerPlayScore, 'ppSlot');
-      trySwapOneSpecialSpot(roster, d.pk1, getPenaltyKillScore, 'pkSlot');
-    }
-    if(d&&typeof assignHealthyScratches==='function') assignHealthyScratches(roster, d);
-    stampProRoleLabels(roster);
-  } else {
-    roster._depthLocked=false;
-    assignDepthChart(roster, {forceRebuild:true});
-  }
+  if(!roster.depth||!roster._depthLocked) assignDepthChart(roster);
+  else assignDepthChartSticky(roster);
+  if(typeof assignHealthyScratches==='function'&&roster.depth) assignHealthyScratches(roster, roster.depth);
+  stampProRoleLabels(roster);
   if(typeof G!=='undefined'&&G&&G.leagueRostersCache&&roster.teamName){
-    G.leagueRostersCache[rosterCacheKey(lk, roster.teamName)]=roster;
+    G.leagueRostersCache[rosterCacheKey(roster.leagueKey||(G.leagueKey||''), roster.teamName)]=roster;
   }
 }
 
@@ -2016,9 +3202,9 @@ function renderDepthChartTab(){
     '<span style="color:var(--gold)">HEAD COACH:</span> '+escHtml(coach.name)+' &nbsp;·&nbsp; '+escHtml(String(coach.style).toUpperCase());
   html+=' &nbsp;·&nbsp; <span style="color:var(--wht)">12F + 6D dress · 2F + 1D scratch (lowest rated / coldest)</span>';
   if(isEstablishedProLeague(G.leagueKey)){
-    html+=' &nbsp;·&nbsp; <span style="color:#c9a84c">Lines refresh when you open this tab</span>';
+    html+=' &nbsp;·&nbsp; <span style="color:#c9a84c">Lines stick until the next game or week</span>';
   } else {
-    html+=' &nbsp;·&nbsp; <span style="color:var(--acc)">Depth reshuffled each visit</span>';
+    html+=' &nbsp;·&nbsp; <span style="color:var(--acc)">Lines stick until the next game or week</span>';
   }
   html+='</div>';
 
@@ -2117,15 +3303,16 @@ function renderLeagueLeadersTab(){
   if(!el) return;
   var rows=ensureLeaguePlayerStats();
   var archived=G._leadersViewMode==='archive';
-  var careerView=G._leadersViewMode==='career';
+  var careerView=typeof isCareerLeadersViewMode==='function'&&isCareerLeadersViewMode(G._leadersViewMode);
   var snap=archived&&G.leagueStatsArchive?G.leagueStatsArchive[G._leadersArchiveIdx]:null;
   var leagueLbl=snap?snap.leagueShort:(G.league&&G.league.short)||'';
   var stat=G._leadersFilter||'pts';
   var posF=G._leadersPosFilter||'all';
-  var hasPlayed=archived||(G.gp||0)>0||(G._npcStatsSyncedWeek||0)>0;
+  var hasPlayed=archived||careerView||(G.gp||0)>0||(G._npcStatsSyncedWeek||0)>0;
   var html='';
   if(careerView){
-    html+='<div class="vt" style="font-size:13px;color:var(--gold);margin-bottom:10px">ALL-TIME · '+escHtml(leagueLbl)+' (career totals in this league, includes current season)</div>';
+    var lbl=typeof getCareerLeadersViewLabel==='function'?getCareerLeadersViewLabel(G._leadersViewMode, leagueLbl):('ALL-TIME · '+leagueLbl);
+    html+='<div class="vt" style="font-size:13px;color:var(--gold);margin-bottom:10px">'+escHtml(lbl)+'</div>';
   } else if(archived&&snap){
     html='<div class="vt" style="font-size:13px;color:var(--gold);margin-bottom:10px">S'+snap.season+' · '+escHtml(leagueLbl)+' (saved snapshot)</div>';
   } else {
@@ -2138,10 +3325,16 @@ function renderLeagueLeadersTab(){
 
   function playerLabel(p){
     var s='';
+    if(p.legend||p.retired) s+=' <span style="color:var(--mut);font-size:11px">[RET]</span>';
     if(p.leadership==='C') s+=' <span style="color:var(--gold)">[C]</span>';
     else if(p.leadership==='A') s+=' <span style="color:var(--acc)">[A]</span>';
     if(p.isMe) s+=' *';
     return s;
+  }
+
+  function teamCell(p){
+    if(p.legend||p.retired) return escHtml(p.era||'RET');
+    return escHtml((p.team||'').split(' ').slice(-1)[0]);
   }
 
   function posLabel(p){
@@ -2151,9 +3344,35 @@ function renderLeagueLeadersTab(){
   function sortSkaters(list){
     if(stat==='g') return list.sort(function(a,b){return b.g-a.g||b.pts-a.pts;});
     if(stat==='a') return list.sort(function(a,b){return b.a-a.a||b.pts-a.pts;});
-    if(stat==='pm') return list.sort(function(a,b){return b.pm-a.pm||b.pts-a.pts;});
+    if(stat==='pm'){
+      return list.sort(function(a,b){
+        if(b.pm!==a.pm) return b.pm-a.pm;
+        if(a.player.pos==='D'&&b.player.pos!=='D') return -1;
+        if(b.player.pos==='D'&&a.player.pos!=='D') return 1;
+        return b.pts-a.pts;
+      });
+    }
     if(stat==='pim') return list.sort(function(a,b){return (b.pim||0)-(a.pim||0)||b.pts-a.pts;});
     return list.sort(function(a,b){return b.pts-a.pts;});
+  }
+
+  function sortGoalies(list){
+    if(stat==='gaa'){
+      return list.sort(function(a,b){
+        var gaaA=a.gp>0?a.ga/a.gp:99, gaaB=b.gp>0?b.ga/b.gp:99;
+        if(gaaA!==gaaB) return gaaA-gaaB;
+        var sa=a.sv+a.ga, sb=b.sv+b.ga;
+        return (sb>0?b.sv/sb:0)-(sa>0?a.sv/sa:0);
+      });
+    }
+    if(stat==='w') return list.sort(function(a,b){return b.w-a.w||(b.sv-a.sv);});
+    if(stat==='sv') return list.sort(function(a,b){return b.sv-a.sv;});
+    if(stat==='ga') return list.sort(function(a,b){return a.ga-b.ga||(b.sv-a.sv);});
+    return list.sort(function(a,b){
+      var sa=a.sv+a.ga, sb=b.sv+b.ga;
+      var pA=sa>0?a.sv/sa:0, pB=sb>0?b.sv/sb:0;
+      return pB-pA||b.gp-a.gp;
+    });
   }
 
   var skaters=rows.filter(function(r){
@@ -2165,50 +3384,56 @@ function renderLeagueLeadersTab(){
   });
   sortSkaters(skaters);
 
-  var goalies=rows.filter(function(r){return r.player.pos==='G';}).sort(function(a,b){
-    var sa=a.sv+a.ga, sb=b.sv+b.ga;
-    var pA=sa>0?a.sv/sa:0, pB=sb>0?b.sv/sb:0;
-    return pB-pA;
+  var goalies=rows.filter(function(r){
+    if(r.player.pos!=='G') return false;
+    if(r.player.isMe) return true;
+    var minGp=typeof getLeagueGoalieLeaderMinGp==='function'?getLeagueGoalieLeaderMinGp(G.leagueKey):10;
+    return (r.gp||0)>=minGp;
   });
+  sortGoalies(goalies);
 
   var calGp=getLeagueCalendarGamesPlayed(G.leagueKey);
   if(posF!=='G'){
-    html+='<div class="vt" style="font-size:14px;color:var(--gold);margin:10px 0 6px">SKATER LEADERS · '+stat.toUpperCase()+'</div>';
+    var skaterLbl=posF==='D'?'DEFENSE':(posF==='F'?'FORWARD':'SKATER');
+    html+='<div class="vt" style="font-size:14px;color:var(--gold);margin:10px 0 6px">'+skaterLbl+' LEADERS · '+stat.toUpperCase()+'</div>';
     if(careerView){
-      html+='<div style="font-size:11px;color:var(--mut);margin-bottom:4px">Career totals in '+escHtml(leagueLbl)+'</div>';
+      html+='<div style="font-size:11px;color:var(--mut);margin-bottom:4px">Career totals in '+escHtml(leagueLbl)+(G._leadersViewMode==='career_active'?' · active players only':' · includes retired legends')+'</div>';
     } else {
-      html+='<div style="font-size:11px;color:var(--mut);margin-bottom:4px">Calendar: '+calGp+' GP · <span style="color:var(--gold)">*</span> = missed 2+ games</div>';
+      html+='<div style="font-size:11px;color:var(--mut);margin-bottom:4px">Calendar: '+calGp+' GP · <span style="color:var(--gold)">*</span> = missed 2+ games';
+      if(G.leagueKey==='USJL') html+=' · USNDT on shorter USJL slates (U17 ~'+(typeof USNDT_U17_LEAGUE_GAMES!=='undefined'?USNDT_U17_LEAGUE_GAMES:36)+', U18 ~'+(typeof USNDT_U18_LEAGUE_GAMES!=='undefined'?USNDT_U18_LEAGUE_GAMES:26)+')';
+      html+='</div>';
     }
     html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:VT323,monospace;font-size:14px">';
     html+='<tr style="color:var(--mut);font-size:12px"><th style="text-align:left;padding:4px">#</th><th style="text-align:left">PLAYER</th><th>POS</th><th>H</th><th>OVR</th><th>TEAM</th><th>GP</th><th>G</th><th>A</th><th>PTS</th><th>+/-</th><th>PIM</th></tr>';
-    var n=Math.min(25, skaters.length), i, r;
+    var n=Math.min(22, skaters.length), i, r;
     for(i=0;i<n;i++){
       r=skaters[i];
-      var hi=r.player.isMe?' style="color:var(--gold)"':'';
+      var hi=r.player.isMe?' style="color:var(--gold)"':(r.player.legend?' style="color:var(--mut)"':'');
       html+='<tr'+hi+'><td style="padding:4px">'+(i+1)+'</td><td>'+escHtml(r.player.first+' '+r.player.last)+playerLabel(r.player)+'</td>'+
         '<td>'+posLabel(r.player)+'</td><td>'+escHtml(r.player.hand||'')+'</td><td>'+(r.player.ovr||'')+'</td>'+
-        '<td style="font-size:12px">'+escHtml((r.player.team||'').split(' ').slice(-1)[0])+'</td>'+
+        '<td style="font-size:12px">'+teamCell(r.player)+'</td>'+
         '<td>'+(careerView?r.gp:formatLeaderGpCell(r, calGp))+'</td><td>'+r.g+'</td><td>'+r.a+'</td><td>'+r.pts+'</td><td>'+(r.pm>=0?'+':'')+r.pm+'</td><td>'+(r.pim||0)+'</td></tr>';
     }
     html+='</table></div>';
   }
 
-  if(posF==='all'||posF==='G'){
-    html+='<div class="vt" style="font-size:14px;color:var(--gold);margin:14px 0 6px">GOALIE LEADERS</div>';
+  if(posF==='G'){
+    var gStatLbl=stat==='svpct'?'SV%':stat.toUpperCase();
+    html+='<div class="vt" style="font-size:14px;color:var(--gold);margin:10px 0 6px">GOALIE LEADERS · '+gStatLbl+'</div>';
+    html+='<div style="font-size:11px;color:var(--mut);margin-bottom:4px">Min '+((typeof getLeagueGoalieLeaderMinGp==='function')?getLeagueGoalieLeaderMinGp(G.leagueKey):10)+' GP · starters only</div>';
     html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-family:VT323,monospace;font-size:14px">';
-    html+='<tr style="color:var(--mut);font-size:12px"><th style="text-align:left;padding:4px">#</th><th style="text-align:left">GOALIE</th><th>H</th><th>OVR</th><th>TEAM</th><th>GP</th><th>SV%</th><th>GAA</th><th>W</th><th>PIM</th></tr>';
-    n=Math.min(15, goalies.filter(function(r){return r.gp>=1||r.player.isMe;}).length);
-    var gList=goalies.filter(function(r){return r.gp>=1||r.player.isMe;});
+    html+='<tr style="color:var(--mut);font-size:12px"><th style="text-align:left;padding:4px">#</th><th style="text-align:left">GOALIE</th><th>H</th><th>OVR</th><th>TEAM</th><th>GP</th><th>SV</th><th>GA</th><th>SV%</th><th>GAA</th><th>W</th><th>PIM</th></tr>';
+    n=Math.min(22, goalies.length);
     for(i=0;i<n;i++){
-      r=gList[i];
+      r=goalies[i];
       var shots=r.sv+r.ga;
       var pct=shots>0?formatSvPctFromRatio(r.sv/shots):'--';
-      var gaa=r.gp>0?Math.round(r.ga/r.gp*100)/100:'--';
-      var hi2=r.player.isMe?' style="color:var(--gold)"':'';
+      var gaa=r.gp>0?Math.round(r.ga/r.gp*1000)/1000:'--';
+      var hi2=r.player.isMe?' style="color:var(--gold)"':(r.player.legend?' style="color:var(--mut)"':'');
       html+='<tr'+hi2+'><td style="padding:4px">'+(i+1)+'</td><td>'+escHtml(r.player.first+' '+r.player.last)+playerLabel(r.player)+'</td>'+
         '<td>'+escHtml(r.player.hand||'')+'</td><td>'+(r.player.ovr||'')+'</td>'+
-        '<td style="font-size:12px">'+escHtml((r.player.team||'').split(' ').slice(-1)[0])+'</td>'+
-        '<td>'+r.gp+'</td><td>'+pct+'</td><td>'+gaa+'</td><td>'+r.w+'</td><td>'+(r.pim||0)+'</td></tr>';
+        '<td style="font-size:12px">'+teamCell(r.player)+'</td>'+
+        '<td>'+(careerView?r.gp:formatLeaderGpCell(r, calGp))+'</td><td>'+r.sv+'</td><td>'+r.ga+'</td><td>'+pct+'</td><td>'+gaa+'</td><td>'+r.w+'</td><td>'+(r.pim||0)+'</td></tr>';
     }
     html+='</table></div>';
   }

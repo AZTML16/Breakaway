@@ -123,6 +123,15 @@ Create flow: nationality, gender, position, archetype, X-Factor, attributes, lea
 <select id="c-favorite-team" style="width:100%;max-width:100%;padding:8px;margin-top:4px"></select>
 <div class="vt" style="font-size:12px;color:var(--mut);margin-top:4px">PICK A REAL TEAM FROM THE GAME -- BOOSTS INTEREST IF YOU SIGN THERE LATER.</div>
 </div>
+<div class="panel"><div class="ptitle">DIFFICULTY</div>
+<div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:10px">Pick how many <b>bonus attribute points</b> you get after choosing your archetype. More points = easier start; fewer = harder grind.</div>
+<div class="g3" id="create-budget-btns">
+<button type="button" class="btn bs" onclick="setCreateAttrBudget(200,this)">EASY — 200 PTS</button>
+<button type="button" class="btn bp" id="create-budget-medium" onclick="setCreateAttrBudget(100,this)">MEDIUM — 100 PTS</button>
+<button type="button" class="btn bs" onclick="setCreateAttrBudget(0,this)">HARD — 0 PTS</button>
+</div>
+<div class="vt" id="create-budget-hint" style="font-size:13px;color:var(--gold);margin-top:8px">Selected: <b>MEDIUM</b> (100 bonus points)</div>
+</div>
 <div class="panel"><div class="ptitle">POSITION</div>
 <div class="g3" id="pos-btns">
 <button class="btn bp" onclick="setPos('F',this)">FORWARD</button>
@@ -169,7 +178,7 @@ Create flow: nationality, gender, position, archetype, X-Factor, attributes, lea
 <div class="screen" id="s-attrs">
 <div class="hbar"><span>BREAKAWAY</span><span>ATTRIBUTES</span></div>
 <div class="panel"><div class="ptitle">DISTRIBUTE BONUS POINTS</div>
-<div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:12px">POINTS REMAINING: <span id="pts-left" style="color:var(--gold)">50</span> / <span id="pts-budget-max">50</span></div>
+<div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:12px"><span id="pts-difficulty-label" style="color:var(--gold)">MEDIUM</span> — POINTS REMAINING: <span id="pts-left" style="color:var(--gold)">50</span> / <span id="pts-budget-max">50</span></div>
 <div id="attr-dist"></div>
 </div>
 <div class="panel"><div class="ptitle">ATTRIBUTE PREVIEW</div><div id="attr-preview"></div></div>
@@ -623,6 +632,8 @@ Create flow: nationality, gender, position, archetype, X-Factor, attributes, lea
 <script src="js/game/country-list.js"></script>
 <script src="js/game/00-data.js"></script>
 <script src="js/game/local-leagues.js"></script>
+<script src="js/game/36-team-locale.js"></script>
+<script src="js/game/37-league-legends.js"></script>
 <script src="js/game/name-pool-data.js"></script>
 <script src="js/game/name-pool.js"></script>
 <script src="js/game/01-game-state.js"></script>
@@ -640,6 +651,8 @@ Create flow: nationality, gender, position, archetype, X-Factor, attributes, lea
 <script src="js/game/13-select-option-fixed-passing-assist-not-goal.js"></script>
 <script src="js/game/14-post-game.js"></script>
 <script src="js/game/15-week-season.js"></script>
+<script src="js/game/34-cjl-usndt.js"></script>
+<script src="js/game/35-pro-academy-system.js"></script>
 <script src="js/game/16-injury.js"></script>
 <script src="js/game/17-milestones.js"></script>
 <script src="js/game/18-season-awards.js"></script>

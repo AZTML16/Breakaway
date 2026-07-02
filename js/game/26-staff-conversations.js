@@ -104,8 +104,9 @@ function triggerTradeConversation(newTeam){
 }
 
 function triggerOffseasonStaffChat(){
+  if(!G||!G.league) return;
   var coach=COACH_NAMES[ri(0,COACH_NAMES.length-1)];
-  var tier=G.league.tier;
+  var tier=G.league.tier||'';
   var scenarios=[
     // Contract expiring
     function(){

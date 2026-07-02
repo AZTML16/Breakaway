@@ -148,7 +148,7 @@ function selectOption(idx,auto){
         RetroSound.partialSave();
       }
     } else if(reward==='assist'){
-      if(Math.random()<0.44){
+      if(Math.random()<0.52){
         gameStats.a++;
         resultText='SECONDARY ASSIST -- PLAY KEPT ALIVE!';
         resultClass='partial';
@@ -169,6 +169,11 @@ function selectOption(idx,auto){
       resultText='GOOD READ -- CHANCE STILL ALIVE.';
       resultClass='partial';
       RetroSound.partial();
+    } else if(reward==='goal'&&Math.random()<0.38){
+      gameStats.a++;
+      resultText='PRIMARY ASSIST -- TEAMMATE FINISHES!';
+      resultClass='partial';
+      RetroSound.assist();
     } else {
       gameStats.sog++;
       resultText='GOOD SHOT -- GOALIE MADE THE SAVE.';

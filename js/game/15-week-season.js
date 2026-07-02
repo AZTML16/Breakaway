@@ -46,24 +46,25 @@ function nextWeek(){
   accrueWeeklySalary();
   tickSocialFollowers();
   if(typeof catchUpLeagueNpcStats==='function') catchUpLeagueNpcStats();
+  if(typeof maybeRefreshLinesAfterWeek==='function') maybeRefreshLinesAfterWeek();
+  if(typeof processLeagueTransactionNews==='function') processLeagueTransactionNews();
   if(typeof weeklyTeamSystemsTick==='function') weeklyTeamSystemsTick();
-  var totalWks=typeof getSeasonWeekCount==='function'
-    ?getSeasonWeekCount(G.leagueKey)
-    :Math.ceil((G.league.games||68)/Math.max(1,getGamesPerWeek(G.leagueKey)));
-  if(G.week>totalWks&&typeof endRegSeason==='function'){
-    endRegSeason();
-    return;
+  if(typeof maybeEndRegularSeason==='function'){
+    maybeEndRegularSeason();
+    if(G._inOffseason||(G._playoffCtx&&G._playoffCtx.active)) return;
   }
   renderHub();show('s-hub');
 }
 
 var PLAYOFF_SERIES_WINS=4;
 
+/** Best-of-7 pro default. College/local = single game; Memorial Cup RR/championship = single game. */
 function getPlayoffSeriesWinsForLeague(leagueKey){
+  if(typeof G!=='undefined'&&G&&G._playoffCtx&&G._playoffCtx.cjlUsndtChallenge) return 1;
+  if(typeof G!=='undefined'&&G&&G._playoffCtx&&G._playoffCtx.memorialCup) return 1;
   if(typeof isLocalLeague==='function'&&isLocalLeague(leagueKey)) return 1;
-  var tier=(typeof LEAGUES!=='undefined'&&LEAGUES[leagueKey])?LEAGUES[leagueKey].tier:'';
-  if(tier==='junior'||tier==='college') return 3;
-  return 4;
+  if(typeof LEAGUES!=='undefined'&&LEAGUES[leagueKey]&&LEAGUES[leagueKey].tier==='college') return 1;
+  return PLAYOFF_SERIES_WINS;
 }
 
 function getPlayoffSeriesWinsNeeded(){
@@ -72,10 +73,77 @@ function getPlayoffSeriesWinsNeeded(){
   return PLAYOFF_SERIES_WINS;
 }
 
+function showOffseasonScreen(){
+  if(typeof refreshOffseasonRecapPanels==='function') refreshOffseasonRecapPanels();
+  G._inOffseason=true;
+  show('s-offseason');
+}
+
+function scheduleOffseasonDebriefOnce(){
+  if(!G||G._offseasonDebriefShownForSeason===G.season) return;
+  G._offseasonDebriefShownForSeason=G.season;
+  setTimeout(function(){if(typeof triggerOffseasonStaffChat==='function') triggerOffseasonStaffChat();},400);
+}
+
 /** When eliminated — fast-sim every remaining series/round until a champion, then offseason. */
 function fastSimRemainingPlayoffBracket(){
   var ctx=G._playoffCtx;
   if(!ctx||!ctx.active) return;
+  if(ctx.memorialCup&&ctx.mcPhase==='roundrobin'){
+    var guardMc=0;
+    while(G._playoffCtx&&G._playoffCtx.active&&G._playoffCtx.memorialCup&&G._playoffCtx.mcPhase==='roundrobin'&&guardMc++<80){
+      ctx=G._playoffCtx;
+      while(ctx.pairIndex<ctx.pairs.length){
+        var prMc=ctx.pairs[ctx.pairIndex];
+        var hMc=prMc[0], aMc=prMc[1];
+        if(typeof memorialCupRecordRrGameFromSeries==='function'){
+          var hwMc=playoffSingleGameHomeWins(hMc,aMc)?1:0;
+          ctx.seriesHW=hwMc; ctx.seriesAW=1-hwMc;
+          memorialCupRecordRrGameFromSeries(hMc, aMc);
+        }
+        ctx.pairIndex++;
+      }
+      if(typeof memorialCupOnRoundComplete==='function') memorialCupOnRoundComplete();
+    }
+    if(G._playoffCtx&&G._playoffCtx.active&&G._playoffCtx.memorialCup&&G._playoffCtx.mcPhase!=='roundrobin'){
+      fastSimRemainingPlayoffBracket();
+    }
+    return;
+  }
+  if(ctx.memorialCup&&(ctx.mcPhase==='semifinal'||ctx.mcPhase==='final')){
+    var guardMcFin=0;
+    while(G._playoffCtx&&G._playoffCtx.active&&G._playoffCtx.memorialCup&&guardMcFin++<40){
+      ctx=G._playoffCtx;
+      if(ctx.mcPhase==='semifinal'){
+        while(ctx.pairIndex<ctx.pairs.length){
+          var prSemi=ctx.pairs[ctx.pairIndex];
+          var hSemi=prSemi[0], aSemi=prSemi[1];
+          var semiWin=playoffSingleGameHomeWins(hSemi,aSemi)?hSemi:aSemi;
+          ctx._roundMatchups.push(hSemi.team.n+' vs '+aSemi.team.n+' -> '+semiWin.team.n+' (sim)');
+          ctx.winnersThisRound.push(semiWin);
+          ctx.pairIndex++;
+        }
+        ctx.summary.rounds.push({name:ctx.roundName,matchups:ctx._roundMatchups.slice()});
+        if(typeof advanceMemorialCupToChampionship==='function') advanceMemorialCupToChampionship(ctx.winnersThisRound[0]);
+        continue;
+      }
+      if(ctx.mcPhase==='final'){
+        while(ctx.pairIndex<ctx.pairs.length){
+          var prFin=ctx.pairs[ctx.pairIndex];
+          var hFin=prFin[0], aFin=prFin[1];
+          var finWin=playoffSingleGameHomeWins(hFin,aFin)?hFin:aFin;
+          ctx._roundMatchups.push(hFin.team.n+' vs '+aFin.team.n+' -> '+finWin.team.n+' (sim)');
+          ctx.winnersThisRound.push(finWin);
+          ctx.pairIndex++;
+        }
+        ctx.current=[ctx.winnersThisRound[0]];
+        finishPlayablePlayoffs();
+        return;
+      }
+      break;
+    }
+    return;
+  }
   if(ctx.eliminated&&ctx.pairIndex<ctx.pairs.length){
     var pr=ctx.pairs[ctx.pairIndex];
     if(pr&&(pr[0].isMe||pr[1].isMe)) ctx.pairIndex++;
@@ -116,33 +184,44 @@ function onPlayoffEliminated(){
   if(!G._playoffCtx||!G._playoffCtx.active||!G._playoffCtx.eliminated) return;
   if(G._playoffElimAutoRun) return;
   G._playoffElimAutoRun=true;
-  var localTag=(G.league&&G.league.tier==='local')?'Community showcase over':'Playoff run over';
+  var localTag=(typeof isLocalLeague==='function'&&isLocalLeague(G.leagueKey))?'Community showcase over':(G._playoffCtx.cjlUsndtChallenge?'CJL vs USNDT Challenge over':(G._playoffCtx.memorialCup?'CJL Memorial Cup over':'Playoff run over'));
   addNews(localTag+' — heading to offseason.','neutral');
   notify('ELIMINATED — OFFSEASON','gold');
-  fastSimRemainingPlayoffBracket();
+  try{
+    fastSimRemainingPlayoffBracket();
+  }catch(ePo){
+    console.warn('playoff fast-sim failed', ePo);
+    if(typeof skipLocalShowcaseToOffseason==='function'&&typeof isLocalLeague==='function'&&isLocalLeague(G.leagueKey)){
+      skipLocalShowcaseToOffseason();
+    } else if(typeof finishSeasonToOffseason==='function'){
+      G._playoffCtx=null;
+      finishSeasonToOffseason();
+    }
+  }
   G._playoffElimAutoRun=false;
   if(G._inOffseason){
     try{show('s-offseason');}catch(eOff){}
+    if(typeof refreshOffseasonRecapPanels==='function') try{ refreshOffseasonRecapPanels(); }catch(eOffR){}
   } else if(!G._playoffCtx||!G._playoffCtx.active){
     try{renderHub();show('s-hub');}catch(eHub){}
   }
 }
 /** Simmed playoff games: flatter power curve, heavier player penalty, grind favors physical teams. */
 var PLAYOFF_SIM_POWER_DIV=44;
-var PLAYOFF_SIM_PLAYER_HURDLE=0.124;
+var PLAYOFF_SIM_PLAYER_HURDLE=0.138;
 function getPlayoffYoungLeagueSimHurdle(){
   if(typeof G==='undefined'||!G||!G.league) return 0;
   var t=G.league.tier;
-  if(t==='junior'||t==='college') return 0.038;
-  if(t==='minor') return 0.022;
-  return 0.008;
+  if(t==='junior'||t==='college') return 0.065;
+  if(t==='minor') return 0.038;
+  return 0.012;
 }
 function getPlayoffYoungLeaguePlayablePressure(){
   if(typeof G==='undefined'||!G||!G.league) return 0;
   var t=G.league.tier;
-  if(t==='junior'||t==='college') return 0.042;
-  if(t==='minor') return 0.028;
-  return 0.012;
+  if(t==='junior'||t==='college') return 0.055;
+  if(t==='minor') return 0.034;
+  return 0.014;
 }
 /** Extra bracket-sim power for physical/defensive profiles and brat/heavy hitter in playoffs (stacks with OVR). */
 function getPlayoffSimGrindPowerBonus(){
@@ -164,6 +243,18 @@ function playoffSingleGameHomeWins(home,away){
   var awayPower=(away.pts/(away.gp||1))+ (away.isMe?(ovr(G.attrs,G.pos)/5)*pk:0);
   if(home.isMe) homePower+=getPlayoffSimGrindPowerBonus();
   if(away.isMe) awayPower+=getPlayoffSimGrindPowerBonus();
+  if(typeof getUsndtPlayoffPowerBonus==='function'){
+    homePower+=getUsndtPlayoffPowerBonus(home);
+    awayPower+=getUsndtPlayoffPowerBonus(away);
+  }
+  if(typeof getMajorJuniorPlayoffPowerBonus==='function'){
+    homePower+=getMajorJuniorPlayoffPowerBonus(home);
+    awayPower+=getMajorJuniorPlayoffPowerBonus(away);
+  }
+  if(typeof getPlayoffRegularSeasonRegression==='function'){
+    homePower+=getPlayoffRegularSeasonRegression(home);
+    awayPower+=getPlayoffRegularSeasonRegression(away);
+  }
   var prob=cl(0.5 + (homePower-awayPower)/PLAYOFF_SIM_POWER_DIV,0.08,0.92);
   if(home.isMe||away.isMe){
     var ph=PLAYOFF_SIM_PLAYER_HURDLE+getPlayoffYoungLeagueSimHurdle();
@@ -292,15 +383,17 @@ function simulatePlayoffs(){
 }
 
 function initPlayablePlayoffs(){
+  if(typeof reconcileLeagueFromRegistry==='function') reconcileLeagueFromRegistry();
   G._worldStageCtx=null;
   G._playoffElimAutoRun=false;
   G.standings=buildStandings(G.leagueKey);
   var sorted=G.standings.slice().sort(function(a,b){return b.pts-a.pts;});
-  var isLocal=G.league&&G.league.tier==='local';
+  var isLocal=typeof isLocalLeague==='function'&&isLocalLeague(G.leagueKey);
   G._playoffSeriesWins=getPlayoffSeriesWinsForLeague(G.leagueKey);
   var bracket=isLocal?sorted.slice(0,Math.min(8,sorted.length)):buildPlayoffBracketFromStandings(sorted, G.leagueKey);
   if(!bracket||bracket.length<2){
     addNews(isLocal?'Community showcase skipped — not enough teams.':'Not enough playoff teams -- skipping playable bracket.','neutral');
+    _lastPlayoffRecapHTML='<div>'+escHtml((G.team&&G.team.n)||'Your club')+' — no playoff bracket (insufficient teams).</div>';
     if(isLocal&&typeof applyLocalCommunitySeasonAwards==='function') applyLocalCommunitySeasonAwards(sorted);
     finishSeasonToOffseason();
     return;
@@ -372,6 +465,23 @@ function processPlayoffPairQueue(){
   }
   var pr=ctx.pairs[ctx.pairIndex];
   var home=pr[0], away=pr[1];
+  if(ctx.memorialCup&&ctx.mcPhase!=='roundrobin'){
+    var mcWin=playoffSingleGameHomeWins(home,away);
+    var mcWinner=mcWin?home:away;
+    ctx._roundMatchups.push(home.team.n+' vs '+away.team.n+' -> '+mcWinner.team.n+' ('+(mcWin?'W':'L')+')');
+    ctx.winnersThisRound.push(mcWinner);
+    ctx.pairIndex++;
+    if(ctx.pairIndex>=ctx.pairs.length){
+      ctx.summary.rounds.push({name:ctx.roundName,matchups:ctx._roundMatchups.slice()});
+      if(ctx.mcPhase==='semifinal'&&typeof advanceMemorialCupToChampionship==='function'){
+        advanceMemorialCupToChampionship(mcWinner);
+        return;
+      }
+      ctx.current=[mcWinner];
+      finishPlayablePlayoffs();
+    }
+    return;
+  }
   if(home.isMe||away.isMe){
     var opp=home.isMe?away:home;
     ctx.playoffOpponent={n:opp.team.n,e:opp.team.e||'[-]'};
@@ -394,6 +504,44 @@ function processPlayoffPairQueue(){
 function afterPlayoffPlayableGame(won){
   var ctx=G._playoffCtx;
   if(!ctx)return;
+  if(ctx.cjlUsndtChallenge&&typeof cjlUsndtAfterPlayableGame==='function'){
+    var pr0=ctx.pairs[ctx.pairIndex];
+    if(pr0){
+      var homeTeamWon=typeof cjlUsndtHomeTeamWonFromUserResult==='function'
+        ?cjlUsndtHomeTeamWonFromUserResult(pr0[0], pr0[1], won):won;
+      var hg=typeof gameHomeScore!=='undefined'?gameHomeScore:0;
+      var ag=typeof gameAwayScore!=='undefined'?gameAwayScore:0;
+      var scoreLine='('+ (pr0[0].isMe?hg:ag)+'-'+ (pr0[0].isMe?ag:hg)+')';
+      cjlUsndtAfterPlayableGame(won, homeTeamWon, scoreLine);
+    } else {
+      cjlUsndtAfterPlayableGame(won);
+    }
+    return;
+  }
+  if(ctx.memorialCup&&ctx.mcPhase==='roundrobin'){
+    var prRr=ctx.pairs[ctx.pairIndex];
+    if(!prRr){
+      if(ctx.hubScheduleMode&&ctx.pairIndex>=ctx.pairs.length){
+        if(typeof memorialCupOnRoundComplete==='function') memorialCupOnRoundComplete();
+        try{renderHub();}catch(eMcH){} show('s-hub');
+      }
+      return;
+    }
+    var homeRr=prRr[0], awayRr=prRr[1];
+    if(won){ if(homeRr.isMe) ctx.seriesHW++; else if(awayRr.isMe) ctx.seriesAW++; }
+    else { if(homeRr.isMe) ctx.seriesAW++; else if(awayRr.isMe) ctx.seriesHW++; }
+    if(typeof memorialCupRecordRrGameFromSeries==='function') memorialCupRecordRrGameFromSeries(homeRr, awayRr);
+    ctx.pairIndex++;
+    ctx.seriesHW=0;
+    ctx.seriesAW=0;
+    ctx.awaitingUserGame=false;
+    G._isPlayoffGame=false;
+    if(ctx.pairIndex>=ctx.pairs.length){
+      if(typeof memorialCupOnRoundComplete==='function') memorialCupOnRoundComplete();
+    }
+    try{renderHub();}catch(eMcR){} show('s-hub');
+    return;
+  }
   var pr=ctx.pairs[ctx.pairIndex];
   if(!pr){
     if(ctx.hubScheduleMode&&ctx.pairIndex>=ctx.pairs.length){
@@ -431,7 +579,7 @@ function afterPlayoffPlayableGame(won){
     ctx._roundMatchups.push(home.team.n+' vs '+away.team.n+' -> '+userRow.team.n+' (YOU) ('+hw+'-'+aw+')');
     ctx.winnersThisRound.push(userRow);
     ctx.roundReached=ctx.roundName;
-    addNews('YOU WIN '+ctx.roundName+' series '+hw+'-'+aw+' vs '+oppRow.team.n+'!','good');
+    addNews('YOU WIN '+ctx.roundName+(hw+aw>1?' series '+hw+'-'+aw:'')+' vs '+oppRow.team.n+'!','good');
   } else {
     ctx._roundMatchups.push(home.team.n+' vs '+away.team.n+' -> '+oppRow.team.n+' ('+hw+'-'+aw+')');
     ctx.winnersThisRound.push(oppRow);
@@ -449,9 +597,21 @@ function afterPlayoffPlayableGame(won){
   G._isPlayoffGame=false;
   if(ctx.hubScheduleMode){
     if(ctx.pairIndex>=ctx.pairs.length){
-      tryCompletePlayoffRoundFromHub();
+      if(ctx.memorialCup&&(ctx.mcPhase==='semifinal'||ctx.mcPhase==='final')){
+        ctx.summary.rounds.push({name:ctx.roundName,matchups:ctx._roundMatchups.slice()});
+        if(ctx.mcPhase==='semifinal'&&typeof advanceMemorialCupToChampionship==='function'){
+          advanceMemorialCupToChampionship(ctx.winnersThisRound[0]);
+        } else {
+          ctx.current=[ctx.winnersThisRound[0]];
+          finishPlayablePlayoffs();
+        }
+      } else {
+        tryCompletePlayoffRoundFromHub();
+      }
     }
-    if(G._playoffCtx&&G._playoffCtx.active){
+    if(G._inOffseason){
+      showOffseasonScreen();
+    } else if(G._playoffCtx&&G._playoffCtx.active){
       try{renderHub();}catch(eH1){}
       show('s-hub');
     }
@@ -466,6 +626,30 @@ function finishPlayablePlayoffs(){
     // Context already cleared after a normal finish — do not run season-end again (duplicate season log)
     return;
   }
+  if(ctx.memorialCup){
+    var champion=ctx.current[0];
+    ctx.wonCup=!!(champion&&champion.isMe);
+    ctx.summary.champion=champion?champion.team.n:'';
+    G.wonCup=ctx.wonCup;
+    G._memorialCupChampion=champion?champion.team.n:'';
+    _lastPlayoffStats=ctx.myStats;
+    var playoffObj={wonCup:ctx.wonCup,roundReached:ctx.roundReached||'Finals',summary:ctx.summary};
+    recordPlayoffLogFromResult(playoffObj);
+    _lastPlayoffRecapHTML=(_lastPlayoffRecapHTML||'')+(typeof buildPlayoffRecapHTML==='function'?buildPlayoffRecapHTML(playoffObj,{memorialCup:true}):'');
+    G._playoffCtx=null;
+    G._isPlayoffGame=false;
+    if(champion&&!champion.isMe){
+      addNews(champion.team.n+' wins the CJL Memorial Cup.','good');
+    }
+    if(typeof finishMemorialCupToOffseason==='function'){
+      finishMemorialCupToOffseason();
+      return;
+    }
+  }
+  if(ctx.cjlUsndtChallenge){
+    if(typeof finishCjlUsndtChallengeToOffseason==='function') finishCjlUsndtChallengeToOffseason();
+    return;
+  }
   var champion=ctx.current[0];
   ctx.wonCup=!!(champion&&champion.isMe);
   ctx.summary.champion=champion?champion.team.n:'';
@@ -473,7 +657,7 @@ function finishPlayablePlayoffs(){
   _lastPlayoffStats=ctx.myStats;
   var playoffObj={wonCup:ctx.wonCup,roundReached:ctx.roundReached||'Finals',summary:ctx.summary};
   recordPlayoffLogFromResult(playoffObj);
-  _lastPlayoffRecapHTML=buildPlayoffRecapHTML(playoffObj);
+  _lastPlayoffRecapHTML=buildPlayoffRecapHTML(playoffObj,{leagueOnly:true});
   G._playoffCtx=null;
   G._isPlayoffGame=false;
   if(G.wonCup){
@@ -490,21 +674,29 @@ function finishPlayablePlayoffs(){
     addNews(champion.team.n+' wins the '+G.league.short+' championship.','good');
     addNews('CHAMPIONSHIP FINAL: '+champion.team.n+' close out the '+G.league.short+' season on top.','neutral');
   }
-  if(G.league&&G.league.tier==='local'&&typeof applyLocalCommunitySeasonAwards==='function'){
+  if(G.league&&typeof isLocalLeague==='function'&&isLocalLeague(G.leagueKey)&&typeof applyLocalCommunitySeasonAwards==='function'){
     applyLocalCommunitySeasonAwards(G.standings||[]);
   }
-  if(typeof buildSeasonRecapHTML==='function'){
-    G._lastSeasonRecapHTML=buildSeasonRecapHTML();
+  if(typeof captureSeasonRecapSnapshot==='function') captureSeasonRecapSnapshot();
+  else if(typeof buildSeasonRecapHTML==='function') G._lastSeasonRecapHTML=buildSeasonRecapHTML();
+  if(typeof isCjlMajorJuniorLeague==='function'&&isCjlMajorJuniorLeague(G.leagueKey)&&typeof beginCjlMemorialCupSequence==='function'){
+    if(typeof prepareUsndtForSpringEvents==='function') prepareUsndtForSpringEvents();
+    if(beginCjlMemorialCupSequence(champion)) return;
   }
+  if(typeof prepareUsndtForSpringEvents==='function') prepareUsndtForSpringEvents();
+  if(typeof beginCjlUsndtChallenge==='function'&&beginCjlUsndtChallenge()) return;
   finishSeasonToOffseason();
   if(G._inOffseason){
     try{show('s-offseason');}catch(eFp){}
   }
 }
 
-function buildPlayoffRecapHTML(playoff){
+function buildPlayoffRecapHTML(playoff, opts){
+  opts=opts||{};
   if(!playoff||!playoff.summary) return 'NO PLAYOFF BRACKET AVAILABLE.';
-  var html='<div style="margin-bottom:8px;color:var(--gold);font-size:15px">PLAYOFF FIELD</div>';
+  var title=opts.memorialCup?'CJL MEMORIAL CUP RECAP':(opts.leagueOnly?'LEAGUE PLAYOFF RECAP':'PLAYOFF RECAP');
+  var champLabel=opts.memorialCup?'MEMORIAL CUP CHAMPION':'LEAGUE CHAMPION';
+  var html='<div style="margin-bottom:8px;color:var(--gold);font-size:15px">'+title+'</div>';
   html+='<div style="display:grid;grid-template-columns:1fr;gap:4px;margin-bottom:10px">';
   for(var f=0;f<playoff.summary.field.length;f++){
     html+='<div style="padding:6px;border:1px solid rgba(122,184,224,.2);background:rgba(12,26,36,.5)">'+playoff.summary.field[f]+'</div>';
@@ -517,7 +709,7 @@ function buildPlayoffRecapHTML(playoff){
       html+='<div style="padding:6px;border-left:3px solid var(--acc);margin-bottom:4px;background:rgba(12,26,36,.35)">'+r.matchups[j]+'</div>';
     }
   }
-  html+='<div style="margin-top:10px;padding:8px;border:1px solid rgba(46,204,113,.35);color:var(--green)">CHAMPION: '+playoff.summary.champion+'</div>';
+  html+='<div style="margin-top:10px;padding:8px;border:1px solid rgba(46,204,113,.35);color:var(--green)">'+champLabel+': '+playoff.summary.champion+'</div>';
   if(_lastPlayoffStats){
     if(G.pos==='G'){
       var psvPct=formatSvPctFromCounts(_lastPlayoffStats.sv,_lastPlayoffStats.ga);
@@ -772,6 +964,9 @@ function startNextQueuedWorldStagePlayable(){
 function startOffseasonWorldStageFlow(){
   G._worldFaceoffInvited=false;
   G._worldFaceoffDeclined=false;
+  G._inOffseason=true;
+  if(typeof refreshOffseasonRecapPanels==='function') refreshOffseasonRecapPanels();
+  show('s-offseason');
   var jev,sev,fev;
   if(isEliteIntlHockeyCountry(G.nat)){
     jev=evaluateWorldTournament('junior');
@@ -786,14 +981,16 @@ function startOffseasonWorldStageFlow(){
   if(!jev.ok) _lastWorldStageHTML+=jev.msg||'';
   if(!sev.ok) _lastWorldStageHTML+=sev.msg||'';
   if(!fev.ok&&fev.msg) _lastWorldStageHTML+=fev.msg;
+  if(typeof refreshOffseasonRecapPanels==='function') refreshOffseasonRecapPanels();
   if(fev.ok){
     G._worldFaceoffInvited=true;
+    G._worldStageStaffChatOpen=true;
     openStaffChat('WORLD FACEOFF -- THIS OFFSEASON',
       [{sender:'National Program', color:'var(--gold)', text:getNationalTeamName(G.nat)+' has named you to the World Faceoff roster — a developmental international event for emerging hockey nations. You are on the team regardless of age or OVR. Simulate, play the games, or decline the invitation.'}],
       [
         {label:'SIM WORLD FACEOFF', fn:function(){
           runInternationalTournamentFromEval(fev);
-          closeOffseasonWorldStageAndShow();
+          closeOffseasonWorldStageAndShow({skipDebrief:false});
         }},
         {label:'PLAY NATIONAL GAMES', fn:function(){
           G._worldStagePlayQueue=[fev];
@@ -813,8 +1010,11 @@ function startOffseasonWorldStageFlow(){
     var bits=[];
     if(jev.ok) bits.push('WORLD JUNIORS');
     if(sev.ok) bits.push('WORLD TOURNAMENT');
+    var worldsNote=isWorldTournamentOfHockeyYear()
+      ?' The World Tournament of Hockey (Olympic-style, quadrennial) runs this summer.'
+      :(' The World Tournament of Hockey is quadrennial Olympic-style hockey (next: '+getNextWorldTournamentOfHockeyYear()+'). World Juniors (U20) is a separate annual event.');
     openStaffChat('WORLD STAGE -- THIS OFFSEASON',
-      [{sender:'National Program', color:'var(--gold)', text:'International duty: '+bits.join(' & ')+'. Simulate the full run or play the national-team games (same 3-moment games as league play). Elite events — scoring is brutal.'}],
+      [{sender:'National Program', color:'var(--gold)', text:'International duty: '+bits.join(' & ')+'.'+worldsNote+' Simulate the full run or play the national-team games (same 3-moment games as league play). Elite events — scoring is brutal.'}],
       [
         {label:'SIM TOURNAMENTS', fn:function(){
           if(jev.ok) runInternationalTournamentFromEval(jev);
@@ -840,18 +1040,37 @@ function evaluateWorldFaceoff(){
   if(!isWorldFaceoffCountry(G.nat)){
     return {ok:false,msg:''};
   }
-  var teamPower=cl(0.38+(G.league.dev||1)*0.14+rd(-0.08,0.22),0.22,0.92);
+  var teamPower=cl(0.38+((G.league&&G.league.dev)||1)*0.14+rd(-0.08,0.22),0.22,0.92);
   return {ok:true,isFaceoff:true,isJunior:false,tName:tName,nt:nt,reqOvr:0,pOvr:ovr(G.attrs,G.pos),teamPower:teamPower,guaranteed:true};
 }
 
-function closeOffseasonWorldStageAndShow(){
+function refreshOffseasonRecapPanels(){
+  if(typeof ensureSeasonRecapForOffseason==='function') ensureSeasonRecapForOffseason();
   safeEl('offseason-playoff-recap').innerHTML=_lastPlayoffRecapHTML||'NO PLAYOFF RECAP YET.';
   safeEl('offseason-world-stage').innerHTML=_lastWorldStageHTML||'NO TOURNAMENT UPDATE YET.';
   var recapEl=safeEl('offseason-season-recap');
-  if(recapEl) recapEl.innerHTML=(G&&G._lastSeasonRecapHTML)||(typeof buildSeasonRecapHTML==='function'?buildSeasonRecapHTML():'');
+  if(recapEl) recapEl.innerHTML=(G&&G._lastSeasonRecapHTML)||'';
+}
+
+function closeOffseasonWorldStageAndShow(opts){
+  opts=opts||{};
+  refreshOffseasonRecapPanels();
   G._inOffseason=true;
   show('s-offseason');
-  setTimeout(function(){triggerOffseasonStaffChat();},400);
+  if(!opts.skipDebrief) scheduleOffseasonDebriefOnce();
+}
+
+/** Senior World Tournament of Hockey — real worlds, once every four calendar years. World Juniors stays annual. */
+var WORLD_TOURNAMENT_CYCLE_YEARS=4;
+function isWorldTournamentOfHockeyYear(year){
+  var y=year!=null?year:(typeof G!=='undefined'&&G&&G.year?G.year:2026);
+  return (y%WORLD_TOURNAMENT_CYCLE_YEARS)===0;
+}
+function getNextWorldTournamentOfHockeyYear(fromYear){
+  var y=(fromYear!=null?fromYear:(typeof G!=='undefined'&&G&&G.year?G.year:2026))+1;
+  var guard=0;
+  while(!isWorldTournamentOfHockeyYear(y)&&guard++<12) y++;
+  return y;
 }
 
 function evaluateWorldTournament(kind){
@@ -866,18 +1085,23 @@ function evaluateWorldTournament(kind){
   if(isJunior){
     // World Juniors: U20 — under 20 only (no 18+ floor).
     if(G.age>=20) return {ok:false,msg:'<div>'+tName+': '+nt+' age ineligible (World Juniors — under 20 only).</div>'};
+    if(typeof isUsaNationalTeamEligible==='function'&&isUsaNationalTeamEligible(G.nat)){
+      reqOvrBase-=typeof getUsaWorldJuniorsOvrDiscount==='function'?getUsaWorldJuniorsOvrDiscount():0;
+    }
   } else {
     if(G.age<18) return {ok:false,msg:'<div>'+tName+': '+nt+' age ineligible (senior tournament — must be 18+).</div>'};
   }
   if(isJunior && G.leagueKey===getProLeagueKeyByGender(G.gender)) return {ok:false,msg:'<div>'+tName+': Ineligible as full-time '+getProLeagueKeyByGender(G.gender)+' player.</div>'};
-  if(!isJunior && (G.year%4)!==0) return {ok:false,msg:'<div>'+tName+': Not held this year.</div>'};
+  if(!isJunior&&!isWorldTournamentOfHockeyYear(G.year)){
+    return {ok:false,msg:'<div>'+tName+': Quadrennial Olympic-style tournament — not held this summer (next: '+getNextWorldTournamentOfHockeyYear(G.year)+').</div>'};
+  }
   var countryMult=getWorldStageCountryDifficultyMult(G.nat);
   var reqOvr=reqOvrBase*countryMult;
   var pOvr=ovr(G.attrs,G.pos);
   var reqShow=Math.round(reqOvr);
   if(pOvr<reqOvr)
     return {ok:false,msg:'<div>'+tName+': Not selected by '+nt+' (OVR '+pOvr+' / req '+reqShow+').</div>'};
-  var teamPower=cl((pOvr-reqOvr)/20 + (G.league.dev||1)*0.2 + rd(-0.15,0.25),0.05,1.2);
+  var teamPower=cl((pOvr-reqOvr)/20 + ((G.league&&G.league.dev)||1)*0.2 + rd(-0.15,0.25),0.05,1.2);
   return {ok:true,isJunior:isJunior,tName:tName,nt:nt,reqOvr:reqShow,pOvr:pOvr,teamPower:teamPower};
 }
 
@@ -930,10 +1154,13 @@ function runInternationalTournamentFromEval(ev){
   var gp=ri(isFaceoff?3:4,isFaceoff?5:7);
   if(G.pos==='G'){
     var shots=ri(isFaceoff?55:70,isFaceoff?95:130);
-    var svRate=cl((isFaceoff?0.9:0.87) + (pOvr-70)*0.0008 + rd(-0.01,0.01),0.82,0.95);
-    if(G.xFactor==='clutch') svRate=cl(svRate+0.009,0.82,0.956);
-    if(G.xFactor==='regular_season') svRate=cl(svRate-0.007,0.82,0.95);
-    if(G.xFactor==='careless'&&isCarelessSlumping()) svRate=cl(svRate-0.006,0.82,0.95);
+    var wsPerfBias=cl((pOvr-70)/20,-1.2,1.4);
+    var svRate=typeof computeGoalieSaveRate==='function'
+      ?computeGoalieSaveRate(wsPerfBias,{base:isFaceoff?0.908:0.905})
+      :cl((isFaceoff?0.908:0.905)+(pOvr-70)*0.0007+rd(-0.008,0.008),0.895,0.968);
+    if(G.xFactor==='clutch') svRate=cl(svRate+0.009,0.895,0.968);
+    if(G.xFactor==='regular_season') svRate=cl(svRate-0.007,0.895,0.968);
+    if(G.xFactor==='careless'&&isCarelessSlumping()) svRate=cl(svRate-0.006,0.895,0.968);
     var sv=Math.round(shots*svRate);
     var ga=shots-sv;
     addNews((medal?medal+' MEDAL! ':'')+nt+' '+tName+' run -- '+G.first+' '+G.last+' posts '+sv+' SV and '+ga+' GA in '+gp+' games.','big');
@@ -991,9 +1218,17 @@ function runInternationalTournamentFromEval(ev){
 }
 
 function endRegSeason(){
+  if(typeof ensureLeagueContext==='function') ensureLeagueContext();
   if(G._inOffseason){
     notify('OFFSEASON — USE NEXT SEASON WHEN READY','gold');
-    show('s-offseason');
+    showOffseasonScreen();
+    return;
+  }
+  if(G._seasonEndLoggedForSeason===G.season){
+    G._inOffseason=true;
+    if(typeof ensureSeasonRecapForOffseason==='function') ensureSeasonRecapForOffseason();
+    if(typeof continueOffseasonAfterDraft==='function') continueOffseasonAfterDraft();
+    showOffseasonScreen();
     return;
   }
   if(G._playoffCtx&&G._playoffCtx.active){
@@ -1007,7 +1242,7 @@ function endRegSeason(){
   var sorted=G.standings.slice().sort(function(a,b){return b.pts-a.pts;});
   var myIdx=0;
   for(var i=0;i<sorted.length;i++){if(sorted[i].isMe){myIdx=i;break;}}
-  var isLocal=G.league&&G.league.tier==='local';
+  var isLocal=typeof isLocalLeague==='function'&&isLocalLeague(G.leagueKey);
   var madePlayoffs=isLocal?(myIdx<8):(myIdx<Math.ceil(sorted.length/2));
   if(madePlayoffs){
     initPlayablePlayoffs();
@@ -1021,30 +1256,45 @@ function endRegSeason(){
     _lastPlayoffRecapHTML=isLocal&&typeof buildLocalSeasonRecapHTML==='function'?buildLocalSeasonRecapHTML(sorted):('<div>'+G.team.n+' missed the playoffs this season.</div>');
     if(isLocal&&typeof applyLocalCommunitySeasonAwards==='function') applyLocalCommunitySeasonAwards(sorted);
   }
+  if(typeof isCjlMajorJuniorLeague==='function'&&isCjlMajorJuniorLeague(G.leagueKey)&&typeof beginCjlMemorialCupSequence==='function'){
+    if(typeof prepareUsndtForSpringEvents==='function') prepareUsndtForSpringEvents();
+    if(beginCjlMemorialCupSequence(null)) return;
+  }
+  if(typeof prepareUsndtForSpringEvents==='function') prepareUsndtForSpringEvents();
+  if(typeof beginCjlUsndtChallenge==='function'&&beginCjlUsndtChallenge()) return;
   finishSeasonToOffseason();
 }
 
 function finishSeasonToOffseason(){
-  // One log row per season end (playoff paths could otherwise fire this multiple times)
-  if(G._seasonEndLoggedForSeason===G.season){
-    goToOffseason();
-    return;
+  if(typeof ensureLeagueContext==='function') ensureLeagueContext();
+  if(typeof isActiveProCallUp==='function'&&isActiveProCallUp()&&typeof endProCallUpStint==='function') endProCallUpStint();
+  var alreadyLogged=G._seasonEndLoggedForSeason===G.season;
+  if(!alreadyLogged){
+    G._seasonEndLoggedForSeason=G.season;
+    try{
+      var logEntry={year:G.year,season:G.season,league:(G.league&&G.league.short)||G.leagueKey||'',leagueKey:G.leagueKey,team:G.team.n.split(' ').slice(-1)[0],gp:G.gp,w:G.w,l:G.l,otl:G.otl,ovrVal:ovr(G.attrs,G.pos),wonCup:G.wonCup,isGoalie:G.pos==='G'};
+      if(G.pos==='G'){
+        var sSvPct=G.saves+(G.goalsAgainst||0)>0?(G.saves/(G.saves+(G.goalsAgainst||0))):null;
+        var sGAA=G.gp>0?Math.round(((G.goalsAgainst||0)/G.gp)*100)/100:'--';
+        logEntry.sv=G.saves; logEntry.ga=G.goalsAgainst||0; logEntry.svpct=sSvPct; logEntry.gaa=sGAA;
+      } else {
+        logEntry.g=G.goals; logEntry.a=G.assists;
+      }
+      G.seasonLog.push(logEntry);
+      if(typeof recordLhlSeasonIfComplete==='function') recordLhlSeasonIfComplete();
+      if(typeof pushCallUpSeasonLogEntries==='function') pushCallUpSeasonLogEntries();
+      if(typeof snapshotJuniorTeammates==='function') snapshotJuniorTeammates();
+      if(!(typeof isLocalLeague==='function'&&isLocalLeague(G.leagueKey))&&typeof registerLeagueAlumni==='function') registerLeagueAlumni();
+    }catch(eEnd){
+      console.warn('finishSeasonToOffseason partial failure', eEnd);
+    }
   }
-  G._seasonEndLoggedForSeason=G.season;
-  // Store season stats in log
-  var logEntry={year:G.year,season:G.season,league:G.league.short,leagueKey:G.leagueKey,team:G.team.n.split(' ').slice(-1)[0],gp:G.gp,ovrVal:ovr(G.attrs,G.pos),wonCup:G.wonCup,isGoalie:G.pos==='G'};
-  if(G.pos==='G'){
-    var sSvPct=G.saves+(G.goalsAgainst||0)>0?(G.saves/(G.saves+(G.goalsAgainst||0))):null;
-    var sGAA=G.gp>0?Math.round(((G.goalsAgainst||0)/G.gp)*100)/100:'--';
-    logEntry.sv=G.saves; logEntry.ga=G.goalsAgainst||0; logEntry.svpct=sSvPct; logEntry.gaa=sGAA;
-  } else {
-    logEntry.g=G.goals; logEntry.a=G.assists;
-  }
-  G.seasonLog.push(logEntry);
-  if(typeof buildSeasonRecapHTML==='function') G._lastSeasonRecapHTML=buildSeasonRecapHTML();
-  if(typeof snapshotJuniorTeammates==='function') snapshotJuniorTeammates();
-  if(typeof registerLeagueAlumni==='function') registerLeagueAlumni();
-  // Season awards
-  checkSeasonAwards();
+  if(typeof ensureSeasonRecapForOffseason==='function') ensureSeasonRecapForOffseason();
+  if(typeof processOffseasonFreeAgencyNews==='function') processOffseasonFreeAgencyNews();
   goToOffseason();
+  var runAwards=function(){
+    try{ checkSeasonAwards(); }catch(eAwards){ console.warn('checkSeasonAwards failed', eAwards); }
+  };
+  if(typeof isLocalLeague==='function'&&isLocalLeague(G.leagueKey)) setTimeout(runAwards, 0);
+  else runAwards();
 }

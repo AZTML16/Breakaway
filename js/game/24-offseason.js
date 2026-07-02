@@ -69,12 +69,17 @@ function isPlayerUnderBindingContract(){
   if((G.contractYrsLeft||0)<=0) return false;
   var t=String(G.contract.type||'');
   if(t==='AMATEUR'||t==='JUNIOR DEAL'||t==='SCHOLARSHIP') return false;
+  if((t==='ACADEMY CONTRACT'||t==='ORG PRO DEAL')&&(G.contractYrsLeft||0)>0) return true;
   if(G.league&&(G.league.tier==='junior'||G.league.tier==='college'||G.league.tier==='local')) return false;
   return true;
 }
 
 function isContractLeagueMoveAllowed(targetKey){
   if(!isPlayerUnderBindingContract()) return true;
+  if(G.contract&&(G.contract.type==='ACADEMY CONTRACT'||G.contract.type==='ORG PRO DEAL')&&typeof getAcademyOrgAllowedLeagueKeys==='function'){
+    var acAllowed=getAcademyOrgAllowedLeagueKeys();
+    if(acAllowed) return acAllowed.indexOf(targetKey)>=0;
+  }
   ensureContractBindingStamped();
   var circuit=G._contractCircuit||getContractCircuit(G._contractSignedLeagueKey||G.leagueKey);
   var allowed=getContractCircuitLeagues(circuit);
@@ -199,7 +204,17 @@ function appendFallbackLeagueOffers(){
     teams=TEAMS[lk]||[];
     if(!teams.length) continue;
     team=teams[ri(0,teams.length-1)];
-    curFAOffers.push({lk:lk,l:l,team:team,sal:Math.max(0,l.salBase||0),yrs:ri(1,3),fallback:true});
+    var isCollege=lk==='NCHA'||lk==='NWCHA';
+    var isJunior=l.tier==='junior';
+    curFAOffers.push({
+      lk:lk, l:l, team:team,
+      sal:isCollege||isJunior?0:Math.max(0,l.salBase||0),
+      stipendWeekly:(isCollege||isJunior)?estimateWeeklyStipendForOffer(lk):undefined,
+      yrs:isCollege?ri(3,4):ri(1,3),
+      fallback:true,
+      scholarship:isCollege,
+      juniorDeal:isJunior
+    });
   }
 }
 function handleExpiredContractBeforeCamp(){
@@ -231,9 +246,16 @@ function handleExpiredContractBeforeCamp(){
 /** OVR band for college / overseas semi-pro when too good for juniors but not pro-ready. */
 function getDevPathCollegeSemiMinOvr(){return 68;}
 function getDevPathCollegeSemiMaxOvr(){return 74;}
+/** Elite CHL/overseas junior — should see semi-pro, college, and dev-league interest. */
+function qualifiesForEliteJuniorExitPath(){
+  if(!G||!G.league||G.league.tier!=='junior') return false;
+  var o=ovr(G.attrs,G.pos);
+  return o>=74&&(G.age||16)>=17;
+}
 function qualifiesForCollegeSemiProDevPath(){
   if(!G||!G.attrs) return false;
   var o=ovr(G.attrs,G.pos);
+  if(qualifiesForEliteJuniorExitPath()&&o<=82) return true;
   if(o<getDevPathCollegeSemiMinOvr()||o>getDevPathCollegeSemiMaxOvr()) return false;
   if(G.league&&G.league.tier==='pro') return false;
   if(hasActiveDraftRights()&&draftClubWillingToSignElc()) return false;
@@ -247,6 +269,10 @@ function pickCollegeSemiProSwitchOffers(otherLeagues){
   var col=G.gender==='M'?'NCHA':'NWCHA';
   var semi=getSemiProLeagueKeysByGender(G.gender);
   var out=[], j, k;
+  if(typeof qualifiesForEliteJuniorExitPath==='function'&&qualifiesForEliteJuniorExitPath()&&typeof hasActiveDraftRights==='function'&&hasActiveDraftRights()){
+    var minorK=typeof getMinorLeagueKeyByGender==='function'?getMinorLeagueKeyByGender(G.gender):'NAML';
+    if(otherLeagues.indexOf(minorK)>=0) out.push(minorK);
+  }
   if(otherLeagues.indexOf(col)>=0) out.push(col);
   for(j=0;j<semi.length;j++){
     k=semi[j];
@@ -284,6 +310,208 @@ function appendOverseasProOffersWhileRightsHeld(){
   }
 }
 
+function appendEliteDraftedDevOffers(){
+  if(!hasActiveDraftRights()||(G.age||16)<18) return;
+  var po=ovr(G.attrs,G.pos);
+  if(po<74) return;
+  if(typeof playerTooGoodForMinorLeague==='function'&&playerTooGoodForMinorLeague(po)) return;
+  var minorK=getMinorLeagueKeyByGender(G.gender);
+  var ml=LEAGUES[minorK];
+  if(!ml||ml.gender!==G.gender) return;
+  var dup=false, j;
+  for(j=0;j<curFAOffers.length;j++){ if(curFAOffers[j].lk===minorK){ dup=true; break; } }
+  if(dup) return;
+  var teams=TEAMS[minorK]||[];
+  if(!teams.length) return;
+  var team=teams[ri(0,teams.length-1)];
+  curFAOffers.push({
+    lk:minorK, l:ml, team:team,
+    sal:Math.round((ml.salBase||80000)*rd(0.72,0.92)/1000)*1000,
+    yrs:ri(2,3),
+    devAssignment:true,
+    rightsNote:G.draftRights.team+' ('+G.draftRights.leagueKey+') holds NA rights — '+minorK+' is a dev assignment'
+  });
+}
+
+function generateJuniorProspectOffers(){
+  if(!G||!G.league||G.league.tier!=='junior') return;
+  var po=ovr(G.attrs,G.pos);
+  if(!hasActiveDraftRights()&&!qualifiesForEliteJuniorExitPath()) return;
+  appendOverseasProOffersWhileRightsHeld();
+  appendEliteDraftedDevOffers();
+  appendCollegeSemiProFAOffers();
+  if(!curFAOffers.length) appendFallbackLeagueOffers();
+}
+
+function estimateWeeklyStipendForOffer(leagueKey){
+  if(!G) return 0;
+  var lk=leagueKey||'';
+  if(typeof isChlMajorJuniorLeague==='function'&&isChlMajorJuniorLeague(lk)&&G.gender==='M'){
+    var floor=Math.round(5000/52), ceil=Math.round(100000/52);
+    var pOvr=ovr(G.attrs,G.pos);
+    return Math.round(cl(floor+(pOvr-58)/42*(ceil-floor), floor, ceil));
+  }
+  if(typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(lk)&&typeof getAcademyWeeklyStipend==='function'){
+    return getAcademyWeeklyStipend(G.gender, lk);
+  }
+  if(lk==='NCHA'||lk==='NWCHA') return Math.round((G.gender==='M'?175:130)+40);
+  if(lk==='USJL') return Math.round(110);
+  return 0;
+}
+
+function offerAlreadyHasLeague(lk){
+  var j;
+  for(j=0;j<curFAOffers.length;j++){ if(curFAOffers[j].lk===lk) return true; }
+  return false;
+}
+
+function offerAlreadyHasTeam(lk, teamName){
+  var j;
+  for(j=0;j<curFAOffers.length;j++){
+    if(curFAOffers[j].lk===lk&&curFAOffers[j].team&&curFAOffers[j].team.n===teamName) return true;
+  }
+  return false;
+}
+
+function appendAcademyLeagueTransferOffers(){
+  if(typeof isProAcademyJuniorLeague!=='function'||!isProAcademyJuniorLeague(G.leagueKey)||!G.team) return;
+  var lk=G.leagueKey;
+  var l=LEAGUES[lk];
+  if(!l) return;
+  var candidates=shuf((TEAMS[lk]||[]).filter(function(t){return t.n!==G.team.n;}));
+  var po=ovr(G.attrs,G.pos);
+  var n=Math.min(3, candidates.length), i;
+  for(i=0;i<n;i++){
+    var team=candidates[i];
+    if(offerAlreadyHasTeam(lk, team.n)) continue;
+    curFAOffers.push({
+      lk:lk, l:l, team:team,
+      sal:0,
+      stipendWeekly:estimateWeeklyStipendForOffer(lk),
+      yrs:po>=78?3:(po>=68?2:1),
+      juniorDeal:true,
+      academyTransfer:true,
+      movementOffer:true
+    });
+  }
+}
+
+function appendMovementOfferForLeague(lk, opts){
+  opts=opts||{};
+  if(!LEAGUES[lk]||offerAlreadyHasLeague(lk)||!canJoinLeagueByAge(lk)) return;
+  if(!canMoveToProLeague(lk)||!isContractLeagueMoveAllowed(lk)) return;
+  var l=LEAGUES[lk];
+  var teams=TEAMS[lk]||[];
+  if(!teams.length) return;
+  var team=opts.team||(G.draftRights&&G.draftRights.leagueKey===lk?getValidTeamForLeague(lk,G.draftRights.team):teams[ri(0,teams.length-1)]);
+  if(!team) return;
+  var po=ovr(G.attrs,G.pos);
+  var o={lk:lk,l:l,team:team,sal:0,yrs:2,movementOffer:true};
+  if(l.tier==='junior'){
+    o.stipendWeekly=estimateWeeklyStipendForOffer(lk);
+    o.yrs=po>=78?3:(po>=68?2:1);
+    o.juniorDeal=true;
+    if(typeof isChlTerritoryMismatch==='function'&&isChlTerritoryMismatch(lk,G.hometown,G.nat,G.gender)) o.importCareer=true;
+  } else if(l.tier==='college'){
+    o.stipendWeekly=estimateWeeklyStipendForOffer(lk);
+    o.yrs=po>=78?4:3;
+    o.scholarship=true;
+  } else if(l.tier==='pro'){
+    if(!(G.draftRights&&G.draftRights.leagueKey===lk)&&G.league&&G.league.tier!=='pro') return;
+    o.sal=Math.round((l.salBase||400000)*rd(0.82,1.05)/1000)*1000;
+    o.yrs=po>=getEliteReadyOvrBar()?3:ri(2,4);
+    o.rights=!!(G.draftRights&&G.draftRights.leagueKey===lk);
+  } else if(l.tier==='minor'){
+    if((G.age||16)<18||po<getMinorLeagueOvrFloor()) return;
+    if(typeof playerTooGoodForMinorLeague==='function'&&playerTooGoodForMinorLeague(po)) return;
+    o.sal=Math.round((l.salBase||80000)*rd(0.72,0.95)/1000)*1000;
+    o.yrs=ri(2,3);
+    o.devAssignment=!!opts.devAssignment;
+  } else {
+    o.sal=Math.max(0, Math.round((l.salBase||40000)*rd(0.72,1.02)/1000)*1000);
+    o.yrs=ri(1,3);
+    o.overseasPro=!!opts.overseasPro;
+  }
+  if(opts.rightsNote) o.rightsNote=opts.rightsNote;
+  curFAOffers.push(o);
+}
+
+function buildOffseasonMovementLeagueKeys(mustLeaveAmateur){
+  var tier=G.league&&G.league.tier||'';
+  var offerPool=mustLeaveAmateur?getTransitionLeagueOptions():(tier==='local'?getLocalAdvanceLeagueOptions().filter(function(k){return LEAGUES[k]&&canJoinLeagueByAge(k);}):(tier==='pro'?getTransitionLeagueOptions():(G.gender==='M'?['OJL','QMJL','WJL','NCHA','USJL','NEJC','CEJC','ARJC','NEHL','FHL','CEHL','ARHL']:['CWHL','NWCHA','USWDL','EWJC','AWJC','SDHL','FWHL','AWHL'])));
+  if(tier==='junior'&&G.season>=1){
+    var collegeKey=G.gender==='M'?'NCHA':'NWCHA';
+    if(offerPool.indexOf(collegeKey)===-1) offerPool.unshift(collegeKey);
+  }
+  var draftedFastTrack=G.draftRights&&draftClubWillingToSignElc();
+  if(draftedFastTrack&&G.draftRights.leagueKey!==G.leagueKey&&offerPool.indexOf(G.draftRights.leagueKey)===-1) offerPool.unshift(G.draftRights.leagueKey);
+  var otherLeagues=offerPool.filter(function(k){
+    if(!LEAGUES[k]||!canMoveToProLeague(k)) return false;
+    if(!isContractLeagueMoveAllowed(k)) return false;
+    return k!==G.leagueKey;
+  });
+  if(typeof filterLeaguesForScoutingCredential==='function') otherLeagues=filterLeaguesForScoutingCredential(otherLeagues);
+  var switchOvr=ovr(G.attrs,G.pos);
+  var offers;
+  if(tier==='pro'){
+    offers=otherLeagues.slice(0,Math.min(3,otherLeagues.length));
+  } else if(qualifiesForCollegeSemiProDevPath()||qualifiesForEliteJuniorExitPath()){
+    offers=pickCollegeSemiProSwitchOffers(otherLeagues);
+    if(!offers.length) offers=shuf(otherLeagues).slice(0,Math.min(6,otherLeagues.length));
+  } else if(tier==='junior'&&G.season>=2&&switchOvr>=getJuniorCollegeSemiPackMinOvr()){
+    var colPick=G.gender==='M'?'NCHA':'NWCHA';
+    var euroPick;
+    if(G.gender==='M'){
+      if(G.leagueKey==='NEJC') euroPick=['NEHL','FHL'][ri(0,1)];
+      else if(G.leagueKey==='CEJC') euroPick='CEHL';
+      else if(G.leagueKey==='ARJC') euroPick='ARHL';
+      else euroPick=['NEHL','FHL','CEHL'][ri(0,2)];
+    } else {
+      if(G.leagueKey==='AWJC') euroPick='AWHL';
+      else if(G.leagueKey==='EWJC') euroPick=['SDHL','FWHL'][ri(0,1)];
+      else euroPick=['SDHL','FWHL'][ri(0,1)];
+    }
+    var priority=[];
+    if(otherLeagues.indexOf(colPick)>=0) priority.push(colPick);
+    if(otherLeagues.indexOf(euroPick)>=0) priority.push(euroPick);
+    var restPool=shuf(otherLeagues.filter(function(x){return priority.indexOf(x)<0;}));
+    offers=priority.slice();
+    for(var oix=0;oix<restPool.length&&offers.length<6;oix++){
+      if(offers.indexOf(restPool[oix])<0) offers.push(restPool[oix]);
+    }
+  } else {
+    var numOffers=Math.min(6, Math.max(1, Math.floor((switchOvr-58)/10)));
+    offers=shuf(otherLeagues).slice(0,numOffers);
+  }
+  if(draftedFastTrack&&G.draftRights&&G.draftRights.leagueKey!==G.leagueKey&&offers.indexOf(G.draftRights.leagueKey)===-1) offers.unshift(G.draftRights.leagueKey);
+  if(typeof applyUsndtOffseasonOfferBias==='function') offers=applyUsndtOffseasonOfferBias(offers, otherLeagues, tier);
+  if(typeof applyAcademyEarlySignOfferBias==='function') offers=applyAcademyEarlySignOfferBias(offers, otherLeagues);
+  return offers||[];
+}
+
+function appendOffseasonMovementOffers(wantMovement, mustLeaveAmateur){
+  if(!wantMovement) return;
+  var keys=buildOffseasonMovementLeagueKeys(mustLeaveAmateur);
+  var i;
+  for(i=0;i<keys.length;i++) appendMovementOfferForLeague(keys[i]);
+}
+
+function generateOffseasonContractOffers(wantMovement, mustLeaveAmateur){
+  generateFAOffers(true);
+  appendOffseasonMovementOffers(wantMovement, mustLeaveAmateur);
+  if(typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(G.leagueKey)){
+    appendAcademyLeagueTransferOffers();
+  }
+  if(wantMovement&&G.league&&G.league.tier==='junior'&&(hasActiveDraftRights()||qualifiesForEliteJuniorExitPath())){
+    appendOverseasProOffersWhileRightsHeld();
+    appendEliteDraftedDevOffers();
+    appendCollegeSemiProFAOffers();
+  }
+  if(!curFAOffers.length) appendFallbackLeagueOffers();
+  var rightsActive=hasActiveDraftRights()||isPlayerRfaStatus();
+  renderFAOffersPanel(rightsActive, rightsActive&&!draftClubWillingToSignElc(), wantMovement, mustLeaveAmateur);
+}
+
 function appendCollegeSemiProFAOffers(){
   if(!qualifiesForCollegeSemiProDevPath()) return;
   var keys=shuf(buildCollegeSemiProLeagueKeys());
@@ -299,24 +527,32 @@ function appendCollegeSemiProFAOffers(){
     var dup=false, j;
     for(j=0;j<curFAOffers.length;j++){ if(curFAOffers[j].lk===lk){ dup=true; break; } }
     if(dup) continue;
+    var isCollege=lk==='NCHA'||lk==='NWCHA';
+    var isJunior=l.tier==='junior';
     curFAOffers.push({
       lk:lk, l:l, team:team,
-      sal:Math.max(0,l.salBase||0),
-      yrs:lk==='NCHA'||lk==='NWCHA'?ri(3,4):ri(1,3),
-      devPath:true
+      sal:isCollege||isJunior?0:Math.max(0,l.salBase||0),
+      stipendWeekly:(isCollege||isJunior)?estimateWeeklyStipendForOffer(lk):undefined,
+      yrs:isCollege?ri(3,4):ri(1,3),
+      devPath:true,
+      scholarship:isCollege,
+      juniorDeal:isJunior
     });
   }
 }
 
 function getTransitionLeagueOptions(){
   // Default pathway is lower levels within your contract circuit; pro only via draft-rights signing.
-  // Affiliate minors (NAML/PWDL) only at 75+ OVR from dev paths; otherwise semi-pro + dev only.
+  // Affiliate minors (NAML/PWDL): ~72–83 OVR dev band; 84+ belongs in PHL/PWL.
   var minorK=getMinorLeagueKeyByGender(G.gender);
   var opts=[minorK].concat(getSemiProLeagueKeysByGender(G.gender));
   opts=opts.filter(function(k){return LEAGUES[k]&&canJoinLeagueByAge(k);});
-  if(ovr(G.attrs,G.pos)<getProHardDevelopmentFloorOvr()){
-    opts=opts.filter(function(k){return LEAGUES[k].tier!=='minor';});
-  }
+  var po=ovr(G.attrs,G.pos);
+  opts=opts.filter(function(k){
+    if(k!==minorK) return true;
+    if(typeof playerTooGoodForMinorLeague==='function'&&playerTooGoodForMinorLeague(po)) return false;
+    return po>=getMinorLeagueOvrFloor();
+  });
   return opts;
 }
 
@@ -404,9 +640,12 @@ function canMoveToProLeague(targetKey){
   }
   if(tTier==='minor'){
     if((G.age||16)<18) return false;
+    var po=ovr(G.attrs,G.pos);
+    if(typeof playerTooGoodForMinorLeague==='function'&&playerTooGoodForMinorLeague(po)) return false;
+    if(po<getMinorLeagueOvrFloor()) return false;
     if(G.league && (G.league.tier==='minor'||G.league.tier==='pro')) return isContractLeagueMoveAllowed(targetKey);
     if(!G.draftRights) return false;
-    return ovr(G.attrs,G.pos)>=getProHardDevelopmentFloorOvr() && isContractLeagueMoveAllowed(targetKey);
+    return po<getMinorLeagueOvrCeiling() && isContractLeagueMoveAllowed(targetKey);
   }
   if(!isContractLeagueMoveAllowed(targetKey)) return false;
   return true;
@@ -448,6 +687,12 @@ function runDraftEventIfEligible(){
   }
   if(G._lastDraftAgeProcessed===draftAge) return;
   G._lastDraftAgeProcessed=draftAge;
+
+  if(typeof requiresLhlBeforeScouts==='function'&&requiresLhlBeforeScouts(G.nat)&&typeof hasLhlScoutingCredential==='function'&&!hasLhlScoutingCredential(G)){
+    G._draftStatusText='DRAFT STATUS: NO LHL TAPE — SCOUTS NEED A COMMUNITY-LEAGUE SEASON FIRST';
+    addNews('Draft boards: Without a logged LHL season, international scouts are not listing '+G.first+' '+G.last+'.','neutral');
+    return false;
+  }
 
   // Draft-year breakout: rare prospects can pop at 18 (esp. NA draft year).
   if(draftAge===18 && G.league && G.league.tier!=='pro'){
@@ -504,10 +749,12 @@ function runDraftEventIfEligible(){
   var drafted=Math.random()<chance;
   if(drafted){
     var proKey=getProLeagueKeyByGender(G.gender);
-    var teams=TEAMS[proKey]||[];
-    var draftedTeam=teams.length?shuf(teams.slice())[0]:{n:'Pro Club'};
     var draftScore=cl(0.55 + (pOvr-60)*0.02 + perf*0.25 + rd(-0.1,0.12),0.05,0.99);
     var round=Math.min(7,Math.max(1,8-Math.floor(draftScore*7.2)));
+    var pickQuality=(round-1)/6;
+    var draftedTeam=typeof getProDraftPickTeam==='function'
+      ?getProDraftPickTeam(proKey, pickQuality)
+      :((TEAMS[proKey]||[]).length?shuf((TEAMS[proKey]||[]).slice())[0]:{n:'Pro Club'});
     var suffix=round===1?'ST':round===2?'ND':round===3?'RD':'TH';
     var pick=ri(1,32);
     G.draftRights={leagueKey:proKey,team:draftedTeam.n,age:draftAge,round:round,pos:G.pos,subPos:G.subPos||G.pos};
@@ -566,9 +813,27 @@ function showProDraftRevealScreen(){
   return true;
 }
 
+function finishOffseasonUiAfterDraft(){
+  if(typeof refreshOffseasonRecapPanels==='function') refreshOffseasonRecapPanels();
+  if(G._worldStageFlowDoneForSeason!==G.season){
+    G._worldStageFlowDoneForSeason=G.season;
+    if(typeof startOffseasonWorldStageFlow==='function'){
+      startOffseasonWorldStageFlow();
+      return;
+    }
+  }
+  show('s-offseason');
+}
+
 function dismissProDraftReveal(){
   G._proDraftReveal=null;
-  continueOffseasonAfterDraft();
+  try{
+    continueOffseasonAfterDraft();
+  }catch(err){
+    console.error('continueOffseasonAfterDraft failed', err);
+    notify('Offseason failed to load — try refreshing the page.','red');
+  }
+  finishOffseasonUiAfterDraft();
 }
 
 function getOffseasonRecommendations(){
@@ -691,7 +956,16 @@ function renderOffseasonActionButtons(actions, rec){
 }
 
 function goToOffseason(){
-  G.contractYrsLeft--;
+  if(typeof ensureLeagueContext==='function') ensureLeagueContext();
+  G._inOffseason=true;
+  if(G._offseasonInitializedForSeason===G.season){
+    continueOffseasonAfterDraft();
+    if(typeof refreshOffseasonRecapPanels==='function') refreshOffseasonRecapPanels();
+    show('s-offseason');
+    return;
+  }
+  G._offseasonInitializedForSeason=G.season;
+  G.contractYrsLeft=Math.max(0,(G.contractYrsLeft||0)-1);
   if(typeof ensureInjuryTracking==='function') ensureInjuryTracking();
   G._enteredOffseasonInjured=!!G.isInjured;
   G._offseasonMedical=false;
@@ -713,19 +987,21 @@ function goToOffseason(){
   _lastWorldStageHTML='';
   _lastWorldStageStats=null;
   var justDrafted=runDraftEventIfEligible();
+  if(typeof maybeAcademyEarlyProOffer==='function') maybeAcademyEarlyProOffer();
   if(justDrafted&&G._proDraftReveal){
-    G._inOffseason=true;
     if(showProDraftRevealScreen()) return;
     G._proDraftReveal=null;
   }
   continueOffseasonAfterDraft();
+  finishOffseasonUiAfterDraft();
+  try{show('s-offseason');}catch(eGo){}
 }
 
 function buildSeasonRecapHTML(){
   if(!G) return '';
   var o=typeof ovr==='function'?ovr(G.attrs,G.pos):0;
   var tier=G.league&&G.league.tier||'';
-  var html='<div style="color:var(--gold);font-size:15px;margin-bottom:8px">SEASON '+G.season+' RECAP — '+escHtml(G.league.short)+'</div>';
+  var html='<div style="color:var(--gold);font-size:15px;margin-bottom:8px">SEASON '+G.season+' RECAP — '+escHtml((G.league&&G.league.short)||G.leagueKey||'LEAGUE')+'</div>';
   html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
   html+='<div style="padding:8px;border:1px solid rgba(122,184,224,.2)"><span style="color:var(--mut)">TEAM</span><br><b>'+escHtml(G.team.n)+'</b></div>';
   html+='<div style="padding:8px;border:1px solid rgba(122,184,224,.2)"><span style="color:var(--mut)">RECORD</span><br><b>'+(G.w||0)+'-'+(G.l||0)+'-'+(G.otl||0)+'</b> · '+G.gp+' GP</div>';
@@ -741,15 +1017,78 @@ function buildSeasonRecapHTML(){
     html+='<div style="color:var(--acc);margin-bottom:6px">Hot streak peak: '+G._seasonHotStreak+' straight positive games.</div>';
   }
   if(tier==='local'){
-    html+='<div style="color:var(--mut);font-size:13px">Community path — development-first calendar with mixed games and rink events.</div>';
+    html+='<div style="color:var(--mut);font-size:13px">Community path — development-first calendar with mixed games and rink events.';
+    if(typeof requiresLhlBeforeScouts==='function'&&requiresLhlBeforeScouts(G.nat)&&typeof hasLhlScoutingCredential==='function'&&!hasLhlScoutingCredential(G)){
+      html+=' Scouts abroad need at least one full LHL season on tape.';
+    }
+    html+='</div>';
   } else if(tier==='junior'){
     html+='<div style="color:var(--mut);font-size:13px">Junior circuit — draft stock and ice time matter as much as the scoreboard.</div>';
   }
-  if(G.wonCup) html+='<div style="color:var(--green);margin-top:8px"><b>League champion</b> this season.</div>';
+  if(G._wonLeagueChampionship||G.wonCup) html+='<div style="color:var(--green);margin-top:8px"><b>League champion</b> this season.</div>';
+  if(G._memorialCupWon) html+='<div style="color:var(--gold);margin-top:6px"><b>CJL Memorial Cup champion</b> — national junior title.</div>';
+  else if(G._wonLeagueChampionship&&G._memorialCupChampion) html+='<div style="color:var(--mut);margin-top:6px">Memorial Cup: <b>'+escHtml(G._memorialCupChampion)+'</b> won the national title.</div>';
+  if(typeof buildSeasonCallUpSplitsHtml==='function'){
+    var cuHtml=buildSeasonCallUpSplitsHtml();
+    if(cuHtml) html+='<div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(122,184,224,.15)">'+cuHtml+'</div>';
+  }
   return html;
 }
 
+function buildSeasonRecapHTMLFromLog(entry){
+  if(!entry||!G) return '';
+  var lg=entry.league||(G.league&&G.league.short)||entry.leagueKey||'LEAGUE';
+  var html='<div style="color:var(--gold);font-size:15px;margin-bottom:8px">SEASON '+entry.season+' RECAP — '+escHtml(lg)+'</div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
+  html+='<div style="padding:8px;border:1px solid rgba(122,184,224,.2)"><span style="color:var(--mut)">TEAM</span><br><b>'+escHtml(G.team&&G.team.n?G.team.n:'—')+'</b></div>';
+  html+='<div style="padding:8px;border:1px solid rgba(122,184,224,.2)"><span style="color:var(--mut)">GP</span><br><b>'+(entry.gp||0)+'</b></div>';
+  html+='<div style="padding:8px;border:1px solid rgba(122,184,224,.2)"><span style="color:var(--mut)">OVR</span><br><b>'+Math.round(entry.ovrVal||0)+'</b></div>';
+  html+='<div style="padding:8px;border:1px solid rgba(122,184,224,.2)"><span style="color:var(--mut)">YEAR</span><br><b>'+(entry.year||G.year||'—')+'</b></div>';
+  html+='</div>';
+  if(entry.isGoalie){
+    var sv=entry.sv||0, ga=entry.ga||0;
+    html+='<div style="margin-bottom:6px">Line: <b>'+sv+' SV</b> · '+ga+' GA · SV% '+formatSvPctFromCounts(sv,ga)+'</div>';
+  } else {
+    var g=entry.g||0, a=entry.a||0;
+    html+='<div style="margin-bottom:6px">Line: <b>'+g+'G '+a+'A '+(g+a)+'PTS</b></div>';
+  }
+  if(entry.wonCup) html+='<div style="color:var(--green);margin-top:8px"><b>League champion</b> this season.</div>';
+  return html;
+}
+
+function captureSeasonRecapSnapshot(){
+  if(!G||typeof buildSeasonRecapHTML!=='function') return;
+  G._lastSeasonRecapForSeason=G.season;
+  G._lastSeasonRecapHTML=buildSeasonRecapHTML();
+}
+
+/** Keep offseason season recap aligned with the season just completed. */
+function ensureSeasonRecapForOffseason(){
+  if(!G) return;
+  if(G._lastSeasonRecapForSeason===G.season&&G._lastSeasonRecapHTML) return;
+  if((G.gp||0)>0){
+    captureSeasonRecapSnapshot();
+    return;
+  }
+  if(G.seasonLog&&G.seasonLog.length){
+    var i, row;
+    for(i=G.seasonLog.length-1;i>=0;i--){
+      row=G.seasonLog[i];
+      if(row&&row.season===G.season){
+        G._lastSeasonRecapForSeason=G.season;
+        G._lastSeasonRecapHTML=buildSeasonRecapHTMLFromLog(row);
+        return;
+      }
+    }
+  }
+  captureSeasonRecapSnapshot();
+}
+
 function continueOffseasonAfterDraft(){
+  if(typeof ensureLeagueContext==='function') ensureLeagueContext();
+  if(typeof maybeAcademyProGraduationOffer==='function') maybeAcademyProGraduationOffer();
+  G.contract=G.contract||{sal:0,yrs:0,type:'AMATEUR',ntc:false,bonus:false};
+  var tier=G.league&&G.league.tier||'';
   var actions=[
     {id:'surgery',   icon:'[H]', name:'SURGERY & REHAB',   desc:'Medical staff -- restore health, protect career.', fn:function(){G._offseasonMedical=true;G.health=cl(G.health+35,0,100);if(G.attrs&&G.attrs.durability)G.attrs.durability=cl(G.attrs.durability+rd(4,9),22,99);G.isInjured=false;G.injWks=0;G.injName='';addNews('Surgery & rehab -- medical staff handled lingering damage.','good');}},
     {id:'elite',     icon:'[T]', name:'ELITE SKILLS CAMP', desc:'Private coaching -- attr gains.',        fn:function(){if((G.age||16)>=26){G.morale=cl(G.morale+8,0,100);addNews('Skills camp -- mental reps and video work (physical ceiling reached at 26+).','neutral');return;}var pSk=getPotentialDevMult(G.potential||'support');var pool=(G.pos!=='G'&&typeof SKATER_RATING_ATTR_KEYS!=='undefined')?SKATER_RATING_ATTR_KEYS.filter(function(k){return k!=='conditioning';}):ATTRS[G.pos];var picks=shuf(pool.slice()).slice(0,3);var cc=getAttrCapForAge(G.age||16);var cmin=typeof G._attrClampMin==='number'?G._attrClampMin:40;picks.forEach(function(a){G.attrs[a]=cl(G.attrs[a]+rd(1,2.5)*pSk,cmin,cc);});if(typeof updatePlayerConditioning==='function')updatePlayerConditioning({offseasonBoost:6});addNews('Skills camp -- significant improvement.','good');}},
@@ -771,7 +1110,7 @@ function continueOffseasonAfterDraft(){
     ? ('ACTIVE -- YEAR '+cl(3-(G.contractYrsLeft||0)+1,1,3)+'/3')
     : (G.hadELC?'COMPLETED':'NOT SIGNED'));
   safeEl('offseason-contract-status').innerHTML=
-    'CONTRACT: '+(G.contract.type||'N/A')+' &bull; '+(G.contractYrsLeft>0?(G.contractYrsLeft+' YEAR(S) LEFT'):'EXPIRED')+'<br>'+
+    'CONTRACT: '+((G.contract&&G.contract.type)||'AMATEUR')+' &bull; '+(G.contractYrsLeft>0?(G.contractYrsLeft+' YEAR(S) LEFT'):'EXPIRED')+'<br>'+
     'CURRENT VALUE: '+(G.contract&&G.contract.sal?fmt(G.contract.sal)+'/YR':'AMATEUR')+'<br>'+
     (isPlayerUnderBindingContract()
       ?('BOUND TO: '+(G._contractClubTeam||G.team.n)+' &bull; '+getContractCircuitHint(G._contractCircuit||'')+'<br>')
@@ -785,10 +1124,9 @@ function continueOffseasonAfterDraft(){
       ?'<div style="margin-top:10px"><button type="button" class="btn bd bw" onclick="requestContractRelease()">REQUEST CONTRACT RELEASE</button>'+
         '<div class="vt" style="font-size:12px;color:var(--mut);margin-top:6px">Ask out of your deal to sign elsewhere. Club may buy you out — not guaranteed.</div></div>'
       :'');
-  var tier=G.league.tier;
   var advPanel=safeEl('league-advance-panel');
   var shouldAdv=['junior','college'].indexOf(tier)!==-1&&G.season>=3||['euro','asia'].indexOf(tier)!==-1&&G.season>=2;
-  var shouldAdvMinor=tier==='minor'&&G.season>=2&&ovr(G.attrs,G.pos)>=getProHardDevelopmentFloorOvr();
+  var shouldAdvMinor=tier==='minor'&&G.season>=2&&ovr(G.attrs,G.pos)>=getPhlPromotionFromMinorOvr();
   if(shouldAdv||shouldAdvMinor){
     advPanel.style.display='block';
     var nextKeys=(NEXT_TIER[tier]&&NEXT_TIER[tier][G.gender])||[];
@@ -817,114 +1155,22 @@ function continueOffseasonAfterDraft(){
     advPanel.style.display='none';
     G._advLeague=null;
   }
-  var switchPanel=safeEl('league-switch-panel');
+  safeEl('league-switch-panel').style.display='none';
+  G._switchLeague=null;
   var mustLeaveJunior=(tier==='junior' && G.age>getJuniorMaxAge());
   var mustLeaveCollege=(tier==='college' && G.age>getCollegeMaxAge());
   var mustLeaveAmateur=mustLeaveJunior||mustLeaveCollege;
-  var proKeyTop=getProLeagueKeyByGender(G.gender);
-  if(mustLeaveAmateur || qualifiesForLocalAdvancePath() || (tier==='junior' && G.season>=1 && ovr(G.attrs,G.pos)>=JUNIOR_EARLY_SWITCH_PANEL_OVR) || qualifiesForCollegeSemiProDevPath() || G.isDraftFreeAgent || G.draftRights || tier==='pro'){
-    switchPanel.style.display='block';
-    var offerPool=mustLeaveAmateur?getTransitionLeagueOptions():(tier==='local'?getLocalAdvanceLeagueOptions().filter(function(k){return LEAGUES[k]&&canJoinLeagueByAge(k);}):(tier==='pro'?getTransitionLeagueOptions():(G.gender==='M'?['OJL','QMJL','WJL','NCHA','USJL','NEJC','CEJC','ARJC','NEHL','FHL','CEHL','ARHL']:['CWHL','NWCHA','USWDL','EWJC','AWJC','SDHL','FWHL','AWHL'])));
-    // Common pathway: strong juniors can jump to college scholarship after year 1.
-    if(tier==='junior' && G.season>=1){
-      var collegeKey=G.gender==='M'?'NCHA':'NWCHA';
-      if(offerPool.indexOf(collegeKey)===-1) offerPool.unshift(collegeKey);
-    }
-    // Drafted players: pro destination in the switcher only once the club would offer (ELC-ready OVR).
-    var draftedFastTrack=G.draftRights && draftClubWillingToSignElc();
-    if(draftedFastTrack && G.draftRights.leagueKey!==G.leagueKey && offerPool.indexOf(G.draftRights.leagueKey)===-1) offerPool.unshift(G.draftRights.leagueKey);
-    var otherLeagues=offerPool.filter(function(k){
-      if(!LEAGUES[k]||!canMoveToProLeague(k)) return false;
-      if(!isContractLeagueMoveAllowed(k)) return false;
-      return k!==G.leagueKey;
-    });
-    var switchOvr=ovr(G.attrs,G.pos);
-    var offers;
-    if(tier==='pro'){
-      var numPro=Math.min(3, Math.max(1, otherLeagues.length));
-      offers=otherLeagues.slice(0,numPro);
-    } else if(qualifiesForCollegeSemiProDevPath()){
-      offers=pickCollegeSemiProSwitchOffers(otherLeagues);
-      if(!offers.length) offers=shuf(otherLeagues).slice(0,Math.min(4,otherLeagues.length));
-    } else if(tier==='junior' && G.season>=2 && switchOvr>=getJuniorCollegeSemiPackMinOvr()){
-      var colPick=G.gender==='M'?'NCHA':'NWCHA';
-      var euroPick;
-      if(G.gender==='M'){
-        if(G.leagueKey==='NEJC') euroPick=['NEHL','FHL'][ri(0,1)];
-        else if(G.leagueKey==='CEJC') euroPick='CEHL';
-        else if(G.leagueKey==='ARJC') euroPick='ARHL';
-        else euroPick=['NEHL','FHL','CEHL'][ri(0,2)];
-      } else {
-        if(G.leagueKey==='AWJC') euroPick='AWHL';
-        else if(G.leagueKey==='EWJC') euroPick=['SDHL','FWHL'][ri(0,1)];
-        else euroPick=['SDHL','FWHL'][ri(0,1)];
-      }
-      var priority=[];
-      if(otherLeagues.indexOf(colPick)>=0) priority.push(colPick);
-      if(otherLeagues.indexOf(euroPick)>=0) priority.push(euroPick);
-      var restPool=shuf(otherLeagues.filter(function(x){return priority.indexOf(x)<0;}));
-      offers=priority.slice();
-      for(var oix=0;oix<restPool.length && offers.length<6;oix++){
-        if(offers.indexOf(restPool[oix])<0) offers.push(restPool[oix]);
-      }
-    } else {
-      var numOffers=Math.min(3, Math.max(1, Math.floor((switchOvr-58)/10)));
-      offers=shuf(otherLeagues).slice(0,numOffers);
-    }
-    if(draftedFastTrack && G.draftRights && G.draftRights.leagueKey!==G.leagueKey && offers.indexOf(G.draftRights.leagueKey)===-1) offers.unshift(G.draftRights.leagueKey);
-    if(!offers.length){
-      var shtmlEmpty='<div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:10px">NO OTHER LEAGUES TO SWITCH TO RIGHT NOW. USE <b>STAY</b> OR HANDLE MOVES IN-SEASON.</div>';
-      safeEl('switch-content').innerHTML=shtmlEmpty+'<div class="vt" style="margin-top:8px"><button class="btn bs" onclick="pickSwitchLeague(null)">STAY IN '+G.league.short+'</button></div>';
-      G._switchLeague=null;
-    } else {
-    var shtml='<div class="vt" style="font-size:15px;color:var(--mut);margin-bottom:10px">'+
-      (mustLeaveAmateur?(mustLeaveJunior?'Age rule: must leave junior hockey before age 20 — college, semi-pro, or overseas.':'Age rule: college eligibility ended (25+) — semi-pro, euro, or asia leagues only.'):
-      (tier==='pro'?'LEAGUE SWITCH: OTHER LEAGUES ONLY (YOU ARE ALREADY IN '+G.league.short+').':
-      (G.isDraftFreeAgent?'FREE AGENT OFFERS AVAILABLE:':'OFFERS AVAILABLE:')))+'</div>';
-    if(qualifiesForCollegeSemiProDevPath() && !mustLeaveAmateur){
-      shtml+='<div class="vt" style="font-size:14px;color:var(--acc);margin-bottom:8px"><b>DEVELOPMENT PATH:</b> At OVR '+Math.round(switchOvr)+' you are strong for juniors but below pro/AHL bars — <b>college</b> (NCHA/NWCHA) and <b>overseas semi-pro</b> (NEHL/CEHL/ARHL, SDHL/FWHL/AWHL) are actively recruiting.</div>';
-    } else if(tier==='local' && !mustLeaveAmateur){
-      shtml+='<div class="vt" style="font-size:14px;color:var(--acc);margin-bottom:8px"><b>PATHWAY OPEN:</b> At OVR '+Math.round(switchOvr)+' you can try <b>junior</b> or <b>college</b> circuits — or stay in community hockey another year to keep developing.</div>';
-    } else if(tier==='junior' && G.season>=2 && switchOvr>=getJuniorCollegeSemiPackMinOvr() && !mustLeaveAmateur){
-      shtml+='<div class="vt" style="font-size:14px;color:var(--acc);margin-bottom:8px"><b>OPTIONAL:</b> You can stay in '+G.league.short+' or try <b>college</b> (NCHA/NWCHA) or <b>overseas semi-pro</b> (e.g. NEHL/CEHL/ARHL or women's SDHL/FWHL/AWHL) — harder, more structured hockey. Not required.</div>';
-    }
-    if(tier==='pro'){
-      shtml+='<div class="vt" style="font-size:14px;color:var(--gold);margin-bottom:8px">Pro deals bind you to your circuit: '+getMinorLeagueKeyByGender(G.gender)+' two-way, plus junior/college <b>loans</b> if you are not roster-ready. Cross-league moves (e.g. overseas) need a release or expired contract.</div>';
-    } else if(isPlayerUnderBindingContract()){
-      shtml+='<div class="vt" style="font-size:14px;color:var(--gold);margin-bottom:8px"><b>CONTRACT:</b> '+getContractCircuitHint(G._contractCircuit||'')+'. Other circuits are blocked until your deal ends or you earn a release.</div>';
-    } else if(!G.draftRights){
-      shtml+='<div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:8px">'+getMinorLeagueKeyByGender(G.gender)+' feeds '+proKeyTop+'. First pro entry needs <b>draft rights</b>. Affiliate minors from dev leagues need <b>'+getProHardDevelopmentFloorOvr()+'+ OVR</b>, age 18+.</div>';
-    } else {
-      shtml+='<div class="vt" style="font-size:14px;color:var(--gold);margin-bottom:8px">DRAFTED BY '+G.draftRights.team.toUpperCase()+' ('+G.draftRights.leagueKey+'). '+
-        (draftClubWillingToSignElc()
-          ? 'ELC OFFERS APPEAR WHEN YOUR CONTRACT EXPIRES.'
-          : 'RIGHTS ONLY — NO '+getProLeagueKeyByGender(G.gender)+' CONTRACT YET. PLAY OVERSEAS SEMI-PRO OR DEV LEAGUES; ELC AT '+getDraftClubElcMinOvr()+'+ OVR.')+
-        '</div>';
-    }
-    for(var j=0;j<offers.length;j++){
-      var k=offers[j]; var l=LEAGUES[k];
-      shtml+='<div class="lcard" id="switch-'+k+'" onclick="pickSwitchLeague(\''+k+'\')">';
-      shtml+='<div class="ltier" style="color:var(--acc)">'+l.tier.toUpperCase()+'</div>';
-      shtml+='<div class="lname">'+stripBracketIcons(l.short)+' -- '+l.name+'</div>';
-      shtml+='<div class="ldesc">'+l.desc+'</div></div>';
-    }
-    if(!mustLeaveAmateur) shtml+='<div class="vt" style="font-size:14px;color:var(--mut);margin-top:8px">-- OR -- <button class="btn bs" onclick="pickSwitchLeague(null)">STAY IN '+G.league.short+'</button></div>';
-    safeEl('switch-content').innerHTML=shtml;
-    G._switchLeague=offers[0]||null;
-    }
-  } else {
-    switchPanel.style.display='none';
-    G._switchLeague=null;
-  }
+  var inAcademy=typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(G.leagueKey);
+  var wantMovementOffers=mustLeaveAmateur || qualifiesForLocalAdvancePath() || (tier==='junior' && G.season>=1 && ovr(G.attrs,G.pos)>=JUNIOR_EARLY_SWITCH_PANEL_OVR) || qualifiesForCollegeSemiProDevPath() || qualifiesForEliteJuniorExitPath() || G.isDraftFreeAgent || G.draftRights || tier==='pro' || (inAcademy&&G.season>=1);
+  var showOffersPanel=wantMovementOffers || (G.contractYrsLeft<=0 && tier!=='junior' && tier!=='college' && tier!=='local') || (tier==='junior'&&(hasActiveDraftRights()||qualifiesForEliteJuniorExitPath())) || (inAcademy&&G.season>=1);
   var cePanel=safeEl('contract-expire-panel');
-  if(G.contractYrsLeft<=0 && G.league && G.league.tier!=='junior' && G.league.tier!=='college' && G.league.tier!=='local'){
-    cePanel.style.display='block';
-    generateFAOffers();
+  if(showOffersPanel){
+    generateOffseasonContractOffers(wantMovementOffers, mustLeaveAmateur);
+    cePanel.style.display=curFAOffers.length?'block':'none';
   } else {
     cePanel.style.display='none';
   }
-  // International: SIM vs PLAY choice when eligible (otherwise auto messages only).
-  startOffseasonWorldStageFlow();
+  if(typeof refreshOffseasonRecapPanels==='function') refreshOffseasonRecapPanels();
 }
 
 function doOffseasonAction(id){
@@ -958,6 +1204,10 @@ function pickAdvLeague(k){
   var cards=document.querySelectorAll('[id^="adv-"]');
   for(var i=0;i<cards.length;i++) cards[i].classList.remove('sel');
   if(k){
+    if(typeof requiresLhlBeforeScouts==='function'&&requiresLhlBeforeScouts(G.nat)&&typeof hasLhlScoutingCredential==='function'&&!hasLhlScoutingCredential(G)&&LEAGUES[k]&&LEAGUES[k].tier!=='local'){
+      notify('Complete at least one full LHL season before scouts will offer spots abroad.','red');
+      return;
+    }
     if(!canMoveToProLeague(k)){
       notify('MOVE BLOCKED','red');
       if(!isContractLeagueMoveAllowed(k)) addNews(getContractMoveBlockReason(k),'bad');
@@ -983,6 +1233,11 @@ function pickSwitchLeague(k){
   var cards=document.querySelectorAll('[id^="switch-"]');
   for(var i=0;i<cards.length;i++) cards[i].classList.remove('sel');
   if(k){
+    if(typeof requiresLhlBeforeScouts==='function'&&requiresLhlBeforeScouts(G.nat)&&typeof hasLhlScoutingCredential==='function'&&!hasLhlScoutingCredential(G)&&LEAGUES[k]&&LEAGUES[k].tier!=='local'){
+      notify('Complete at least one full LHL season before scouts will offer junior or college spots.','red');
+      addNews('SCOUTS PASS: No LHL tape on file yet — finish your first community season first.','bad');
+      return;
+    }
     if(!canMoveToProLeague(k)){
       notify('MOVE BLOCKED','red');
       if(!isContractLeagueMoveAllowed(k)) addNews(getContractMoveBlockReason(k),'bad');
@@ -1016,17 +1271,20 @@ function pickSwitchLeague(k){
   }
 }
 
-function generateFAOffers(){
+function generateFAOffers(skipRender){
   curFAOffers=[];
   var gender=G.gender;
+  var rightsActive=hasActiveDraftRights()||isPlayerRfaStatus();
   var potentialLeagues=['PHL','PWL','NAML','PWDL'].filter(function(k){return LEAGUES[k]&&LEAGUES[k].gender===gender;});
   potentialLeagues=potentialLeagues.filter(function(k){
     var lk=LEAGUES[k];
     if(!lk) return false;
     if(lk.tier==='minor'){
       if((G.age||16)<18) return false;
+      var poMin=ovr(G.attrs,G.pos);
+      if(typeof playerTooGoodForMinorLeague==='function'&&playerTooGoodForMinorLeague(poMin)) return false;
       if(G.league && (G.league.tier==='minor'||G.league.tier==='pro')) return true;
-      return ovr(G.attrs,G.pos)>=getProHardDevelopmentFloorOvr();
+      return poMin>=getMinorLeagueOvrFloor()&&poMin<getMinorLeagueOvrCeiling();
     }
     if(lk.tier==='pro'){
       if(G.league && G.league.tier==='pro') return true;
@@ -1034,13 +1292,12 @@ function generateFAOffers(){
     }
     return true;
   });
-  if(!potentialLeagues.length && !hasActiveDraftRights() && !isPlayerRfaStatus()){
+  if(!potentialLeagues.length && !rightsActive){
     appendCollegeSemiProFAOffers();
     appendFallbackLeagueOffers();
-    renderFAOffersPanel(rightsActive,false);
+    if(!skipRender) renderFAOffersPanel(false,false);
     return;
   }
-  var rightsActive=hasActiveDraftRights()||isPlayerRfaStatus();
   var rteam=null;
   if(rightsActive){
     var rk=G.draftRights.leagueKey;
@@ -1086,17 +1343,53 @@ function generateFAOffers(){
     }
   }
   appendOverseasProOffersWhileRightsHeld();
+  appendEliteDraftedDevOffers();
   appendCollegeSemiProFAOffers();
   if(!curFAOffers.length) appendFallbackLeagueOffers();
-  renderFAOffersPanel(rightsActive,rightsActive && !draftClubWillingToSignElc());
+  if(!skipRender) renderFAOffersPanel(rightsActive,rightsActive && !draftClubWillingToSignElc());
 }
 
-function renderFAOffersPanel(rightsActive,rightsDevHold){
+function stayInCurrentLeague(){
+  if(!G||!G.league) return;
+  G._offseasonStayedInLeague=true;
+  addNews(G.first+' '+G.last+' returns to '+G.team.n+' in the '+G.league.short+' for another season.','neutral');
+  notify('STAYING IN '+G.league.short.toUpperCase(),'gold');
+  safeEl('contract-expire-panel').style.display='none';
+}
+
+function renderFAOffersPanel(rightsActive,rightsDevHold,wantMovement,mustLeaveAmateur){
   var html='';
+  if(wantMovement){
+    var tier=G.league&&G.league.tier||'';
+    var switchOvr=ovr(G.attrs,G.pos);
+    if(mustLeaveAmateur){
+      html+='<div class="vt" style="font-size:14px;color:var(--gold);margin-bottom:10px">'+(G.age>getJuniorMaxAge()?'Age rule: must leave junior before age 20 — sign college, semi-pro, or overseas below.':'College eligibility ended — semi-pro or overseas offers only.')+'</div>';
+    } else if(qualifiesForCollegeSemiProDevPath()||qualifiesForEliteJuniorExitPath()){
+      html+='<div class="vt" style="font-size:14px;color:var(--acc);margin-bottom:8px"><b>CONTRACT OFFERS:</b> At OVR '+Math.round(switchOvr)+' scouts are offering college, overseas semi-pro, junior stipends, and dev paths. Draft rights do not block overseas play.</div>';
+    } else if(tier==='local'){
+      html+='<div class="vt" style="font-size:14px;color:var(--acc);margin-bottom:8px"><b>PATHWAY OPEN:</b> Junior and college offers below — or stay in community hockey.</div>';
+    } else if(tier==='pro'){
+      html+='<div class="vt" style="font-size:14px;color:var(--gold);margin-bottom:8px">Pro circuit moves — other leagues only. Cross-circuit deals need an expired contract or release.</div>';
+    } else {
+      html+='<div class="vt" style="font-size:15px;color:var(--mut);margin-bottom:10px">CONTRACT OFFERS AVAILABLE:</div>';
+    }
+    if(typeof getPlayerTerritoryJuniorLeague==='function'&&G.gender==='M'){
+      var homeLg=getPlayerTerritoryJuniorLeague(G.hometown,G.nat,G.gender);
+      if(homeLg&&LEAGUES[homeLg]){
+        html+='<div class="vt" style="font-size:13px;color:var(--mut);margin-bottom:8px">CHL home territory: <b>'+stripBracketIcons(LEAGUES[homeLg].short)+'</b> (from '+escHtml(G.hometown||'your region')+'). Out-of-territory CHL deals are marked <b>IMPORT</b>.</div>';
+      }
+    }
+    if(typeof getUsndtOffseasonSwitchBlurb==='function'){
+      var usndtBlurb=getUsndtOffseasonSwitchBlurb(switchOvr);
+      if(usndtBlurb) html+=usndtBlurb;
+    }
+  }
   if(rightsDevHold){
-    html+='<div class="vt" style="font-size:15px;color:var(--gold);margin-bottom:8px">DRAFT RIGHTS — '+G.draftRights.team.toUpperCase()+' ('+G.draftRights.leagueKey+')</div>';
-    html+='<div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:12px;line-height:1.65">No '+getProLeagueKeyByGender(G.gender)+' contract yet — they hold your <b>rights</b> only. Below <b>'+getDraftClubElcMinOvr()+'+ OVR</b> they will not table an ELC. You can still sign <b>overseas semi-pro</b> below or use <b>League Switch</b> for junior/college/overseas paths. Rights stay with the drafting club for NA pro entry.</div>';
-  } else {
+    var drTeam=(G.draftRights&&G.draftRights.team)?String(G.draftRights.team).toUpperCase():'YOUR CLUB';
+    var drLk=(G.draftRights&&G.draftRights.leagueKey)||getProLeagueKeyByGender(G.gender);
+    html+='<div class="vt" style="font-size:15px;color:var(--gold);margin-bottom:8px">DRAFT RIGHTS — '+drTeam+' ('+drLk+')</div>';
+    html+='<div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:12px;line-height:1.65">No '+getProLeagueKeyByGender(G.gender)+' contract yet — they hold your <b>rights</b> only. Below <b>'+getDraftClubElcMinOvr()+'+ OVR</b> they will not table an ELC. You can still sign <b>overseas semi-pro</b> or <b>junior/college stipend</b> offers below. Rights stay with the drafting club for NA pro entry.</div>';
+  } else if(!wantMovement){
     html+='<div class="vt" style="font-size:14px;color:var(--mut);margin-bottom:10px">YOU ARE A '+(isPlayerRfaStatus()?'RESTRICTED':'UNRESTRICTED')+' FREE AGENT — PRIOR CONTRACT EXPIRED. YOU MAY LEAVE YOUR OLD CIRCUIT AND SIGN A NEW DEAL:</div>';
     if(isPlayerRfaStatus()){
       html+='<div class="vt" style="font-size:13px;color:var(--gold);margin-bottom:8px">RFA: Your club must match, but a huge ask costs them multiple draft picks — team-friendly money signs faster.</div>';
@@ -1109,10 +1402,23 @@ function renderFAOffersPanel(rightsActive,rightsDevHold){
   }
   for(var i=0;i<curFAOffers.length;i++){
     var o=curFAOffers[i];
+    var stipW=o.stipendWeekly;
+    if(stipW==null&&(o.juniorDeal||o.scholarship||(o.l&&o.l.tier==='junior')||(o.l&&o.l.tier==='college'))) stipW=estimateWeeklyStipendForOffer(o.lk);
     html+='<div style="background:var(--rink);border:1px solid var(--rl);padding:12px;margin-bottom:8px">';
     html+='<div class="vt" style="font-size:16px">'+stripBracketIcons(o.team.e)+' '+o.team.n+' -- '+stripBracketIcons(o.l.short)+'</div>';
-    html+='<div class="cval-big">'+fmt(o.sal)+'/YR</div>';
-    html+='<div class="vt" style="font-size:14px;color:var(--mut)">'+o.yrs+'-YEAR DEAL -- TOTAL '+fmt(o.sal*o.yrs)+'</div>';
+    if(o.juniorDeal||(o.l&&o.l.tier==='junior'&&!o.sal)){
+      html+='<div class="cval-big">STIPEND '+fmt((stipW||0)*52)+'/SEASON</div>';
+      html+='<div class="vt" style="font-size:14px;color:var(--mut)">~'+fmt(stipW||0)+'/WEEK -- '+o.yrs+'-YEAR JUNIOR DEAL</div>';
+    } else if(o.scholarship||(o.l&&o.l.tier==='college'&&!o.sal)){
+      html+='<div class="cval-big">SCHOLARSHIP + '+fmt((stipW||0)*52)+'/SEASON STIPEND</div>';
+      html+='<div class="vt" style="font-size:14px;color:var(--mut)">~'+fmt(stipW||0)+'/WEEK -- '+o.yrs+'-YEAR DEAL</div>';
+    } else {
+      html+='<div class="cval-big">'+fmt(o.sal)+'/YR</div>';
+      html+='<div class="vt" style="font-size:14px;color:var(--mut)">'+o.yrs+'-YEAR DEAL -- TOTAL '+fmt(o.sal*o.yrs)+'</div>';
+    }
+    if(o.importCareer) html+='<div class="vt" style="font-size:13px;color:var(--gold)">IMPORT — OUT OF HOME CHL TERRITORY</div>';
+    if(o.movementOffer) html+='<div class="vt" style="font-size:13px;color:var(--acc)">LEAGUE MOVE</div>';
+    if(o.academyTransfer) html+='<div class="vt" style="font-size:13px;color:var(--acc)">ACADEMY TRANSFER — NEW ORG PROGRAM</div>';
     if(o.rights) html+='<div class="vt" style="font-size:13px;color:var(--gold)">YOUR RIGHTS-HOLDING TEAM</div>';
     if(o.eliteReady) html+='<div class="vt" style="font-size:13px;color:var(--good)">HIGH-END READY ('+getEliteReadyOvrBar()+'+ OVR)</div>';
     if(o.offerSheet) html+='<div class="vt" style="font-size:13px;color:var(--acc)">RARE OFFER SHEET</div>';
@@ -1122,16 +1428,29 @@ function renderFAOffersPanel(rightsActive,rightsDevHold){
     html+='<button class="btn bp" style="margin-top:8px;font-size:14px;padding:6px 14px" onclick="signFAOffer('+i+')">SIGN HERE</button>';
     html+='</div>';
   }
+  if(wantMovement&&!mustLeaveAmateur&&G.league){
+    html+='<div class="vt" style="font-size:14px;color:var(--mut);margin-top:10px">-- OR -- <button class="btn bs" onclick="stayInCurrentLeague()">STAY IN '+G.league.short+'</button></div>';
+  }
   html+='<button class="btn bd bw" style="margin-top:6px" onclick="offerContract()">NEGOTIATE DEAL</button>';
   safeEl('fa-offers').innerHTML=html;
   safeEl('offseason-contract-status').innerHTML=
-    'CONTRACT: '+(G.contract.type||'N/A')+' &bull; '+(G.contractYrsLeft>0?(G.contractYrsLeft+' YEAR(S) LEFT'):'EXPIRED')+'<br>'+
+    'CONTRACT: '+((G.contract&&G.contract.type)||'AMATEUR')+' &bull; '+(G.contractYrsLeft>0?(G.contractYrsLeft+' YEAR(S) LEFT'):'EXPIRED')+'<br>'+
     'CURRENT VALUE: '+(G.contract&&G.contract.sal?fmt(G.contract.sal)+'/YR':'AMATEUR')+'<br>'+
     'OPEN OFFERS: '+curFAOffers.length;
 }
 
 function signFAOffer(i){
   var o=curFAOffers[i];if(!o)return;
+  if(typeof requiresLhlBeforeScouts==='function'&&requiresLhlBeforeScouts(G.nat)&&typeof hasLhlScoutingCredential==='function'&&!hasLhlScoutingCredential(G)&&o.l&&o.l.tier!=='local'&&o.lk!==G.leagueKey){
+    notify('Complete at least one full LHL season before scouts will offer spots abroad.','red');
+    return;
+  }
+  if(typeof isChlTerritoryMismatch==='function'&&typeof isChlTerritoryLeague==='function'&&isChlTerritoryLeague(o.lk)&&isChlTerritoryMismatch(o.lk,G.hometown,G.nat,G.gender)&&!o.importCareer&&!G._chlImportCareer){
+    var homeLg=typeof getPlayerTerritoryJuniorLeague==='function'?getPlayerTerritoryJuniorLeague(G.hometown,G.nat,G.gender):'';
+    notify('CHL HOME TERRITORY REQUIRED','red');
+    addNews('CHL rules: your home circuit is '+(homeLg&&LEAGUES[homeLg]?LEAGUES[homeLg].short:homeLg||'your region')+'. Sign an import offer or stay in territory.','bad');
+    return;
+  }
   if(o.l&&o.l.tier==='pro' && (!G.league||G.league.tier!=='pro') && !(G.draftRights && G.draftRights.leagueKey===o.lk)){
     notify('PRO SIGNING REQUIRES DRAFT RIGHTS','red');
     addNews('Signing blocked: must hold draft rights to join '+o.l.short+' from lower levels.','bad');
@@ -1147,16 +1466,31 @@ function signFAOffer(i){
   }
   G.leagueKey=o.lk;G.league=o.l;G.team=o.team;
   onTeamChangeLeadershipReset();
+  if(o.academyTransfer&&typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(o.lk)){
+    if(typeof stampAcademyParentOrg==='function') stampAcademyParentOrg(o.team.n, o.lk);
+    if(typeof syncPlayerAcademyBand==='function') syncPlayerAcademyBand();
+    G.contract=G.contract||{sal:0,yrs:1,type:'ACADEMY CONTRACT',ntc:false,bonus:false};
+    if(G.contract.type!=='ORG PRO DEAL') G.contract.type='ACADEMY CONTRACT';
+  }
   var faType;
-  if(G.league.tier==='pro') faType=getProContractType();
+  if(o.juniorDeal||(o.l&&o.l.tier==='junior')){
+    faType='JUNIOR DEAL';
+    if(o.importCareer) G._chlImportCareer=true;
+  } else if(o.scholarship||(o.l&&o.l.tier==='college')){
+    faType='SCHOLARSHIP';
+  } else if(G.league.tier==='pro') faType=getProContractType();
   else if(G.league.tier==='minor') faType='TWO-WAY ('+getProLeagueKeyByGender(G.gender)+')';
   else faType='PRO CONTRACT';
-  var yrs=(faType==='ENTRY LEVEL')?3:(G.league.tier==='minor'?Math.min(2,Math.max(1,o.yrs)):o.yrs);
-  G.contract={sal:o.sal,yrs:yrs,type:faType,ntc:false,bonus:false};
+  var yrs;
+  if(faType==='JUNIOR DEAL'||faType==='SCHOLARSHIP') yrs=o.yrs;
+  else if(faType==='ENTRY LEVEL') yrs=3;
+  else if(G.league.tier==='minor') yrs=Math.min(2,Math.max(1,o.yrs));
+  else yrs=o.yrs;
+  G.contract={sal:(faType==='JUNIOR DEAL'||faType==='SCHOLARSHIP')?0:(o.sal||0),yrs:yrs,type:faType,ntc:false,bonus:false};
   if(faType==='ENTRY LEVEL'){G.hadELC=true;G.elcYears=3;}
   G.contractYrsLeft=yrs;
   G._offseasonContractSigned=true;
-  stampContractBinding(o.lk, o.team.n);
+  if(faType!=='JUNIOR DEAL'&&faType!=='SCHOLARSHIP') stampContractBinding(o.lk, o.team.n);
   if(o.sal>0){
     var sb=Math.round(o.sal*0.08);
     if(typeof creditPlayerMoney==='function') creditPlayerMoney(sb, 'signing');
@@ -1217,6 +1551,8 @@ function nextSeason(){
   if(!handleExpiredContractBeforeCamp()) return;
   if(typeof evaluateOffseasonInjuryFallout==='function'&&evaluateOffseasonInjuryFallout()) return;
   G._inOffseason=false;
+  G._offseasonInitializedForSeason=0;
+  G._seasonEndLoggedForSeason=0;
   G._offseasonMedical=false;
   G._enteredOffseasonInjured=false;
   if(typeof ensureInjuryTracking==='function') ensureInjuryTracking();
@@ -1239,6 +1575,23 @@ function nextSeason(){
   var _ageSeasonEnded=G.age;
   G.age++;G.season++;G.year++;
   applyPhysiqueGrowthAfterAgeUp(_ageSeasonEnded,G.age);
+  if(typeof applyUsndtAgePromotion==='function') applyUsndtAgePromotion();
+  var proKey=getProLeagueKeyByGender(G.gender);
+  var minorKey=getMinorLeagueKeyByGender(G.gender);
+  var poNow=ovr(G.attrs,G.pos);
+  if(G.leagueKey===minorKey&&typeof playerTooGoodForMinorLeague==='function'&&playerTooGoodForMinorLeague(poNow)){
+    if(G.draftRights&&G.draftRights.leagueKey===proKey){
+      var oldMinor=G.team.n;
+      G.leagueKey=proKey;
+      G.league=LEAGUES[proKey];
+      G.team=getValidTeamForLeague(proKey,G.draftRights.team);
+      onTeamChangeLeadershipReset();
+      G.standings=buildStandings(proKey);
+      G.allOpponents=genSeason(proKey,G.team);
+      addNews('PHL CALL-UP: '+G.first+' '+G.last+' ('+poNow+' OVR) promoted from '+oldMinor+' in '+LEAGUES[minorKey].short+' — too good to stay in the minors.','big');
+      notify('PROMOTED TO '+G.league.short.toUpperCase(),'gold');
+    }
+  }
   if(qualifiesYoungProAffiliateDemotion(wasBadProSeason,_ageSeasonEnded)){
     var downKey=getMinorLeagueKeyByGender(G.gender);
     if(downKey && LEAGUES[downKey]){
@@ -1311,12 +1664,12 @@ function nextSeason(){
       addNews('Age rule: '+G.first+' is past college eligibility — continues in '+G.league.short+'.','big');
     }
   }
-  if(G.age>=30){
-    // Aging: slow erosion from 30, ramps through mid-30s, very sharp after 35.
+  if(G.age>=27){
     var pen;
-    if(G.age<33) pen=(G.age-29)*0.09;
-    else if(G.age<35) pen=0.27+(G.age-32)*0.11;
-    else pen=0.5+(G.age-34)*0.72;
+    if(G.age<30) pen=(G.age-26)*0.14;
+    else if(G.age<33) pen=0.42+(G.age-29)*0.16;
+    else if(G.age<35) pen=0.74+(G.age-32)*0.22;
+    else pen=1.1+(G.age-34)*0.85;
     var amin=typeof G._attrClampMin==='number'?G._attrClampMin:40;
     if(G.pos!=='G'&&typeof SKATER_ATTR_CATEGORIES!=='undefined'){
       var ck, cd, ai, ak;
@@ -1325,34 +1678,39 @@ function nextSeason(){
         cd=SKATER_ATTR_CATEGORIES[ck];
         for(ai=0;ai<cd.keys.length;ai++){
           ak=cd.keys[ai];
-          if(ak==='agility'||ak==='speed') G.attrs[ak]=cl(G.attrs[ak]-rd(0,pen*1.1),25,99);
-          else G.attrs[ak]=cl(G.attrs[ak]-rd(0,pen),amin,99);
+          if(ak==='agility'||ak==='speed') G.attrs[ak]=cl(G.attrs[ak]-rd(0,pen*1.25),22,getAttrCapForAge(G.age));
+          else G.attrs[ak]=cl(G.attrs[ak]-rd(0,pen),amin,getAttrCapForAge(G.age));
         }
       }
       if(typeof syncLegacySkaterAttrsFromCategories==='function') syncLegacySkaterAttrsFromCategories(G.attrs);
-      if(G.attrs.durability) G.attrs.durability=cl(G.attrs.durability-rd(0,pen*0.35),25,99);
+      if(G.attrs.durability) G.attrs.durability=cl(G.attrs.durability-rd(0,pen*0.45),22,getAttrCapForAge(G.age));
     } else {
-      var al=ATTRS[G.pos];
-      for(var i=0;i<al.length;i++){
+    var al=ATTRS[G.pos];
+    for(var i=0;i<al.length;i++){
         var ak2=al[i];
-        G.attrs[ak2]=cl(G.attrs[ak2]-rd(0,pen),40,99);
+        G.attrs[ak2]=cl(G.attrs[ak2]-rd(0,pen),40,getAttrCapForAge(G.age));
       }
     }
-    G.stamina=cl(G.stamina-rd(0,pen*1.9),0,100);
+    G.stamina=cl(G.stamina-rd(0,pen*2.1),0,100);
   }
   if(G.age<=25){
     var al2=G.pos!=='G'&&typeof SKATER_SUB_ATTR_KEYS!=='undefined'?SKATER_SUB_ATTR_KEYS.slice():(ATTRS[G.pos]||[]);
     var gm=(G.growthMult||1)*getPotentialDevMult(G.potential||'support');
-    var yb=G.age<=17?1.6:(G.age<=19?1.38:(G.age<=22?1.05:(G.age<=24?0.7:0.45)));
+    var yb=G.age<=17?1.45:(G.age<=19?1.22:(G.age<=22?0.92:(G.age<=24?0.55:0.35)));
     var oc=getAttrCapForAge(G.age||16);
     var omin=typeof G._attrClampMin==='number'?G._attrClampMin:40;
     for(var i=0;i<al2.length;i++) G.attrs[al2[i]]=cl(G.attrs[al2[i]]+rd(0,1.5*gm*yb),omin,oc);
     if(G.pos!=='G'&&typeof syncLegacySkaterAttrsFromCategories==='function') syncLegacySkaterAttrsFromCategories(G.attrs);
   }
   if(typeof mergeUserSeasonIntoCareerLeagueStats==='function') mergeUserSeasonIntoCareerLeagueStats();
+  if(typeof mergeCallUpSeasonsIntoCareerLeagueStats==='function') mergeCallUpSeasonsIntoCareerLeagueStats();
   if(typeof finalizeLeagueSeasonBeforeReset==='function') finalizeLeagueSeasonBeforeReset(G.leagueKey, G.season-1);
   if(typeof resetLeagueRosterCachesForNewSeason==='function') resetLeagueRosterCachesForNewSeason(G.leagueKey);
+  if(typeof maybeAcademyEarlyProOffer==='function') maybeAcademyEarlyProOffer();
+  if(typeof syncPlayerAcademyBand==='function') syncPlayerAcademyBand();
   G.gp=0;G.w=0;G.l=0;G.otl=0;G.goals=0;G.assists=0;G.plusminus=0;G.pim=0;G.sog=0;G.saves=0;G.goalsAgainst=0;
+  G.seasonCallUps=[];
+  if(typeof ensureUserScoringPulse==='function') ensureUserScoringPulse();
   G.week=1;G.weekGames=0;G.isInjured=false;G.wonCup=false;G.milestones=[];
   if(typeof updatePlayerConditioning==='function') updatePlayerConditioning();
   G._leagueStatsKey=null;
@@ -1366,6 +1724,7 @@ function nextSeason(){
   G.health=cl(G.health+20,0,100);
   G.standings=buildStandings(G.leagueKey);
   G.allOpponents=genSeason(G.leagueKey,G.team);
+  if(typeof maybeRecruitToUsndtU17==='function') maybeRecruitToUsndtU17();
   G.contractYrsLeft=Math.max(0,G.contractYrsLeft);
   G.teamTenure=(G.teamTenure||0)+1;
   G.socialMessages=generateSocialMessages();

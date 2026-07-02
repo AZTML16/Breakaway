@@ -46,14 +46,14 @@ function formatPlayerPositionLabel(pos, subPos){
 var LEAGUES = {
   PHL:  {name:'Pro Hockey League',short:'PHL',tier:'pro',gender:'M',games:82,gamesPerWeek:4,dev:0.7,salBase:750000,desc:'Top men\'s pro circuit — 32 clubs, 82-game schedule.'},
   NAML: {name:'North American Minors League',short:'NAML',tier:'minor',gender:'M',games:72,gamesPerWeek:3,dev:0.9,salBase:60000,desc:'PHL affiliate loop — 32 teams, 72 games. Shared nicknames mirror parent clubs.'},
-  OJL:  {name:'Ontario Junior League',short:'OJL',tier:'junior',gender:'M',games:68,dev:1.4,salBase:0,desc:'Ontario major junior — 20 teams, 68 games.'},
-  QMJL: {name:'Quebec-Maritimes Junior League',short:'QMJL',tier:'junior',gender:'M',games:68,dev:1.3,salBase:0,desc:'Quebec & Maritimes juniors — 18 teams, 68 games.'},
-  WJL:  {name:'Western Junior League',short:'WJL',tier:'junior',gender:'M',games:68,dev:1.3,salBase:0,desc:'Western major junior — 22 teams, 68 games.'},
+  OJL:  {name:'Ontario Junior League',short:'OJL',tier:'junior',gender:'M',games:68,dev:1.4,salBase:0,desc:'Ontario major junior — 20 teams, 68 games. Transition-heavy, quick, skilled CHL hockey; deepest goaltending. Kitchener, London, Windsor, Sarnia, and Flint often contend.'},
+  QMJL: {name:'Quebec-Maritimes Junior League',short:'QMJL',tier:'junior',gender:'M',games:68,dev:1.3,salBase:0,desc:'Quebec & Maritimes juniors — 18 teams, 68 games. Weakest CHL talent but flashy, skill-first entertainment. Québec City and Saint John lead the league.'},
+  WJL:  {name:'Western Junior League',short:'WJL',tier:'junior',gender:'M',games:68,dev:1.35,salBase:0,desc:'Western major junior — 22 teams, 68 games. Most structured, physical CHL hockey; talent tier slightly behind OJL.'},
   NCHA: {name:"Nat'l Collegiate Hockey Assoc.",short:'NCHA',tier:'college',gender:'M',games:34,dev:1.2,salBase:0,desc:'U.S. Division I men — 50 programs, ~34-game season.'},
-  USJL: {name:'US Junior League',short:'USJL',tier:'junior',gender:'M',games:62,dev:1.2,salBase:0,desc:'Premier U.S. junior — 16 teams, 62 games.'},
-  NEJC: {name:'Northern European Junior Circuit',short:'NEJC',tier:'junior',gender:'M',games:44,dev:1.35,salBase:0,desc:'Nordic development circuit — feeder path into NEHL.'},
-  CEJC: {name:'Central European Junior Circuit',short:'CEJC',tier:'junior',gender:'M',games:46,dev:1.32,salBase:0,desc:'Weakest major junior pipeline in Europe — depth and structure lag OJL/WJL/NEJC. Feeder into CEHL.'},
-  ARJC: {name:'Eurasian Junior Circuit',short:'ARJC',tier:'junior',gender:'M',games:48,dev:1.28,salBase:0,desc:'Russian, Central Asian & Asia-Pacific junior programs — path to ARHL.'},
+  USJL: {name:'US Junior League',short:'USJL',tier:'junior',gender:'M',games:62,dev:1.2,salBase:0,desc:'Premier U.S. junior — skill-based but structured hockey. 16 clubs plus USNDT (U17: USJL + intl tourneys; U18: college exhibitions & CJL).'},
+  NEJC: {name:'Northern European Junior Circuit',short:'NEJC',tier:'junior',gender:'M',games:44,dev:1.35,salBase:0,desc:'Nordic academies — technical hockey, org contract with parent NEHL/FHL club. U16 under 17, U18 under 19, U20 under 21.'},
+  CEJC: {name:'Central European Junior Circuit',short:'CEJC',tier:'junior',gender:'M',games:46,dev:1.32,salBase:0,desc:'Central European academies — technical, structured development; org deal with parent CEHL club. U16/U18/U20 bands.'},
+  ARJC: {name:'Eurasian Junior Circuit',short:'ARJC',tier:'junior',gender:'M',games:48,dev:1.28,salBase:0,desc:'Eurasian academies — technical hockey, org contract with parent ARHL club. U16 under 17, U18 under 19, U20 under 21.'},
   NEHL: {name:'Northern European Hockey League',short:'NEHL',tier:'euro',gender:'M',games:52,dev:1.1,salBase:55000,desc:'Nordic top tier — 14 teams, 52 games.'},
   FHL:  {name:'Finnish Hockey League',short:'FHL',tier:'euro',gender:'M',games:60,dev:1.1,salBase:32000,desc:"Finland's top men's pro circuit — 15 clubs, 60-game Liiga-style season. Feeder from NEJC; a clear step above CEHL."},
   CEHL: {name:'Central European Hockey League',short:'CEHL',tier:'euro',gender:'M',games:60,dev:1.02,salBase:16000,desc:'Weakest paid euro men\'s loop — Germany, Poland, Czechia & neighbors. Talent barely above LHL community hockey; feeder from CEJC.'},
@@ -63,8 +63,8 @@ var LEAGUES = {
   CWHL: {name:"Canadian Women's Junior League",short:'CWHL',tier:'junior',gender:'F',games:38,dev:1.3,salBase:0,desc:"Canadian women's major junior — 10 teams, 38 games."},
   NWCHA:{name:"Nat'l Women's Collegiate Hockey Assoc.",short:'NWCHA',tier:'college',gender:'F',games:34,dev:1.1,salBase:0,desc:"U.S. Division I women — 14 programs, ~34 games."},
   USWDL:{name:"US Women's Development League",short:'USWDL',tier:'junior',gender:'F',games:52,dev:1.2,salBase:0,desc:"U.S. women's junior dev — 16 teams, 52 games."},
-  EWJC:{name:"European Women's Junior Circuit",short:'EWJC',tier:'junior',gender:'F',games:36,dev:1.22,salBase:0,desc:"European women's programs — feeder into SDHL/FWHL."},
-  AWJC:{name:"Asian Women's Junior Circuit",short:'AWJC',tier:'junior',gender:'F',games:34,dev:1.2,salBase:0,desc:"Asian women's programs — feeder into AWHL."},
+  EWJC:{name:"European Women's Junior Circuit",short:'EWJC',tier:'junior',gender:'F',games:36,dev:1.22,salBase:0,desc:"European women's academies — technical hockey, org contract with SDHL/FWHL parent club. U16 under 17, U18 under 19, U20 under 21."},
+  AWJC:{name:"Asian Women's Junior Circuit",short:'AWJC',tier:'junior',gender:'F',games:34,dev:1.2,salBase:0,desc:"Asian women's academies — technical development, org deal with AWHL parent club. U16 under 17, U18 under 19, U20 under 21."},
   SDHL: {name:"Swedish Women's Hockey League",short:'SDHL',tier:'euro',gender:'F',games:36,dev:1.1,salBase:18000,desc:"Sweden women's top tier — 10 teams, 36 games."},
   FWHL: {name:"Finnish Women's Hockey League",short:'FWHL',tier:'euro',gender:'F',games:36,dev:1.1,salBase:16000,desc:"Finland women's top tier — 10 teams, 36 games."},
   AWHL: {name:"Asian Women's Hockey League",short:'AWHL',tier:'asia',gender:'F',games:36,dev:1.0,salBase:20000,desc:"Asia women's pro — 8 teams, 36 games."}
@@ -442,8 +442,19 @@ var RENAMED_TEAMS={
   'Wisconsin Badgers':'Wisconsin Red Wolves',
   'Ohio State Buckeyes':'Ohio State Bucks'
 };
+function stripLegacyJuniorTeamSuffix(name){
+  if(!name||typeof name!=='string') return name;
+  var s=String(name).trim();
+  if(/\sJ$/.test(s)) s=s.replace(/\s+J$/,'');
+  if(/\sJ20$/.test(s)) s=s.replace(/\s+J20$/,'');
+  if(/\sU20$/.test(s)) s=s.replace(/\s+U20$/,'');
+  return s;
+}
 function migrateRenamedTeamName(name){
-  return RENAMED_TEAMS[name]||name;
+  if(!name) return name;
+  var mapped=RENAMED_TEAMS[name];
+  if(mapped) return stripLegacyJuniorTeamSuffix(mapped);
+  return stripLegacyJuniorTeamSuffix(name);
 }
 
 /** Old saves: CEHL was briefly the Finnish league — move those clubs to FHL. */
@@ -490,6 +501,11 @@ function migrateSaveBranding(){
   if(G.draftRights&&G.draftRights.team) G.draftRights.team=m(G.draftRights.team);
   if(G._formerDraftClubName) G._formerDraftClubName=m(G._formerDraftClubName);
   migrateFinnishLeagueKeySplit();
+  if(typeof refreshPlayerLeagueLocale==='function') refreshPlayerLeagueLocale();
+  if(G._lastSeasonRecapForSeason==null) G._lastSeasonRecapForSeason=0;
+  if(!G.seasonCallUps) G.seasonCallUps=[];
+  if(G._inOffseason&&typeof ensureSeasonRecapForOffseason==='function') ensureSeasonRecapForOffseason();
+  if(typeof isActiveProCallUp==='function'&&isActiveProCallUp()&&typeof ensureCallUpHomeSnapshot==='function') ensureCallUpHomeSnapshot();
   if(typeof pendingTrade!=='undefined'&&pendingTrade&&pendingTrade.team&&pendingTrade.team.n)
     pendingTrade.team.n=m(pendingTrade.team.n);
   if(typeof curOpponent!=='undefined'&&curOpponent&&curOpponent.n) curOpponent.n=m(curOpponent.n);
@@ -514,10 +530,22 @@ function migrateSaveBranding(){
 }
 
 function standingsRowHtml(s,rank){
-  var parts=String(s.team.n||'').trim().split(/\s+/);
-  var name=parts.length>2?parts.slice(-2).join(' '):(parts[parts.length-1]||'TEAM');
   var lk=s.leagueKey||(typeof G!=='undefined'&&G&&G.leagueKey?G.leagueKey:'');
-  return '<div class="srow2'+(s.isMe?' me':'')+'"><div>'+rank+'</div><div>'+teamLogoChip(s.team.n,18,lk)+' '+stripBracketIcons(s.team.e)+' '+name+'</div><div>'+s.w+'</div><div>'+s.l+'</div><div>'+s.otl+'</div><div>'+s.pts+'</div></div>';
+  var rawName=s.team.n||'';
+  var useBand=typeof isAcademyLeagueWithYouthTag==='function'&&isAcademyLeagueWithYouthTag(lk);
+  var dispBand=null;
+  if(useBand){
+    if(s.isMe&&typeof G!=='undefined'&&G){
+      if(typeof syncPlayerAcademyBand==='function') syncPlayerAcademyBand();
+      dispBand=G._academyBand;
+    } else if(typeof getAcademyOrgDisplayBand==='function'){
+      dispBand=getAcademyOrgDisplayBand(lk, rawName);
+    }
+  }
+  var dispName=typeof getTeamDisplayName==='function'?getTeamDisplayName(rawName,lk,{academyBand:dispBand}):rawName;
+  var name=String(dispName||rawName||'').trim()||'TEAM';
+  if(name.length>32) name=name.slice(0,30)+'…';
+  return '<div class="srow2'+(s.isMe?' me':'')+'"><div>'+rank+'</div><div>'+teamLogoChip(rawName,18,lk)+' '+stripBracketIcons(s.team.e)+' '+name+'</div><div>'+s.w+'</div><div>'+s.l+'</div><div>'+s.otl+'</div><div>'+s.pts+'</div></div>';
 }
 
 function standingsMiniTable(rows){
@@ -671,7 +699,7 @@ var ARCHETYPES = {
     Enforcer:     {name:'Enforcer',    icon:'[X]', desc:'Protector. Fights, hits, intimidates.',               boosts:{physical:28,shooting:-16,passing:-12,stickhandling:-8,defense:2,anticipation:-6,agitation:18}}
   },
   D: {
-    OffensiveD:   {name:'Offensive D', icon:'[+]', desc:'Offensive defenseman — joins the attack, shoots and passes from the blue line.', boosts:{passing:18,skating:10,defense:-18,shooting:6,stickhandling:6,anticipation:3}},
+    OffensiveD:   {name:'Offensive D', icon:'[+]', desc:'Offensive defenseman — joins the attack, shoots and passes from the blue line.', boosts:{shooting:14,skating:10,passing:12,defense:-18,stickhandling:6,anticipation:3}},
     StayAtHome:   {name:'Stay-at-Home',icon:'[S]', desc:'No offense, all defense. Hard to play against.',      boosts:{defense:26,physical:12,skating:-6,passing:-8,shooting:-6,stickhandling:-8,anticipation:4}},
     TwoWayD:      {name:'Two-Way D',   icon:'[=]', desc:'Balanced blueliner — leans defensive without going full lockdown.', boosts:{defense:16,anticipation:10,passing:7,skating:5,physical:4,shooting:2,stickhandling:5}},
     ShutdownD:    {name:'Shutdown D',  icon:'[L]', desc:'Assignment: stop the other teams best player.',       boosts:{defense:26,anticipation:18,skating:4,passing:-10,shooting:-4,stickhandling:-6}}
@@ -684,17 +712,29 @@ var ARCHETYPES = {
   }
 };
 
-/** Assists occur ~2.1× as often as goals league-wide (not 50/50). */
-var ASSIST_TO_GOAL_RATIO=2.1;
+/** Assists occur ~2.65× as often as goals league-wide (NHL-ish: ~73% of points are assists). */
+var ASSIST_TO_GOAL_RATIO=2.65;
 function getDefaultGoalPointShare(){
   return 1/(1+ASSIST_TO_GOAL_RATIO);
+}
+
+/** Per-game save rate — average starters ~.905, good ~.915+, elite .925+. */
+function computeGoalieSaveRate(perfBias, opts){
+  opts=opts||{};
+  var leagueDev=opts.leagueDev!=null?opts.leagueDev:1;
+  var attrBonus=opts.attrBonus||0;
+  var base=opts.base!=null?opts.base:0.905;
+  var jitter=opts.jitter!=null?opts.jitter:rd(-0.01,0.008);
+  var rate=base+perfBias*0.014+attrBonus+(leagueDev-1)*0.006+jitter;
+  var floor=opts.floor!=null?opts.floor:0.895;
+  var ceil=opts.ceil!=null?opts.ceil:0.968;
+  return cl(rate,floor,ceil);
 }
 
 /** Per-league goal share of points — LHL favors finishers; established leagues favor playmakers (~2.1:1 A:G). */
 function getLeagueGoalPointShare(leagueKey){
   var lk=leagueKey||(typeof G!=='undefined'&&G?G.leagueKey:'');
-  var L=(typeof LEAGUES!=='undefined'&&lk)?LEAGUES[lk]:null;
-  if(L&&L.tier==='local') return 0.58;
+  if(typeof isLocalLeague==='function'&&isLocalLeague(lk)) return 0.58;
   return typeof getDefaultGoalPointShare==='function'?getDefaultGoalPointShare():0.323;
 }
 
@@ -704,41 +744,122 @@ function getArchetypeGoalPointShare(arch, pos, opts){
   var line=opts.line!=null?opts.line:3;
   var perf=opts.perf!=null?opts.perf:0.85;
   var leagueKey=opts.leagueKey||(typeof G!=='undefined'&&G?G.leagueKey:'');
+  var local=typeof isLocalLeague==='function'&&isLocalLeague(leagueKey);
   var base=typeof getLeagueGoalPointShare==='function'?getLeagueGoalPointShare(leagueKey):(typeof getDefaultGoalPointShare==='function'?getDefaultGoalPointShare():0.323);
   if(pos==='G') return 0;
   if(pos==='D'){
-    if(arch==='OffensiveD') return cl(base*1.38, 0.12, 0.40);
-    if(arch==='TwoWayD') return cl(base*0.98, 0.10, 0.32);
-    if(arch==='StayAtHome') return cl(base*0.65, 0.08, 0.24);
-    if(arch==='ShutdownD') return cl(base*0.55, 0.06, 0.20);
-    return cl(base*0.82, 0.08, 0.30);
+    var dOff=local?0.46:0.44;
+    var dTwo=local?0.34:0.32;
+    var dStay=local?0.28:0.26;
+    var dShut=local?0.24:0.22;
+    var dDef=local?0.30:0.28;
+    if(arch==='OffensiveD'){
+      var od=base*1.62+perf*0.14;
+      if(line===1) od+=0.06;
+      if(line===1&&perf>=0.94) od+=0.05;
+      if(leagueKey==='PHL'&&line===1&&perf>=0.92) od+=0.04;
+      return cl(od, 0.28, dOff);
+    }
+    if(arch==='TwoWayD'){
+      var tw=base*1.12+perf*0.10;
+      if(line<=2) tw+=0.04;
+      return cl(tw, 0.18, dTwo);
+    }
+    if(arch==='StayAtHome'){
+      var sah=base*0.92+perf*0.08;
+      if(line<=2&&perf>=0.88) sah+=0.05;
+      return cl(sah, 0.14, dStay);
+    }
+    if(arch==='ShutdownD'){
+      var shd=base*0.82+perf*0.06;
+      if(line<=2&&perf>=0.90) shd+=0.04;
+      return cl(shd, 0.12, dShut);
+    }
+    return cl(base*0.98, 0.10, dDef);
   }
   var share=base;
+  if(local){
+    if(arch==='Sniper'){
+      share=0.40+perf*0.24;
+      if(line===1) share+=0.07;
+      if(line===1&&perf>=0.94) share+=0.05;
+      if(line===1&&perf>=0.97) share+=0.03;
+      return cl(share, 0.36, 0.74);
+    }
+    if(arch==='PowerForward'){
+      share=0.34+perf*0.16;
+      if(line===1) share+=0.05;
+      return cl(share, 0.30, 0.58);
+    }
+    if(arch==='Playmaker'){
+      share=0.13+perf*0.09;
+      return cl(share, 0.09, 0.27);
+    }
+    if(arch==='TwoWay'){
+      share=0.24+perf*0.10;
+      return cl(share, 0.16, 0.38);
+    }
+    if(arch==='Grinder'||arch==='Enforcer'){
+      share=0.17+perf*0.07;
+      return cl(share, 0.11, 0.30);
+    }
+    return cl(base+(perf-0.85)*0.14, 0.14, 0.42);
+  }
+  /* Established leagues: lower goal share so assists lead (~2.65:1 A:G). */
   if(arch==='Sniper'){
-    share=0.40+perf*0.24;
-    if(line===1) share+=0.07;
-    if(line===1&&perf>=0.94) share+=0.05;
-    if(line===1&&perf>=0.97) share+=0.03;
-    return cl(share, 0.36, 0.74);
+    if(leagueKey==='PHL'){
+      share=base*1.35+perf*0.18;
+      if(line===1) share+=0.08;
+      if(line===1&&perf>=0.94) share+=0.06;
+      if(line===1&&perf>=0.97) share+=0.04;
+      return cl(share, 0.52, 0.68);
+    }
+    if(leagueKey==='OJL'||leagueKey==='WJL'||leagueKey==='QMJL'||leagueKey==='USJL'){
+      share=base*1.22+perf*0.12;
+      if(line===1) share+=0.06;
+      if(line===1&&perf>=0.92) share+=0.04;
+      return cl(share, 0.46, 0.58);
+    }
+    share=base*1.18+perf*0.10;
+    if(line===1) share+=0.06;
+    if(line===1&&perf>=0.94) share+=0.04;
+    return cl(share, 0.44, 0.58);
   }
   if(arch==='PowerForward'){
-    share=0.34+perf*0.16;
-    if(line===1) share+=0.05;
-    return cl(share, 0.30, 0.58);
+    share=base*0.98+perf*0.05;
+    if(line===1) share+=0.02;
+    return cl(share, 0.20, 0.32);
   }
   if(arch==='Playmaker'){
-    share=0.13+perf*0.09;
-    return cl(share, 0.09, 0.27);
+    if(leagueKey==='PHL'){
+      share=base*0.42+perf*0.06;
+      if(line===1) share+=0.04;
+      if(line===1&&perf>=0.94) share+=0.05;
+      if(line===1&&perf>=0.97) share+=0.04;
+      return cl(share, 0.12, 0.28);
+    }
+    if(leagueKey==='QMJL'){
+      share=base*0.58+perf*0.06;
+      if(line===1) share+=0.04;
+      return cl(share, 0.16, 0.28);
+    }
+    if(leagueKey==='OJL'||leagueKey==='WJL'||leagueKey==='USJL'){
+      share=base*0.54+perf*0.05;
+      if(line===1) share+=0.03;
+      return cl(share, 0.14, 0.26);
+    }
+    share=base*0.48+perf*0.04;
+    return cl(share, 0.08, 0.16);
   }
   if(arch==='TwoWay'){
-    share=0.24+perf*0.10;
-    return cl(share, 0.16, 0.38);
+    share=base*0.78+perf*0.05;
+    return cl(share, 0.14, 0.26);
   }
   if(arch==='Grinder'||arch==='Enforcer'){
-    share=0.17+perf*0.07;
-    return cl(share, 0.11, 0.30);
+    share=base*0.58+perf*0.04;
+    return cl(share, 0.10, 0.20);
   }
-  return cl(base+(perf-0.85)*0.14, 0.14, 0.42);
+  return cl(base+(perf-0.85)*0.06, 0.12, 0.30);
 }
 
 function splitGoalsAssistsFromPoints(totalPts, goalShare){
@@ -746,7 +867,7 @@ function splitGoalsAssistsFromPoints(totalPts, goalShare){
   var pts=Math.max(0, Math.round(+totalPts||0));
   if(pts<=0) return out;
   var pGoal=typeof goalShare==='number'?goalShare:(typeof getDefaultGoalPointShare==='function'?getDefaultGoalPointShare():0.323);
-  pGoal=cl(pGoal, 0.08, 0.75);
+  pGoal=cl(pGoal, 0.06, 0.62);
   for(var i=0;i<pts;i++){
     if(Math.random()<pGoal) out.g++;
   }
@@ -755,7 +876,15 @@ function splitGoalsAssistsFromPoints(totalPts, goalShare){
 }
 
 function getCreatePointBudget(gender){
-  return String(gender||'M').toUpperCase()==='F'?25:50;
+  if(typeof selCreateAttrBudget==='number') return selCreateAttrBudget;
+  return 100;
+}
+
+function getCreateDifficultyLabel(pts){
+  var p=pts!=null?pts:(typeof selCreateAttrBudget==='number'?selCreateAttrBudget:100);
+  if(p>=200) return 'EASY';
+  if(p>=100) return 'MEDIUM';
+  return 'HARD';
 }
 
 function getCreateMaxSubBoost(gender){
@@ -770,17 +899,25 @@ function statBarPct(v, floor, cap){
   return Math.min(100, Math.max(0, Math.round((n-f)/(c-f)*100)));
 }
 
-/** Per-game +/- — good seasons land around +30 over ~65 GP; losses can go negative. */
+/** Per-game +/- — good seasons land around +30 over ~65 GP; losses can go negative. D-led +/- boards. */
 function computeSkaterGamePlusMinus(won, tied, goals, assists, blocks, pos, arch, momentPm){
   if(pos==='G') return Math.round(momentPm||0);
   var pts=(+goals||0)+(+assists||0);
   var base=won?0.72:(tied?0.08:-0.58);
-  if(pts>=1) base+=Math.min(0.32, pts*0.11);
-  if(pts>=3) base+=0.16;
+  if(pos==='D'){
+    base+=(won?0.38:(tied?0.06:-0.08));
+    if(pts===0&&won&&(arch==='StayAtHome'||arch==='ShutdownD'||arch==='TwoWayD')) base+=0.22;
+  } else if(pos==='F'){
+    if(pts>=1) base+=Math.min(0.18, pts*0.06);
+    if(pts>=3) base+=0.08;
+  } else {
+    if(pts>=1) base+=Math.min(0.32, pts*0.11);
+    if(pts>=3) base+=0.16;
+  }
   var defBonus=getArchetypeDefensivePlusMinusBonus(pos, arch, won, tied, goals, assists, blocks||0);
   var fight=(momentPm||0)*0.14;
-  var raw=base+defBonus*0.22+fight;
-  var cap=pts>=2?1.45:1.15;
+  var raw=base+defBonus*0.28+fight;
+  var cap=pos==='D'?(pts>=1?1.55:1.35):(pts>=2?1.45:1.15);
   var floor=won?-0.35:-1.15;
   return Math.round(cl(raw,floor,cap));
 }
@@ -1192,7 +1329,7 @@ function getMomentAttrValue(attrName, GG){
   return val;
 }
 
-/** Weekly attr growth multiplier by league path (OJL balanced, QMJL skill/creative, WJL heavy, euro technical, ARHL creative/slow, Asian clubs budget, college well-rounded). */
+/** Weekly attr growth — playstyle tracks: OJL transition/skill, WJL structured/physical, QMJL flashy skill, USJL skill+structure, euro technical. */
 function getLeagueAttrDevMultiplier(leagueKey, teamName, attr){
   var lk=leagueKey||'';
   var tn=String(teamName||'');
@@ -1202,23 +1339,23 @@ function getLeagueAttrDevMultiplier(leagueKey, teamName, attr){
   var asiaPac=/Seoul|Yokohama|Sapporo|Tokyo|Busan|Taipei/i.test(tn);
 
   if(lk==='OJL'){
-    M={skating:1.12,positioning:1.08,physical:1.07,stickhandling:1.07,passing:1.07,shooting:1.06,stamina:1.05,defense:1.05,shotBlocking:1.04,
-      reflexes:1.05,glove:1.04,blocker:1.04,reboundControl:1.04,mental:1.05};
-  } else if(lk==='QMJL'){
-    M={physical:0.8,defense:0.84,shotBlocking:0.87,stickhandling:1.14,passing:1.12,positioning:0.92,stamina:0.94,skating:0.96,shooting:0.98,
-      reflexes:0.94,glove:0.95,blocker:0.95,reboundControl:0.93,mental:1.08};
+    M={skating:1.14,passing:1.10,stickhandling:1.10,positioning:1.06,shooting:1.07,physical:1.04,stamina:1.06,defense:1.04,shotBlocking:1.03,
+      reflexes:1.08,glove:1.07,blocker:1.07,reboundControl:1.06,mental:1.05};
   } else if(lk==='WJL'){
-    M={physical:1.13,shooting:1.05,defense:1.06,shotBlocking:1.04,stickhandling:0.89,passing:0.92,skating:0.98,stamina:1.03,
-      reflexes:1.03,glove:1.04,blocker:1.06,reboundControl:1.05,mental:0.97};
+    M={physical:1.12,defense:1.10,shotBlocking:1.08,positioning:1.08,stamina:1.06,stickhandling:1.02,passing:1.03,skating:1.04,shooting:1.03,
+      reflexes:1.02,glove:1.03,blocker:1.03,reboundControl:1.02,mental:1.04};
+  } else if(lk==='QMJL'){
+    M={stickhandling:1.14,passing:1.12,shooting:1.08,skating:1.06,positioning:0.92,physical:0.78,defense:0.80,shotBlocking:0.82,stamina:0.92,
+      reflexes:0.90,glove:0.91,blocker:0.91,reboundControl:0.89,mental:1.08};
   } else if(lk==='USJL'){
-    M={positioning:0.88,physical:0.9,stamina:0.95,defense:0.93,shotBlocking:0.94,
-      mental:0.92,reflexes:0.96};
+    M={stickhandling:1.06,passing:1.05,positioning:1.05,defense:1.04,shotBlocking:1.03,physical:0.98,stamina:1.0,skating:1.04,shooting:1.03,
+      reflexes:0.98,glove:0.98,blocker:0.98,reboundControl:0.97,mental:1.0};
   } else if(lk==='NEJC'||lk==='CEJC'||lk==='ARJC'){
-    M={passing:1.06,stickhandling:1.05,positioning:1.04,skating:1.03,defense:1.02,shooting:1.02,physical:0.97,stamina:1.02,
-      mental:1.04,reflexes:1.03,glove:1.02,blocker:1.02,reboundControl:1.02};
+    M={passing:1.10,stickhandling:1.08,positioning:1.08,skating:1.05,defense:1.04,shooting:1.03,physical:0.96,stamina:1.02,
+      mental:1.05,reflexes:1.04,glove:1.03,blocker:1.03,reboundControl:1.03};
   } else if(lk==='EWJC'||lk==='AWJC'){
-    M={passing:1.05,positioning:1.04,skating:1.03,stickhandling:1.03,stamina:1.02,physical:0.95,
-      reflexes:1.03,glove:1.02,blocker:1.02,reboundControl:1.02,mental:1.03};
+    M={passing:1.08,stickhandling:1.07,positioning:1.07,skating:1.04,defense:1.03,shooting:1.02,physical:0.95,stamina:1.02,
+      reflexes:1.03,glove:1.02,blocker:1.02,reboundControl:1.02,mental:1.04};
   } else if(lk==='NEHL'||lk==='FHL'){
     M={passing:1.1,positioning:1.08,stickhandling:1.07,skating:1.03,defense:1.03,physical:0.93,shooting:1.02,
       mental:1.06,reflexes:1.04,glove:1.03,blocker:1.03,reboundControl:1.04};

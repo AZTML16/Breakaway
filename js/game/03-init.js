@@ -22,6 +22,7 @@ function initSelectors(){
   }catch(e){}
   applyRetroFxClasses();
   fillCreateHeightWeightSelects();
+  initCreateAttrBudget();
 }
 
 function populateFavoriteTeamSelect(){

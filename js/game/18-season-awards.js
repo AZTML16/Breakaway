@@ -54,10 +54,16 @@ function userLeadsCategory(rows, category){
 }
 
 function checkSeasonAwards(){
+  if(typeof ensureLeagueContext==='function') ensureLeagueContext();
   var pts=G.goals+G.assists;
   var o=ovr(G.attrs,G.pos);
-  var tier=G.league.tier;
-  var rows=typeof getFinalLeaguePlayerStats==='function'?getFinalLeaguePlayerStats():[];
+  var tier=G.league&&G.league.tier||'';
+  var rows=[];
+  if(typeof isLocalLeague==='function'&&isLocalLeague(G.leagueKey)){
+    rows=[];
+  } else if(typeof getFinalLeaguePlayerStats==='function'){
+    rows=getFinalLeaguePlayerStats();
+  }
 
   if(userLeadsCategory(rows, 'pts')){
     G.awards.push({name:G.league.short+' Scoring Champion',icon:'[*]',desc:pts+' points — league leader',season:G.season});

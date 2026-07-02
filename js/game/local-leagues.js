@@ -216,15 +216,86 @@ function qualifiesForLocalTeam(nat){
 
 function getLocalLeagueEntryHint(nat){
   if(!isNatEligibleForLocalHockey(nat)) return getLocalBlockedNatHint(nat);
-  return 'Open entry — lowest level, all skill levels welcome. Strong dev focus.';
+  return 'Open entry — lowest level, all skill levels welcome. Strong dev focus. '+getLhlScoutingPathHint(nat);
 }
 
 function isEliteHockeyNation(nat){
   return !isNatEligibleForLocalHockey(nat);
 }
 
+/** Growing-market nations must log LHL tape before junior/college scouts notice them. */
+function requiresLhlBeforeScouts(nat){
+  return isNatEligibleForLocalHockey(nat);
+}
+
+function countCompletedLhlSeasons(playerState){
+  var g=playerState||G;
+  if(!g) return 0;
+  if((g.lhlSeasonsCompleted||0)>=1) return g.lhlSeasonsCompleted;
+  if(!g.seasonLog||!g.seasonLog.length) return 0;
+  var c=0, i, s;
+  for(i=0;i<g.seasonLog.length;i++){
+    s=g.seasonLog[i];
+    if(!s) continue;
+    if(s.leagueKey==='LHCM'||s.leagueKey==='LHLF'){ c++; continue; }
+    if(s.league==='LHL'||(s.league&&String(s.league).indexOf('LHL')>=0)) c++;
+  }
+  return c;
+}
+
+function hasLhlScoutingCredential(playerState){
+  var g=playerState||G;
+  if(!g) return false;
+  if(!requiresLhlBeforeScouts(g.nat)) return true;
+  return countCompletedLhlSeasons(g)>=1;
+}
+
+function syncLhlScoutingCredentialFromLog(){
+  if(!G) return;
+  var fromLog=countCompletedLhlSeasons(G);
+  if(fromLog>(G.lhlSeasonsCompleted||0)) G.lhlSeasonsCompleted=fromLog;
+}
+
+function isEstablishedLeagueBlockedForNonHockeyNat(leagueKey, nat){
+  if(!requiresLhlBeforeScouts(nat)) return false;
+  var L=typeof LEAGUES!=='undefined'?LEAGUES[leagueKey]:null;
+  if(!L||L.tier==='local') return false;
+  return true;
+}
+
+function getNonHockeyStartLeagueBlockReason(nat){
+  var n=typeof normalizePlayerNat==='function'?normalizePlayerNat(nat):String(nat||'');
+  return 'From '+n+', start in LHL — scouts need at least one full community season on tape before junior or college circuits will notice you.';
+}
+
+function getLhlScoutingPathHint(nat){
+  if(!requiresLhlBeforeScouts(nat)) return '';
+  return 'Scouts abroad need at least one full LHL season on film before junior or college offers.';
+}
+
+function filterLeaguesForScoutingCredential(leagueKeys){
+  if(!leagueKeys||!leagueKeys.length) return leagueKeys||[];
+  if(!G||hasLhlScoutingCredential(G)) return leagueKeys;
+  if(!requiresLhlBeforeScouts(G.nat)) return leagueKeys;
+  return leagueKeys.filter(function(k){
+    var L=LEAGUES[k];
+    return L&&L.tier==='local';
+  });
+}
+
+function recordLhlSeasonIfComplete(){
+  if(!G||!G.league||G.league.tier!=='local') return;
+  if(G._lhlSeasonRecordedFor===G.season) return;
+  G._lhlSeasonRecordedFor=G.season;
+  G.lhlSeasonsCompleted=(G.lhlSeasonsCompleted||0)+1;
+  if(G.lhlSeasonsCompleted===1&&requiresLhlBeforeScouts(G.nat)){
+    addNews('SCOUT TAPE IN: One full LHL season on film — junior and college programs abroad are starting to watch.','good');
+  }
+}
+
 function qualifiesForLocalAdvancePath(){
   if(!G||!G.league||G.league.tier!=='local') return false;
+  if(requiresLhlBeforeScouts(G.nat)&&!hasLhlScoutingCredential(G)) return false;
   var o=typeof ovr==='function'?ovr(G.attrs,G.pos):0;
   return (G.season>=1&&o>=getLocalAdvanceMinOvr())||G.season>=2;
 }
@@ -360,6 +431,54 @@ function countCompletedLocalGames(){
     if(!isLocalScheduleEvent(G.allOpponents[i])) n++;
   }
   return n;
+}
+
+function countCompletedLocalScheduleSlots(){
+  if(!G||!G.allOpponents||!G.allOpponents.length) return 0;
+  var perWeek=(G.league&&G.league.gamesPerWeek)||2;
+  return Math.min(G.allOpponents.length, Math.max(0, ((G.week||1)-1)*perWeek+(G.weekGames||0)));
+}
+
+/** Regular-season calendar finished (handles 12-slot legacy saves and 18-slot current). */
+function isLocalScheduleComplete(lk){
+  if(!G||!G.allOpponents||!G.allOpponents.length) return false;
+  var schedLen=G.allOpponents.length;
+  var target=typeof getLocalSeasonScheduleSlots==='function'?getLocalSeasonScheduleSlots(lk||G.leagueKey):schedLen;
+  target=Math.min(target, schedLen);
+  return countCompletedLocalScheduleSlots()>=target;
+}
+
+function reconcileLeagueFromRegistry(){
+  if(typeof G==='undefined'||!G||!G.leagueKey||typeof LEAGUES==='undefined') return;
+  if(LEAGUES[G.leagueKey]) G.league=LEAGUES[G.leagueKey];
+}
+
+/** Restore G.league from registry when saves omit tier (breaks isLocal / schedule checks). */
+function ensureLeagueContext(){
+  if(typeof reconcileLeagueFromRegistry==='function') reconcileLeagueFromRegistry();
+  if(typeof G!=='undefined'&&G&&G.leagueKey&&!G.league&&typeof LEAGUES!=='undefined'&&LEAGUES[G.leagueKey]){
+    G.league=LEAGUES[G.leagueKey];
+  }
+}
+
+/** Force LHL showcase to finish and enter offseason (escape hatch + auto-finish helper). */
+function skipLocalShowcaseToOffseason(){
+  if(!G||!(typeof isLocalLeague==='function'&&isLocalLeague(G.leagueKey))) return;
+  if(typeof ensureLeagueContext==='function') ensureLeagueContext();
+  if(G._playoffCtx&&G._playoffCtx.active){
+    G._playoffCtx.eliminated=true;
+    if(typeof fastSimRemainingPlayoffBracket==='function') fastSimRemainingPlayoffBracket();
+  }
+  if(!(G._playoffCtx&&G._playoffCtx.active)){
+    if(typeof finishSeasonToOffseason==='function') finishSeasonToOffseason();
+    else if(typeof goToOffseason==='function') goToOffseason();
+  }
+  G._inOffseason=true;
+  G._playoffCtx=null;
+  if(typeof continueOffseasonAfterDraft==='function'){
+    try{ continueOffseasonAfterDraft(); }catch(eCont){}
+  }
+  try{show('s-offseason');}catch(eSkip){}
 }
 
 /** League games scheduled in a given week (1-based) — ignores event slots. */
@@ -555,7 +674,8 @@ function getLocalEventNewsLine(slot, simulated){
 }
 
 function completeLocalScheduleEvent(idx, simulated){
-  if(!G||!G.league||G.league.tier!=='local') return;
+  if(!G||!(typeof isLocalLeague==='function'&&isLocalLeague(G.leagueKey))) return;
+  if(typeof ensureLeagueContext==='function') ensureLeagueContext();
   if(idx!==G.weekGames){
     notify('FINISH SLOT '+(G.weekGames+1)+' ON THE SCHEDULE FIRST','gold');
     return;
@@ -570,6 +690,7 @@ function completeLocalScheduleEvent(idx, simulated){
   G.weekGames=(G.weekGames||0)+1;
   if(simulated) notify('EVENT SIMULATED','gold');
   else notify(slot.label.toUpperCase(),'green');
+  if(typeof maybeEndRegularSeason==='function') maybeEndRegularSeason();
   if(typeof renderHub==='function') renderHub();
 }
 

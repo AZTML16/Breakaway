@@ -67,9 +67,57 @@ function getWeeklySalaryPay(){
   if(!G||G._inOffseason) return 0;
   var sal=(G.contract&&G.contract.sal)|0;
   if(sal<=0) return 0;
+  if(G.contract&&G.contract.type==='ORG PRO DEAL'&&typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(G.leagueKey)){
+    var band=G._academyBand||'';
+    var onProIce=band==='PRO_CALLUP'||(G._callUpCtx&&G._callUpCtx.active);
+    if(!onProIce) return 0;
+  }
   var perWk=getGamesPerWeek(G.leagueKey);
   var wks=Math.max(1,Math.ceil((G.league.games||68)/perWk));
   return Math.round(sal/wks);
+}
+
+function getChlWeeklyStipend(){
+  var pOvr=typeof ovr==='function'?ovr(G.attrs,G.pos):65;
+  var gp=G.gp||0;
+  var perf=gp>0?(G.goals+G.assists)/gp:0;
+  var floor=Math.round(5000/52);
+  var ceil=Math.round(100000/52);
+  var skill=cl((pOvr-58)/42,0,1);
+  var perfBoost=cl(perf/1.2,0,0.35);
+  return Math.round(cl(floor+skill*(ceil-floor)+perfBoost*(ceil-floor)*0.25, floor, ceil));
+}
+
+function getWeeklyStipend(){
+  if(!G||G._inOffseason) return 0;
+  var lk=G.leagueKey||'';
+  var tier=getFinanceTierKey();
+  var g=G.gender||'M';
+  var contractSal=(G.contract&&G.contract.sal)|0;
+  if(contractSal>0){
+    if(G.contract.type==='ORG PRO DEAL'&&typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(lk)){
+      if(typeof getAcademyWeeklyStipend==='function') return getAcademyWeeklyStipend(g, lk);
+    }
+    return 0;
+  }
+  if(isChlMajorJuniorLeague(lk)&&g==='M'){
+    return getChlWeeklyStipend();
+  }
+  if(typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(lk)){
+    if(typeof getAcademyWeeklyStipend==='function') return getAcademyWeeklyStipend(g, lk);
+    return Math.round((g==='M'?275:145)+rd(0,g==='M'?175:95));
+  }
+  if(lk==='NCHA'||lk==='NWCHA'){
+    return Math.round((g==='M'?175:130)+rd(0,g==='M'?125:95));
+  }
+  if(lk==='USJL') return Math.round(105+rd(0,75));
+  if(tier==='junior'){
+    if(lk==='CWHL'||lk==='USWDL') return Math.round(90+rd(0,60));
+    return Math.round((g==='M'?70:55)+rd(0,50));
+  }
+  if(tier==='local') return Math.round(55+rd(0,45));
+  if(tier==='college') return Math.round(80+rd(0,55));
+  return 0;
 }
 
 function getWeeklyLivingCost(){
@@ -100,28 +148,6 @@ function getWeeklyLivingCost(){
   if(G._ownsLakeHouse||G._ownsBeachEstate) base+=Math.round(160+rd(0,80));
   if(G._ownsSportsCar||G._ownsSupercar) base+=Math.round(85+rd(0,55));
   return Math.max(60, Math.round(base));
-}
-
-function getWeeklyStipend(){
-  if(!G||G._inOffseason) return 0;
-  if((G.contract&&G.contract.sal)>0) return 0;
-  var lk=G.leagueKey||'';
-  var tier=getFinanceTierKey();
-  var g=G.gender||'M';
-  if(isChlMajorJuniorLeague(lk)&&g==='M'){
-    return Math.round(265+rd(0,165));
-  }
-  if(lk==='NCHA'||lk==='NWCHA'){
-    return Math.round((g==='M'?175:130)+rd(0,g==='M'?125:95));
-  }
-  if(lk==='USJL') return Math.round(105+rd(0,75));
-  if(tier==='junior'){
-    if(lk==='CWHL'||lk==='USWDL') return Math.round(90+rd(0,60));
-    return Math.round((g==='M'?70:55)+rd(0,50));
-  }
-  if(tier==='local') return Math.round(55+rd(0,45));
-  if(tier==='college') return Math.round(80+rd(0,55));
-  return 0;
 }
 
 function deductWeeklyLiving(){
@@ -207,6 +233,7 @@ function renderPlayerFinanceSection(){
   var stipLabel='';
   if(stipend>0){
     if(isChlMajorJuniorLeague(G.leagueKey)&&G.gender==='M') stipLabel='CHL stipend';
+    else if(typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(G.leagueKey)) stipLabel='academy org stipend';
     else if(G.leagueKey==='NCHA'||G.leagueKey==='NWCHA') stipLabel='scholarship + spending';
     else stipLabel='amateur stipend';
   }
@@ -224,7 +251,7 @@ function renderPlayerFinanceSection(){
     '</div></div>';
 
   html+='<div class="vt" style="font-size:14px;color:var(--gold);margin:8px 0 6px">LIFESTYLE PURCHASES</div>';
-  html+='<div class="vt" style="font-size:12px;color:var(--mut);margin-bottom:10px;line-height:1.45">Prices scale to your league level. CHL/college stipends help cover weekly living — pro money unlocks the big buys.</div>';
+    html+='<div class="vt" style="font-size:12px;color:var(--mut);margin-bottom:10px;line-height:1.45">Prices scale to your league level. CHL stipends scale with skill ($5k–$100k/season). Euro/Asia academies require an org contract — U16/U18 are free; U20 earns a modest stipend; parent-club salary pays only on pro call-ups.</div>';
 
   var tierColor={small:'var(--mut)',mid:'var(--acc)',big:'var(--gold)',mega:'#e8c85c'};
   var i, item, owned, afford, salOk, disabled, btnClass, moraleTxt, cost;

@@ -11,6 +11,7 @@ var cnTeamOffer = {sal:0,yrs:1};
 var curFAOffers = [];
 var pendingTrade = null;
 var ptsLeft = 20;
+var selCreateAttrBudget = 100;
 var selPos = 'F', selSubPos = 'C', selArch = 'Sniper', selLeague = 'OJL';
 var selXFactor = 'hard_worker';
 var selPotential = 'support';
@@ -393,11 +394,11 @@ function applyTeamTheme(teamName){
     if(m2) m2.setAttribute('content', hexBlend('#040a12', bg, 0.32));
   }catch(e1){}
 }
-/** Save % for UI from ratio 0..1 (e.g. 0.905 -> "90.5%"). */
+/** Save % for UI from ratio 0..1 (e.g. 0.905 -> "90.500%"). */
 function formatSvPctFromRatio(ratio){
   if(!(ratio>0)||!isFinite(ratio)) return '--';
   var pct=ratio<=1?ratio*100:ratio;
-  return (Math.round(pct*10)/10).toFixed(1)+'%';
+  return (Math.round(pct*1000)/1000).toFixed(3)+'%';
 }
 /** From save + shot counts. */
 function formatSvPctFromCounts(sv,ga){
@@ -411,7 +412,7 @@ function formatSeasonLogSvPct(val){
   var n=typeof val==='number'?val:parseFloat(String(val).replace(/%/g,''),10);
   if(!isFinite(n)||n<=0) return '--';
   if(n>0&&n<=1) return formatSvPctFromRatio(n);
-  return (Math.round(n*10)/10).toFixed(1)+'%';
+  return (Math.round(n*1000)/1000).toFixed(3)+'%';
 }
 function ovr(attrs, pos){
   if(!attrs) return 60;
@@ -442,8 +443,8 @@ function ovr(attrs, pos){
 
 /** Scout projection — dev rate nudges growth; ovrMin/Max kept for internal balance only. Attr caps are age-only. */
 var POTENTIALS={
-  mvp:{name:'MVP',label:'MVP',ovrMin:97,ovrMax:99,devRate:1.14,desc:'Rare Hart-level peak — scouts see you as a league MVP candidate. You can still miss or exceed it.'},
-  franchise:{name:'Franchise',label:'Franchise',ovrMin:93,ovrMax:97,devRate:1.10,desc:'Face-of-the-franchise tier — the player a city builds around. Not a hard ceiling.'},
+  mvp:{name:'MVP',label:'MVP',ovrMin:97,ovrMax:98,devRate:1.08,desc:'Rare Hart-level peak — scouts see you as a league MVP candidate. You can still miss or exceed it.'},
+  franchise:{name:'Franchise',label:'Franchise',ovrMin:93,ovrMax:97,devRate:1.06,desc:'Face-of-the-franchise tier — the player a city builds around. Not a hard ceiling.'},
   elite:{name:'Elite',label:'Elite',ovrMin:88,ovrMax:93,devRate:1.05,desc:'Top-line / elite tools — drives offense and plays in every big situation.'},
   support:{name:'Support',label:'Support',ovrMin:83,ovrMax:88,devRate:1.0,desc:'Everyday middle-six support — reliable minutes, trusted role.'},
   depth:{name:'Depth',label:'Depth',ovrMin:78,ovrMax:85,devRate:0.86,desc:'Bottom-six / PK / depth minutes — limited offensive flash, high compete.'},
@@ -452,14 +453,26 @@ var POTENTIALS={
 };
 function getBaseAgeAttrCap(age){
   age=age||16;
-  if(age<=20) return 99;
-  if(age<=24) return 97;
-  if(age<=28) return 96;
-  return 92;
+  if(age<=16) return 84;
+  if(age<=18) return 87;
+  if(age<=20) return 90;
+  if(age<=22) return 93;
+  if(age<=24) return 95;
+  if(age<=27) return 97;
+  if(age<=30) return 94;
+  if(age<=33) return 90;
+  if(age<=36) return 86;
+  return 82;
 }
-/** Max rating per attribute for this age (potential does not hard-cap attrs). */
+/** Max rating per attribute for this age — 99 is effectively unreachable; 98 is rare MVP peak only. */
 function getAttrCapForAge(age){
-  return cl(getBaseAgeAttrCap(age),65,99);
+  var cap=getBaseAgeAttrCap(age);
+  if(typeof G!=='undefined'&&G&&G.potential){
+    if(G.potential==='mvp'&&age>=25&&age<=29) cap=Math.min(98, cap+1);
+    else if(G.potential==='franchise'&&age>=24&&age<=28) cap=Math.min(97, cap+1);
+    else if(G.potential==='elite'&&age>=22&&age<=26) cap=Math.min(96, cap+1);
+  }
+  return cl(cap, 60, 98);
 }
 function escapeAttrTitle(s){
   return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
@@ -612,12 +625,36 @@ function applyGameSnapshot(snap){
   if(!snap||snap.v<1||!snap.G) return false;
   G=snap.G;
   normalizePlayerDisplayFields(G);
+  if(typeof reconcileLeagueFromRegistry==='function') reconcileLeagueFromRegistry();
+  if(typeof ensureLeagueContext==='function') ensureLeagueContext();
   reconcileTeamToLeague();
   if(G.xFactor==='sniper_xf') G.xFactor='quick_release';
   if(G.arch==='OQD') G.arch='OffensiveD';
   try{ if(typeof ensureUnifiedSkaterAttrs==='function') ensureUnifiedSkaterAttrs(G); }catch(eUsk){}
   if(!G.potential||!POTENTIALS[G.potential]) G.potential='support';
   if(typeof G._inOffseason!=='boolean') G._inOffseason=false;
+  if(typeof G._offseasonInitializedForSeason!=='number') G._offseasonInitializedForSeason=0;
+  if(G._seasonEndLoggedForSeason===G.season&&!G._inOffseason&&!(G._playoffCtx&&G._playoffCtx.active)){
+    G._inOffseason=true;
+    G._offseasonInitializedForSeason=G.season;
+  }
+  if(G._inOffseason&&typeof continueOffseasonAfterDraft==='function'){
+    try{ continueOffseasonAfterDraft(); }catch(eOs){}
+    if(typeof refreshOffseasonRecapPanels==='function') try{ refreshOffseasonRecapPanels(); }catch(eOsR){}
+  }
+  if(G._seasonEndLoggedForSeason===G.season&&G._playoffCtx&&G._playoffCtx.active){
+    var poCtx=G._playoffCtx;
+    if(!poCtx.memorialCup&&!poCtx.cjlUsndtChallenge) G._playoffCtx=null;
+  }
+  if(G._playoffCtx&&G._playoffCtx.eliminated&&G._playoffCtx.active&&typeof isLocalLeague==='function'&&isLocalLeague(G.leagueKey)){
+    G._playoffCtx=null;
+    if(!G._inOffseason&&typeof finishSeasonToOffseason==='function'){
+      try{ finishSeasonToOffseason(); }catch(ePoFix){
+        G._inOffseason=true;
+        if(typeof goToOffseason==='function') try{ goToOffseason(); }catch(eGoFix){}
+      }
+    }
+  }
   if(typeof G.heightInches!=='number'||G.heightInches<=0) G.heightInches=parseHeightToInches(G.height);
   if(typeof G._physiqueStartHeightInches!=='number') G._physiqueStartHeightInches=G.heightInches;
   if(typeof G._physiqueStartWeight!=='number') G._physiqueStartWeight=G.weight||180;
@@ -627,6 +664,8 @@ function applyGameSnapshot(snap){
   if(typeof G.cSimPerfSum!=='number') G.cSimPerfSum=0;
   if(typeof G.cSimPerfCount!=='number') G.cSimPerfCount=0;
   if(typeof G._tradeDemandSeason!=='number') G._tradeDemandSeason=0;
+  if(typeof G._tradeDeadlineFiredForSeason!=='number') G._tradeDeadlineFiredForSeason=0;
+  if(typeof G._faNewsFiredForSeason!=='number') G._faNewsFiredForSeason=0;
   if(typeof G.careerEarnings!=='number') G.careerEarnings=0;
   if(typeof ensurePlayerFinances==='function') ensurePlayerFinances();
   if(typeof G.socialFollowers!=='number') G.socialFollowers=800+ri(0,900);
@@ -638,13 +677,14 @@ function applyGameSnapshot(snap){
   if(!G._leadersFilter) G._leadersFilter='pts';
   if(!G._leadersPosFilter) G._leadersPosFilter='all';
   if(!G._leadersViewMode) G._leadersViewMode='live';
+  if(G._leadersViewMode==='career') G._leadersViewMode='career_all';
   if(G.xFactor==='sniper_xf') G.xFactor='quick_release';
   if(G.arch==='OQD') G.arch='OffensiveD';
   if(G.standings&&G.standings.length&&G.leagueKey&&typeof refreshStandings==='function'){
     refreshStandings(G.leagueKey);
   }
-  if(G._rosterGenVersion!==21){
-    G._rosterGenVersion=21;
+  if(G._rosterGenVersion!==26){
+    G._rosterGenVersion=26;
     G.leagueRostersCache={};
     G._teamRosterKey=null;
     G.teamRoster=null;
@@ -661,11 +701,14 @@ function applyGameSnapshot(snap){
     if(typeof ensureUnifiedSkaterAttrs==='function') ensureUnifiedSkaterAttrs(G);
   }
   if(typeof migrateSaveBranding==='function') migrateSaveBranding();
-  if(G.league&&G.league.tier==='local'&&G.team&&typeof getLocalSeasonScheduleSlots==='function'&&typeof genLocalSeason==='function'){
+  if(G.leagueKey&&typeof isLocalLeague==='function'&&isLocalLeague(G.leagueKey)&&G.team&&typeof getLocalSeasonScheduleSlots==='function'&&typeof genLocalSeason==='function'){
     var wantSlots=getLocalSeasonScheduleSlots(G.leagueKey);
-    if((!G.allOpponents||G.allOpponents.length<wantSlots)&&(G.gp||0)===0){
-      G.allOpponents=genLocalSeason(G.leagueKey,G.team);
-      G.week=1;G.weekGames=0;
+    var curSlots=G.allOpponents?G.allOpponents.length:0;
+    if(!G.allOpponents||curSlots<wantSlots){
+      if((G.gp||0)===0||(curSlots>0&&curSlots<wantSlots&&typeof isLocalScheduleComplete==='function'&&isLocalScheduleComplete(G.leagueKey))){
+        G.allOpponents=genLocalSeason(G.leagueKey,G.team);
+        if((G.gp||0)===0){ G.week=1; G.weekGames=0; }
+      }
     }
   }
   if(typeof migrateRenamedTeamName==='function'){
@@ -691,6 +734,34 @@ function applyGameSnapshot(snap){
   }
   if(typeof G.pim!=='number') G.pim=0;
   if(G.nat&&typeof normalizePlayerNat==='function') G.nat=normalizePlayerNat(G.nat);
+  if(G.leagueKey&&typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(G.leagueKey)){
+    if(!G._academyParentOrg&&G.team&&typeof stampAcademyParentOrg==='function') stampAcademyParentOrg(G.team.n, G.leagueKey);
+    if(G.contract&&G.contract.type==='JUNIOR DEAL'){
+      G.contract.type='ACADEMY CONTRACT';
+      if(G._academyParentOrg){
+        G.contract.parentTeam=G._academyParentOrg.teamName;
+        G.contract.parentLeague=G._academyParentOrg.leagueKey;
+      }
+    }
+    if(G.contract&&G.contract.type==='ACADEMY CONTRACT'&&!G._academyParentOrg&&G.contract.parentLeague){
+      G._academyParentOrg={leagueKey:G.contract.parentLeague, teamName:G.contract.parentTeam||'', juniorLeagueKey:G.leagueKey};
+    }
+    if(G.contract&&G.contract.type==='ACADEMY CONTRACT'&&G._academyParentOrg&&typeof qualifiesForAcademyProOrgDeal==='function'&&typeof ovr==='function'){
+      var migOvr=ovr(G.attrs,G.pos);
+      if(qualifiesForAcademyProOrgDeal(migOvr, G.leagueKey)&&typeof calcAcademyOrgProSalary==='function'){
+        var migParent=G._academyParentOrg;
+        G.contract.type='ORG PRO DEAL';
+        G.contract.sal=calcAcademyOrgProSalary(migParent.leagueKey, migOvr);
+        G.contract.parentTeam=migParent.teamName;
+        G.contract.parentLeague=migParent.leagueKey;
+        G._contractClubTeam=migParent.teamName;
+        G._contractSignedLeagueKey=migParent.leagueKey;
+      }
+    }
+    if(typeof syncPlayerAcademyBand==='function') syncPlayerAcademyBand();
+  }
+  if(typeof syncLhlScoutingCredentialFromLog==='function') syncLhlScoutingCredentialFromLog();
+  if(typeof G.lhlSeasonsCompleted!=='number') G.lhlSeasonsCompleted=typeof countCompletedLhlSeasons==='function'?countCompletedLhlSeasons(G):0;
   if(G._natLabelVersion!==2){
     G._natLabelVersion=2;
     function migrateRosterNats(roster){
@@ -710,25 +781,14 @@ function applyGameSnapshot(snap){
     G._relationsPersonalityVersion=2;
     G.teamRelations=null;
   }
-  if(G._npcScoringModelVersion!==6){
-    G._npcScoringModelVersion=6;
-    G._npcStatsSyncedWeek=0;
-    G._leagueStatsKey=null;
+  if(G._npcScoringModelVersion!==14){
+    G._npcScoringModelVersion=14;
+    G.leagueRostersCache=null;
+    G.teamRoster=null;
+    G._teamRosterKey=null;
+    G._teamProfiles=null;
     G.leaguePlayerStats=null;
-    G._teamOffenseFactors={};
-    function resetNpcSeasonStats(roster){
-      if(!roster||!roster.players) return;
-      roster.players.forEach(function(p){
-        if(p.isMe) return;
-        p.seasonStats={gp:0,g:0,a:0,pts:0,pm:0,pim:0,sv:0,ga:0,w:0,gpMissed:0};
-      });
-    }
-    if(G.leagueRostersCache){
-      Object.keys(G.leagueRostersCache).forEach(function(k){
-        resetNpcSeasonStats(G.leagueRostersCache[k]);
-      });
-    }
-    resetNpcSeasonStats(G.teamRoster);
+    G._leagueStatsKey=null;
   }
   if(!G.teamRelations) G.teamRelations={coach:null, teammates:{}};
   var x=snap.x||{};
@@ -786,10 +846,17 @@ function refreshUIRAfterLoad(screenId){
     }
     if(id==='s-offseason'){
       G._inOffseason=true;
-      safeEl('offseason-playoff-recap').innerHTML=_lastPlayoffRecapHTML;
-      var recapEl=safeEl('offseason-season-recap');
-      if(recapEl) recapEl.innerHTML=(G&&G._lastSeasonRecapHTML)||'';
-      safeEl('offseason-world-stage').innerHTML=_lastWorldStageHTML;
+      if(typeof ensureLeagueContext==='function') ensureLeagueContext();
+      if(typeof continueOffseasonAfterDraft==='function'){
+        try{ continueOffseasonAfterDraft(); }catch(eOsUi){}
+      }
+      if(typeof refreshOffseasonRecapPanels==='function') refreshOffseasonRecapPanels();
+      else {
+        safeEl('offseason-playoff-recap').innerHTML=_lastPlayoffRecapHTML;
+        var recapEl=safeEl('offseason-season-recap');
+        if(recapEl) recapEl.innerHTML=(G&&G._lastSeasonRecapHTML)||'';
+        safeEl('offseason-world-stage').innerHTML=_lastWorldStageHTML;
+      }
       return;
     }
     if(id==='s-postgame'){

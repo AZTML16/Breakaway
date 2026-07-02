@@ -57,7 +57,18 @@ function startCareer(){
     notify(localMsg,'red');
     return;
   }
-  if(l.tier==='junior'&&typeof isJuniorEligibleAge==='function'&&!isJuniorEligibleAge(G.age||16)){
+  if(typeof isEstablishedLeagueBlockedForNonHockeyNat==='function'&&isEstablishedLeagueBlockedForNonHockeyNat(lk, nat)){
+    var scoutMsg=typeof getNonHockeyStartLeagueBlockReason==='function'?getNonHockeyStartLeagueBlockReason(nat):'Start in LHL — scouts need at least one community season on tape.';
+    notify(scoutMsg,'red');
+    return;
+  }
+  if(typeof isChlTerritoryMismatch==='function'&&isChlTerritoryMismatch(lk, hometownRaw, nat, gender)&&!_createChlImport){
+    var homeLg=typeof getPlayerTerritoryJuniorLeague==='function'?getPlayerTerritoryJuniorLeague(hometown, nat, gender):'';
+    notify('Your home CHL territory is '+stripBracketIcons(LEAGUES[homeLg]&&LEAGUES[homeLg].short||homeLg)+'. Re-select that league as an import if you want to leave home.','red');
+    return;
+  }
+  var chlImportCareer=!!_createChlImport;
+  if(l.tier==='junior'&&typeof isJuniorEligibleAge==='function'&&!isJuniorEligibleAge(16)){
     notify('Junior leagues are ages '+getJuniorMinAge()+'–'+getJuniorMaxAge()+' only.','red');
     return;
   }
@@ -66,6 +77,10 @@ function startCareer(){
   var prospectTrack=devRoll<0.04?'generational':(devRoll<0.14?'elite':(devRoll<0.45?'high':'normal'));
   var growthMult=prospectTrack==='generational'?1.28:(prospectTrack==='elite'?1.16:(prospectTrack==='high'?1.08:1.0));
   var initContract=(function(){
+    if(typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(lk)){
+      var acPack=typeof buildAcademyOrgContract==='function'?buildAcademyOrgContract(lk, gender, pOvrInit, team.n):null;
+      if(acPack) return acPack.contract;
+    }
     if(l.tier==='junior') return {sal:0,yrs:(pOvrInit>=78?3:pOvrInit>=68?2:1),type:'JUNIOR DEAL',ntc:false,bonus:false};
     if(l.tier==='local') return {sal:0,yrs:1,type:'COMMUNITY PROGRAM',ntc:false,bonus:false};
     if(l.tier==='college') return {sal:0,yrs:(pOvrInit>=78?4:pOvrInit>=68?3:2),type:'SCHOLARSHIP',ntc:false,bonus:false};
@@ -95,7 +110,9 @@ function startCareer(){
     contractYrsLeft:initContract.yrs,
     xp:100,news:[],seasonLog:[],awards:[],milestones:[],
     _seasonEndLoggedForSeason:0,
-    playoffLog:[],worldStageLog:[],
+    _lastSeasonRecapForSeason:0,
+    _offseasonInitializedForSeason:0,
+    playoffLog:[],worldStageLog:[],seasonCallUps:[],
     socialMessages:[],socialReactions:{},
     standings:[],wonCup:false,careerCups:0,
     allOpponents:[],activeTab:null,
@@ -129,10 +146,13 @@ function startCareer(){
     _lifeScenarioGuaranteeCgp:ri(120,280),
     _lifeScenarioRolledThisWeek:false,
     _originPlaceRaw:hometownRaw,
+    _chlImportCareer:chlImportCareer,
     _attrClampMin:attrClampMin,
+    _createAttrBudget:typeof selCreateAttrBudget==='number'?selCreateAttrBudget:100,
     leagueRostersCache:{},
     leagueAlumni:[],
     juniorTeammateIds:[],
+    lhlSeasonsCompleted:0,
     _leadersFilter:'pts',
     _leadersPosFilter:'all',
     leagueStatsArchive:[],
@@ -140,16 +160,34 @@ function startCareer(){
     _rosterGenVersion:15,
     _attrSubVersion:2
   };
-  try{ if(typeof ensureUnifiedSkaterAttrs==='function') ensureUnifiedSkaterAttrs(G); }catch(eEns){}
+  try{   if(typeof ensureUnifiedSkaterAttrs==='function') ensureUnifiedSkaterAttrs(G); }catch(eEns){}
+  if(typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(lk)){
+    if(typeof stampAcademyParentOrg==='function') stampAcademyParentOrg(team.n, lk);
+    if(typeof syncPlayerAcademyBand==='function') syncPlayerAcademyBand();
+  }
   if(typeof ensurePlayerFinances==='function') ensurePlayerFinances();
   if(G.contract.sal>0&&G.bankBalance<1) G.bankBalance=Math.round(G.contract.sal*0.05);
   else if(G.bankBalance<1) G.bankBalance=(LEAGUES[lk]&&LEAGUES[lk].tier==='college')?1200:850;
   if(initContract.sal>0&&l.tier!=='junior'&&l.tier!=='college') stampContractBinding(lk, team.n);
+  else if(initContract.type==='ORG PRO DEAL'&&G._academyParentOrg) stampContractBinding(G._academyParentOrg.leagueKey, G._academyParentOrg.teamName);
   G.standings=buildStandings(lk);
   G.allOpponents=genSeason(lk,team);
+  if(typeof normalizeUsndtTeamOnLoad==='function') normalizeUsndtTeamOnLoad();
+  if(typeof syncPlayerAcademyBand==='function') syncPlayerAcademyBand();
+  if(lk==='USJL'&&typeof isUsndtTeam==='function'&&isUsndtTeam(team.n)){
+    G.league=Object.assign({}, l, {games:getUsndtSquadLeagueGames(team.n)});
+    if(typeof ensureCjlSeasonState==='function') ensureCjlSeasonState();
+  }
   G.socialMessages=generateSocialMessages();
   addNews('Career begins with the '+team.n+' as a '+formatPlayerPositionLabel(selPos, selSubPos)+'!','big');
   if(G.contract.sal>0) addNews('Signs '+G.contract.type+' contract -- '+fmt(G.contract.sal)+'/yr for '+G.contract.yrs+' years.','good');
+  else if(G.contract.type==='ORG PRO DEAL'&&G._academyParentOrg){
+    addNews('Signs ORG PRO DEAL with '+G._academyParentOrg.teamName+' ('+G._academyParentOrg.leagueKey+') — '+fmt(G.contract.sal)+'/yr while developing in '+l.short+'.','big');
+  }
+  else if(G.contract.type==='ACADEMY CONTRACT'&&G._academyParentOrg){
+    var acStip=typeof getAcademyWeeklyStipend==='function'?getAcademyWeeklyStipend(gender, lk):0;
+    addNews('Signs ACADEMY CONTRACT with '+G._academyParentOrg.teamName+' ('+G._academyParentOrg.leagueKey+') — '+G.contract.yrs+' yr org deal, ~'+fmt(acStip)+'/wk stipend while developing in '+l.short+'.','big');
+  }
   else addNews('Signs '+G.contract.type+' with '+team.n+' for '+G.contract.yrs+' year'+(G.contract.yrs!==1?'s':'')+'.','neutral');
   renderHub();
   beginCareerIntroSequence();

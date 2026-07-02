@@ -12,11 +12,65 @@ function goToTeamSelect(){
   G._selTeamIdx=0;
 
   if(tier==='junior'){
-    // DRAFT DAY -- one team drafts you
+    var nat=safeEl('c-nat')?safeEl('c-nat').value:'Canada';
+    var hometown=(safeEl('c-hometown')&&safeEl('c-hometown').value.trim())||nat;
+    var previewOvr=typeof getTeamSelectPreviewOvr==='function'?getTeamSelectPreviewOvr():60;
+    var acGender=safeEl('c-gender')?safeEl('c-gender').value:'M';
+
+    if(typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(lk)){
+      var homeTeam=typeof pickAcademyHomeTeam==='function'?pickAcademyHomeTeam(lk,nat,hometown):teams[0];
+      var alternates=typeof pickAcademyAlternateTeams==='function'?pickAcademyAlternateTeams(lk,homeTeam,2):shuf(teams.slice()).slice(0,2);
+      G._availableTeams=[homeTeam].concat(alternates);
+      G._selTeamIdx=0;
+      safeEl('team-select-hdr').textContent=l.short+' ACADEMY';
+      safeEl('team-select-title').textContent='ORGANIZATION SIGNING';
+      safeEl('team-select-sub').textContent='YOUR HOME CLUB OFFERS AN ACADEMY DEAL — OR SIGN WITH ANOTHER PROGRAM:';
+      html+='<div class="vt" style="font-size:14px;color:var(--acc);margin-bottom:10px;border-left:3px solid var(--acc);padding-left:8px">';
+      html+='No draft in '+l.short+'. You sign with a parent-club academy — PHL scouts can still draft you at 18 while you develop in Europe/Asia.';
+      html+='</div>';
+      html+='<div class="lcard sel" id="tc-0" onclick="pickTeam(0)">';
+      html+='<span class="badge green">HOME ORG</span><br>';
+      html+='<span class="vt" style="font-size:18px">'+homeTeam.n+'</span>';
+      var homeParent=typeof getAcademyParentProTeam==='function'?getAcademyParentProTeam(homeTeam.n, lk):null;
+      if(homeParent) html+='<div class="vt" style="font-size:13px;color:var(--mut);margin-top:4px">Parent club: <b>'+homeParent.name+'</b> ('+homeParent.leagueKey+')</div>';
+      if(typeof getAcademyOrgContractBlurb==='function') html+=getAcademyOrgContractBlurb(homeTeam.n, lk, acGender, previewOvr);
+      html+='<div class="vt" style="font-size:13px;color:var(--mut);margin-top:4px">Accept org contract — report to home academy camp</div>';
+      html+='</div>';
+      html+='<div class="vt" style="font-size:14px;color:var(--mut);margin:10px 0 6px">-- OR SIGN WITH ANOTHER ACADEMY PROGRAM --</div>';
+      for(var ai=0;ai<alternates.length;ai++){
+        html+='<div class="lcard" id="tc-'+(ai+1)+'" onclick="pickTeam('+(ai+1)+')">';
+        html+='<span class="badge mut">OTHER PROGRAM</span><br>';
+        html+='<span class="vt" style="font-size:16px">'+alternates[ai].n+'</span>';
+        var altParent=typeof getAcademyParentProTeam==='function'?getAcademyParentProTeam(alternates[ai].n, lk):null;
+        if(altParent) html+='<div class="vt" style="font-size:13px;color:var(--mut);margin-top:3px">Parent: '+altParent.name+' ('+altParent.leagueKey+')</div>';
+        html+='<div class="vt" style="font-size:13px;color:var(--mut);margin-top:3px">Sign elsewhere — org deal with a different club</div>';
+        html+='</div>';
+      }
+    } else {
+    // CHL / USJL DRAFT DAY
     var draftRd=ri(1,4);
     var pick=ri(1,10);
-    var draftedTeam=teams[ri(0,teams.length-1)];
-    var undrafted=shuf(teams.filter(function(t){return t.n!==draftedTeam.n;})).slice(0,2);
+    var pool=teams;
+    if(lk==='USJL'&&typeof filterUsjlTeamsForPlayer==='function'){
+      pool=filterUsjlTeamsForPlayer(teams, nat, 16);
+      if(!pool.length) pool=teams;
+    }
+    var previewOvr=typeof getTeamSelectPreviewOvr==='function'?getTeamSelectPreviewOvr():60;
+    var potKey=(typeof selPotential!=='undefined'&&typeof POTENTIALS!=='undefined'&&POTENTIALS[selPotential])?selPotential:'support';
+    var usndtScout=lk==='USJL'&&typeof qualifiesForUsndtU17Invite==='function'&&qualifiesForUsndtU17Invite(previewOvr, potKey, nat, 16);
+    var draftedTeam=(lk==='USJL'&&typeof pickUsjlDraftTeam==='function')
+      ?pickUsjlDraftTeam(pool, nat, 16, previewOvr, potKey)
+      :pool[ri(0,pool.length-1)];
+    var undrafted=shuf(pool.filter(function(t){return t.n!==draftedTeam.n;})).slice(0,2);
+    if(usndtScout&&typeof isUsndtU17Team==='function'&&!isUsndtU17Team(draftedTeam.n)){
+      var u17Alt=typeof findUsndtU17Team==='function'?findUsndtU17Team(pool):null;
+      if(u17Alt){
+        var hasU17=false, ui;
+        for(ui=0;ui<undrafted.length;ui++){ if(isUsndtU17Team(undrafted[ui].n)){ hasU17=true; break; } }
+        if(!hasU17&&undrafted.length) undrafted[ri(0,undrafted.length-1)]=u17Alt;
+        else if(!hasU17) undrafted.push(u17Alt);
+      }
+    }
     var allShown=[draftedTeam].concat(undrafted);
     G._availableTeams=allShown;
     G._selTeamIdx=0;
@@ -30,6 +84,22 @@ function goToTeamSelect(){
     html+='<div class="vt" style="font-size:26px;color:var(--wht);margin-bottom:4px">'+draftedTeam.n+'</div>';
     html+='<div class="vt" style="font-size:16px;color:var(--mut)">SELECTS YOU WITH THE '+pick+(pick===1?'ST':pick===2?'ND':pick===3?'RD':'TH')+' PICK</div>';
     html+='<div class="vt" style="font-size:15px;color:var(--gold);margin-top:6px">'+formatPlayerPositionLabel(selPos, selSubPos)+'</div>';
+    if(usndtScout){
+      var scoutTier=typeof getUsndtU17InviteTier==='function'?getUsndtU17InviteTier(previewOvr, potKey):'solid';
+      html+='<div class="vt" style="font-size:13px;color:var(--acc);margin-top:8px;border-left:3px solid var(--acc);padding-left:8px">';
+      html+='<b>USNDT U17 scouting:</b> ';
+      if(scoutTier==='lock') html+='National staff view you as a top-end prospect — U17 is likely.';
+      else if(scoutTier==='strong') html+='Elite projection or strong tools — heavy USNDT U17 interest.';
+      else html+='Strong enough profile — USNDT U17 is in play (OVR '+Math.round(previewOvr)+').';
+      html+='</div>';
+    }
+    if(lk==='USJL'&&typeof isUsndtU17Team==='function'&&isUsndtU17Team(draftedTeam.n)){
+      html+='<div class="vt" style="font-size:13px;color:var(--acc);margin-top:8px">USNDT U17 (age 16) — <b>'+(typeof USNDT_U17_LEAGUE_GAMES!=='undefined'?USNDT_U17_LEAGUE_GAMES:36)+'</b> USJL league games plus <b>'+(typeof USNDT_U17_INTL_COUNT!=='undefined'?USNDT_U17_INTL_COUNT:8)+'</b> international tournaments. U18 track starts at age 17. USA eligibility required.</div>';
+    } else     if(lk==='USJL'&&typeof isUsndtU18Team==='function'&&isUsndtU18Team(draftedTeam.n)){
+      html+='<div class="vt" style="font-size:13px;color:var(--acc);margin-top:8px">USNDT U18 — <b>'+(typeof USNDT_U18_LEAGUE_GAMES!=='undefined'?USNDT_U18_LEAGUE_GAMES:26)+'</b> USJL games, heavy <b>'+(typeof USNDT_U18_COLLEGE_EXH!=='undefined'?USNDT_U18_COLLEGE_EXH:14)+'</b> college exhibition slate, CJL showcase + spring Challenge. <b>World Juniors priority</b> for Team USA U20. USA eligibility required.</div>';
+    } else if(lk==='USJL'&&typeof isUsndtTeam==='function'&&isUsndtTeam(draftedTeam.n)){
+      html+='<div class="vt" style="font-size:13px;color:var(--acc);margin-top:8px">US NATIONAL DEVELOPMENT TEAM — USA eligibility required.</div>';
+    }
     html+='</div>';
     html+='<div class="lcard sel" id="tc-0" onclick="pickTeam(0)">';
     html+='<span class="badge gold">DRAFTED</span> <span class="vt" style="font-size:17px">'+draftedTeam.n+'</span>';
@@ -42,6 +112,7 @@ function goToTeamSelect(){
       html+='<span class="vt" style="font-size:16px">'+undrafted[i].n+'</span>';
       html+='<div class="vt" style="font-size:13px;color:var(--mut);margin-top:3px">Sign as undrafted -- potentially more ice time</div>';
       html+='</div>';
+    }
     }
   } else if(tier==='local'){
     var nat=safeEl('c-nat')?safeEl('c-nat').value:'Canada';

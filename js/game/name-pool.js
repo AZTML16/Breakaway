@@ -170,6 +170,7 @@ function ngPickCultureForNat(nat){
 
 /** League-typical passport for NPCs — not the same as name heritage. */
 function rollNpcNationality(leagueKey, teamName){
+  if(teamName&&typeof isUsndtTeam==='function'&&isUsndtTeam(teamName)) return 'United States';
   if((leagueKey==='LHCM'||leagueKey==='LHLF')&&teamName&&typeof getLocalRegionNatsForTeam==='function'){
     var pool=getLocalRegionNatsForTeam(teamName);
     if(pool&&pool.length){
@@ -191,7 +192,13 @@ function rollNpcNationality(leagueKey, teamName){
     if(r<0.94) return 'United States';
     return ngPickIntlNat(['Sweden','Finland','Russia','Czech Republic','France','Germany','Slovakia']);
   }
-  if(lk==='NCHA'||lk==='USJL'||lk==='NWCHA'||lk==='USWDL'){
+  if(lk==='USJL'){
+    /* Club USJL — mostly North American; top USA teens skew to USNDT, not imports. */
+    if(r<0.42) return 'United States';
+    if(r<0.78) return 'Canada';
+    return ngPickIntlNat(['Sweden','Finland','Russia','Czech Republic','Germany','Slovakia','Latvia','Norway']);
+  }
+  if(lk==='NCHA'||lk==='NWCHA'||lk==='USWDL'){
     if(r<0.86) return 'United States';
     if(r<0.94) return 'Canada';
     return ngPickIntlNat(['Sweden','Finland','Russia','Czech Republic','Germany','Slovakia']);

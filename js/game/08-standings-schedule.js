@@ -3,17 +3,46 @@
 // STANDINGS + SCHEDULE
 // ============================================================
 function teamStandingsStrength(teamName, lk){
+  if(typeof getTeamStandingsStrengthFromProfile==='function'){
+    return getTeamStandingsStrengthFromProfile(lk, teamName);
+  }
   var h=0, s=String(teamName)+'|'+String(lk||'');
   for(var i=0;i<s.length;i++) h=((h<<5)-h)+s.charCodeAt(i)|0;
-  return 0.22+((Math.abs(h)%1000)/1000)*0.48;
+  var base=0.22+((Math.abs(h)%1000)/1000)*0.48;
+  if(lk==='USJL'&&typeof isUsndtOrgStandingsTeam==='function'&&isUsndtOrgStandingsTeam(teamName)){
+    if(typeof getUsndtStandingsStrength==='function') return getUsndtStandingsStrength(teamName);
+    return cl(base+0.32, 0.72, 0.86);
+  }
+  if(typeof getMajorJuniorEliteOrgStandingsBonus==='function'){
+    base+=getMajorJuniorEliteOrgStandingsBonus(lk, teamName);
+  }
+  return cl(base, 0.14, 0.86);
+}
+
+/** Worst-to-best draft order for a pro league (weak teams pick first). */
+function getProDraftOrder(proKey){
+  var teams=TEAMS[proKey]||[];
+  var rows=teams.map(function(t){
+    return {team:t, strength:teamStandingsStrength(t.n, proKey)};
+  });
+  rows.sort(function(a,b){return a.strength-b.strength;});
+  return rows.map(function(r){return r.team;});
+}
+
+function getProDraftPickTeam(proKey, pickQuality){
+  var order=getProDraftOrder(proKey);
+  if(!order.length) return {n:'Pro Club'};
+  var idx=Math.floor(cl(pickQuality, 0, 0.999)*(order.length-1));
+  return order[idx]||order[0];
 }
 
 function initStandings(lk){
   var teams=(TEAMS[lk]||TEAMS['OJL']).slice();
+  if(lk==='USJL'&&typeof collapseUsjlStandingsTeams==='function') teams=collapseUsjlStandingsTeams(teams);
   var result=[], i, t, isMe;
   for(i=0;i<teams.length;i++){
     t=teams[i];
-    isMe=(G&&G.team&&t.n===G.team.n);
+    isMe=(G&&G.team&&(t.n===G.team.n||(typeof isUsndtTeam==='function'&&isUsndtTeam(G.team.n)&&typeof isUsndtOrgStandingsTeam==='function'&&isUsndtOrgStandingsTeam(t.n))));
     result.push({
       team:t, gp:0, w:0, l:0, otl:0, pts:0, isMe:isMe,
       leagueKey:lk, strength:teamStandingsStrength(t.n, lk)
@@ -26,16 +55,27 @@ function initStandings(lk){
 function refreshStandings(lk){
   if(typeof G==='undefined'||!G) return [];
   var teams=(TEAMS[lk]||[]);
+  if(lk==='USJL'&&typeof collapseUsjlStandingsTeams==='function') teams=collapseUsjlStandingsTeams(teams);
   if(!G.standings||!G.standings.length||G.standings[0].leagueKey!==lk||G.standings.length!==teams.length){
     G.standings=initStandings(lk);
   }
   var totalGames=LEAGUES[lk].games||68;
+  if(lk==='USJL'&&G.leagueKey===lk&&G.team&&typeof isUsndtTeam==='function'&&isUsndtTeam(G.team.n)&&typeof getUsndtSquadLeagueGames==='function'){
+    totalGames=getUsndtSquadLeagueGames(G.team.n);
+  }
   var perWeek=getGamesPerWeek(lk);
   var played=0;
   if(G.leagueKey===lk){
     var lkTier=LEAGUES[lk]&&LEAGUES[lk].tier;
     if(lkTier==='local'&&typeof countCompletedLocalGames==='function'){
       played=countCompletedLocalGames();
+    } else if(lk==='USJL'&&typeof getUsjlLeagueProgress==='function'){
+      played=getUsjlLeagueProgress();
+      if(typeof isUsndtTeam==='function'&&isUsndtTeam(G.team&&G.team.n)){
+        played=Math.min(totalGames, G.gp||0);
+      } else {
+        played=Math.min((LEAGUES.USJL&&LEAGUES.USJL.games)||62, played);
+      }
     } else {
       played=Math.min(totalGames,((G.week-1)*perWeek)+(G.weekGames||0));
     }
@@ -43,7 +83,8 @@ function refreshStandings(lk){
   for(var i=0;i<G.standings.length;i++){
     var row=G.standings[i];
     if(!row.team) continue;
-    row.isMe=!!(G.team&&row.team.n===G.team.n);
+    row.leagueKey=lk;
+    row.isMe=!!(G.team&&(row.team.n===G.team.n||(typeof isUsndtTeam==='function'&&isUsndtTeam(G.team.n)&&typeof isUsndtOrgStandingsTeam==='function'&&isUsndtOrgStandingsTeam(row.team.n))));
     if(row.isMe){
       row.gp=G.gp||0;
       row.w=G.w||0;
@@ -51,7 +92,8 @@ function refreshStandings(lk){
       row.otl=G.otl||0;
     } else {
       if(typeof row.strength!=='number') row.strength=teamStandingsStrength(row.team.n, lk);
-      row.gp=played;
+      var simGp=lk==='USJL'&&typeof getUsjlTeamStandingsGp==='function'?getUsjlTeamStandingsGp(row.team.n):played;
+      row.gp=simGp;
       var winPct=cl(row.strength,0.14,0.76);
       row.w=Math.round(row.gp*winPct);
       var rem=Math.max(0,row.gp-row.w);
@@ -89,13 +131,22 @@ function applyGameResultStreak(won, tied){
 
 function syncUserStandingsRow(){
   if(!G||!G.standings) return;
+  var gp,w,l,otl;
+  if(G._callUpCtx&&G._callUpCtx.active&&G._callUpCtx.stintStats){
+    var st=G._callUpCtx.stintStats;
+    gp=st.gp||0; w=st.w||0; l=st.l||0; otl=st.otl||0;
+  } else {
+    gp=G.gp||0; w=G.w||0; l=G.l||0; otl=G.otl||0;
+  }
   for(var i=0;i<G.standings.length;i++){
-    if(G.standings[i].isMe){
-      G.standings[i].gp=G.gp||0;
-      G.standings[i].w=G.w||0;
-      G.standings[i].l=G.l||0;
-      G.standings[i].otl=G.otl||0;
-      G.standings[i].pts=(G.w||0)*2+(G.otl||0);
+    var isMeRow=G.standings[i].team&&(G.standings[i].team.n===G.team.n||(typeof isUsndtTeam==='function'&&isUsndtTeam(G.team.n)&&typeof isUsndtOrgStandingsTeam==='function'&&isUsndtOrgStandingsTeam(G.standings[i].team.n)));
+    if(G.standings[i].isMe||isMeRow){
+      G.standings[i].isMe=true;
+      G.standings[i].gp=gp;
+      G.standings[i].w=w;
+      G.standings[i].l=l;
+      G.standings[i].otl=otl;
+      G.standings[i].pts=w*2+otl;
       break;
     }
   }
@@ -109,15 +160,49 @@ function getSeasonWeekCount(lk){
   if(typeof isLocalLeague==='function'&&isLocalLeague(lk)&&typeof getLocalSeasonWeekCount==='function'){
     return getLocalSeasonWeekCount(lk);
   }
+  if(lk==='USJL'&&typeof G!=='undefined'&&G&&G.team&&typeof isUsndtTeam==='function'&&isUsndtTeam(G.team.n)&&typeof getUsndtSquadLeagueGames==='function'){
+    var pw=getGamesPerWeek(lk);
+    return Math.ceil((getUsndtSquadLeagueGames(G.team.n)+getUsndtSquadExtraSlots(G.team.n))/pw);
+  }
   var L=LEAGUES[lk]||{};
   return Math.ceil((L.games||68)/getGamesPerWeek(lk));
+}
+
+/** True when the regular-season calendar is finished (all LHL slots done, or week past schedule). */
+function isRegularSeasonComplete(leagueKey){
+  if(typeof G==='undefined'||!G) return false;
+  if(typeof ensureLeagueContext==='function') ensureLeagueContext();
+  if(G._seasonEndLoggedForSeason===G.season) return true;
+  var lk=leagueKey||G.leagueKey;
+  if(typeof isLocalLeague==='function'&&isLocalLeague(lk)){
+    if(typeof isLocalScheduleComplete==='function'&&isLocalScheduleComplete(lk)) return true;
+    var slots=typeof getLocalSeasonScheduleSlots==='function'?getLocalSeasonScheduleSlots(lk):18;
+    var perWeek=(G.league.gamesPerWeek)||2;
+    var done=((G.week||1)-1)*perWeek+(G.weekGames||0);
+    if(G.allOpponents&&G.allOpponents.length>0&&done>=G.allOpponents.length) return true;
+    if(done>=slots) return true;
+  }
+  if(!G.league) return false;
+  if(G.allOpponents&&G.allOpponents.length>0){
+    var perWk=getGamesPerWeek(lk);
+    var done=((G.week||1)-1)*perWk+(G.weekGames||0);
+    if(done>=G.allOpponents.length) return true;
+  }
+  var totalWks=typeof getSeasonWeekCount==='function'?getSeasonWeekCount(lk):Math.ceil((G.league.games||68)/Math.max(1,getGamesPerWeek(lk)));
+  return (G.week||1)>totalWks;
+}
+
+function maybeEndRegularSeason(){
+  if(!G||G._inOffseason||(G._playoffCtx&&G._playoffCtx.active)) return;
+  if(typeof isRegularSeasonComplete!=='function'||!isRegularSeasonComplete()) return;
+  if(typeof endRegSeason==='function') endRegSeason();
 }
 
 /** OVR at which you're considered "PPG-caliber" for this league. */
 function getPpgCaliberOvrThreshold(leagueKey){
   var L=LEAGUES[leagueKey]||{};
   var base=65;
-  if(leagueKey==='PHL'||leagueKey==='PWL') base=88;
+  if(leagueKey==='PHL'||leagueKey==='PWL') base=82;
   else if(leagueKey==='NAML'||leagueKey==='PWDL') base=72;
   else if(L.tier==='college') base=75;
   else if(leagueKey==='CEHL') base=50;
@@ -137,18 +222,36 @@ function getPpgCaliberOvrThreshold(leagueKey){
   return base;
 }
 
-var DRAFT_CLUB_ELC_MIN_OVR_MEN=80;
+var DRAFT_CLUB_ELC_MIN_OVR_MEN=76;
 function getDraftClubElcMinOvr(){
   return DRAFT_CLUB_ELC_MIN_OVR_MEN;
 }
-function getEliteReadyOvrBar(){
-  return 83;
-}
-function getProAffiliateDemotionMaxOvr(){
+function getPhlRosterFloorOvr(){
   return 80;
 }
+function getMinorLeagueOvrCeiling(){
+  return 84;
+}
+function getMinorLeagueOvrFloor(){
+  return 72;
+}
+function getPhlPromotionFromMinorOvr(){
+  return 85;
+}
+function playerTooGoodForMinorLeague(playerOvr){
+  return (playerOvr||0)>=getMinorLeagueOvrCeiling();
+}
+function playerQualifiesForPhlRoster(playerOvr){
+  return (playerOvr||0)>=getPhlRosterFloorOvr();
+}
+function getEliteReadyOvrBar(){
+  return 85;
+}
+function getProAffiliateDemotionMaxOvr(){
+  return 83;
+}
 function getProHardDevelopmentFloorOvr(){
-  return 75;
+  return getPhlRosterFloorOvr();
 }
 
 function recordPlayoffLogFromResult(playoff){
@@ -243,6 +346,9 @@ function maybeClearDraftRightsIfLeftHoldingClub(){
 function genSeason(lk,myTeam){
   if(typeof isLocalLeague==='function'&&isLocalLeague(lk)&&typeof genLocalSeason==='function'){
     return genLocalSeason(lk,myTeam);
+  }
+  if(lk==='USJL'&&typeof genUsjlSeason==='function'){
+    return genUsjlSeason(lk,myTeam);
   }
   var teams=TEAMS[lk]||[];
   var opp=teams.filter(function(t){return t.n!==myTeam.n;});

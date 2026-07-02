@@ -304,18 +304,219 @@ function isUserHealthyScratch(){
   return !!(me&&isScratchDepthSlot(me.depthSlot));
 }
 
+function isActiveProCallUp(){
+  return !!(G&&G._callUpCtx&&G._callUpCtx.active);
+}
+
+function snapshotHomeSeasonStats(){
+  return {
+    gp:G.gp||0,w:G.w||0,l:G.l||0,otl:G.otl||0,
+    goals:G.goals||0,assists:G.assists||0,plusminus:G.plusminus||0,
+    pim:G.pim||0,sog:G.sog||0,saves:G.saves||0,goalsAgainst:G.goalsAgainst||0
+  };
+}
+
+function restoreHomeSeasonStats(snap){
+  if(!snap||!G) return;
+  G.gp=snap.gp; G.w=snap.w; G.l=snap.l; G.otl=snap.otl;
+  G.goals=snap.goals; G.assists=snap.assists; G.plusminus=snap.plusminus;
+  G.pim=snap.pim; G.sog=snap.sog; G.saves=snap.saves; G.goalsAgainst=snap.goalsAgainst;
+}
+
+function ensureCallUpHomeSnapshot(){
+  var ctx=G._callUpCtx;
+  if(!ctx||!ctx.active||ctx.homeSeasonStats) return;
+  var st=ctx.stintStats||{};
+  ctx.homeSeasonStats={
+    gp:Math.max(0,(G.gp||0)-(st.gp||0)),
+    w:Math.max(0,(G.w||0)-(st.w||0)),
+    l:Math.max(0,(G.l||0)-(st.l||0)),
+    otl:Math.max(0,(G.otl||0)-(st.otl||0)),
+    goals:Math.max(0,(G.goals||0)-(st.g||0)),
+    assists:Math.max(0,(G.assists||0)-(st.a||0)),
+    plusminus:(G.plusminus||0)-(st.pm||0),
+    pim:Math.max(0,(G.pim||0)-(st.pim||0)),
+    sog:Math.max(0,(G.sog||0)-(st.sog||0)),
+    saves:Math.max(0,(G.saves||0)-(st.sv||0)),
+    goalsAgainst:Math.max(0,(G.goalsAgainst||0)-(st.ga||0))
+  };
+}
+
+function archiveCallUpStint(ctx){
+  if(!ctx||!G) return;
+  var st=ctx.stintStats||{};
+  if(!(st.gp>0)) return;
+  if(!G.seasonCallUps) G.seasonCallUps=[];
+  var lg=LEAGUES[ctx.proLeagueKey];
+  var i, existing=null;
+  for(i=0;i<G.seasonCallUps.length;i++){
+    var r=G.seasonCallUps[i];
+    if(r.season===G.season&&r.leagueKey===ctx.proLeagueKey&&r.team===ctx.proTeamName){ existing=r; break; }
+  }
+  if(existing){
+    existing.gp+=st.gp; existing.g=(existing.g||0)+(st.g||0); existing.a=(existing.a||0)+(st.a||0);
+    existing.sv=(existing.sv||0)+(st.sv||0); existing.ga=(existing.ga||0)+(st.ga||0);
+    existing.w=(existing.w||0)+(st.w||0); existing.l=(existing.l||0)+(st.l||0); existing.otl=(existing.otl||0)+(st.otl||0);
+    existing.pm=(existing.pm||0)+(st.pm||0); existing.pim=(existing.pim||0)+(st.pim||0); existing.sog=(existing.sog||0)+(st.sog||0);
+  } else {
+    G.seasonCallUps.push({
+      season:G.season,
+      leagueKey:ctx.proLeagueKey,
+      league:(lg&&lg.short)||ctx.proLeagueKey,
+      team:ctx.proTeamName,
+      gp:st.gp,g:st.g||0,a:st.a||0,sv:st.sv||0,ga:st.ga||0,
+      w:st.w||0,l:st.l||0,otl:st.otl||0,pm:st.pm||0,pim:st.pim||0,sog:st.sog||0,
+      isGoalie:G.pos==='G'
+    });
+  }
+}
+
+function formatCallUpStatLine(row){
+  if(!row) return '';
+  if(row.isGoalie||G.pos==='G'){
+    return row.gp+' GP · '+row.sv+' SV · SV% '+formatSvPctFromCounts(row.sv,row.ga);
+  }
+  return row.gp+' GP · '+(row.g||0)+'G '+(row.a||0)+'A '+((row.g||0)+(row.a||0))+'PTS';
+}
+
+function buildSeasonCallUpSplitsHtml(){
+  if(!G) return '';
+  var html='', i, row, homeShort;
+  if(isActiveProCallUp()){
+    ensureCallUpHomeSnapshot();
+    var cu=G._callUpCtx;
+    homeShort=LEAGUES[cu.homeLeagueKey]?LEAGUES[cu.homeLeagueKey].short:cu.homeLeagueKey;
+    var hs=cu.homeSeasonStats||{};
+    html+='<div style="font-size:11px;color:var(--mut);margin-top:6px;line-height:1.45">'+escHtml(homeShort)+' '+escHtml(cu.homeTeam||'')+' (home): '+
+      (hs.gp||0)+' GP'+(G.pos==='G'?'':' · '+(hs.goals||0)+'G '+(hs.assists||0)+'A')+'</div>';
+  }
+  var list=G.seasonCallUps||[];
+  var merged={}, keys=[], ki, mk, row;
+  for(i=0;i<list.length;i++){
+    row=list[i];
+    if(row.season!==G.season) continue;
+    mk=(row.leagueKey||row.league||'')+'|'+row.team;
+    if(!merged[mk]){
+      merged[mk]={league:row.league,team:row.team,gp:0,g:0,a:0,sv:0,ga:0,isGoalie:!!row.isGoalie};
+      keys.push(mk);
+    }
+    var m=merged[mk];
+    m.gp+=row.gp||0; m.g+=row.g||0; m.a+=row.a||0; m.sv+=row.sv||0; m.ga+=row.ga||0;
+  }
+  for(ki=0;ki<keys.length;ki++){
+    row=merged[keys[ki]];
+    html+='<div style="font-size:11px;color:var(--gold);margin-top:4px;line-height:1.45">CALL-UP · '+escHtml(row.league||'')+' '+escHtml(row.team||'')+': '+formatCallUpStatLine(row)+'</div>';
+  }
+  return html;
+}
+
+function getHubSeasonStatBundle(){
+  if(isActiveProCallUp()){
+    ensureCallUpHomeSnapshot();
+    var st=G._callUpCtx.stintStats||{};
+    return {
+      gp:st.gp||0,w:st.w||0,l:st.l||0,otl:st.otl||0,
+      goals:st.g||0,assists:st.a||0,plusminus:st.pm||0,pim:st.pim||0,
+      saves:st.sv||0,goalsAgainst:st.ga||0
+    };
+  }
+  return {
+    gp:G.gp||0,w:G.w||0,l:G.l||0,otl:G.otl||0,
+    goals:G.goals||0,assists:G.assists||0,plusminus:G.plusminus||0,pim:G.pim||0,
+    saves:G.saves||0,goalsAgainst:G.goalsAgainst||0
+  };
+}
+
+function buildHubSeasonStatGridHtml(){
+  var s=getHubSeasonStatBundle();
+  var splits=buildSeasonCallUpSplitsHtml();
+  var html;
+  if(G.pos==='G'){
+    var gaaSzn=s.gp>0?Math.round((s.goalsAgainst/s.gp)*100)/100:'--';
+    html=
+      '<div class="stbox"><div class="stlbl">GP</div><div class="stval">'+s.gp+'</div></div>'+
+      '<div class="stbox"><div class="stlbl">GA</div><div class="stval" style="color:var(--red)">'+s.goalsAgainst+'</div></div>'+
+      '<div class="stbox"><div class="stlbl">SV</div><div class="stval" style="color:var(--green)">'+s.saves+'</div></div>'+
+      '<div class="stbox"><div class="stlbl">SV%</div><div class="stval" style="color:var(--gold)">'+formatSvPctFromCounts(s.saves,s.goalsAgainst)+'</div></div>'+
+      '<div class="stbox"><div class="stlbl">GAA</div><div class="stval">'+gaaSzn+'</div></div>'+
+      '<div class="stbox"><div class="stlbl">W-L-OTL</div><div class="stval" style="color:var(--gold)">'+s.w+'-'+s.l+'-'+s.otl+'</div></div>';
+  } else {
+    var pimClr=typeof getHubPimDisplayColor==='function'?getHubPimDisplayColor(s.pim,G.pos,G.arch,G.xFactor):'var(--text)';
+    html=
+      '<div class="stbox"><div class="stlbl">GP</div><div class="stval">'+s.gp+'</div></div>'+
+      '<div class="stbox"><div class="stlbl">G</div><div class="stval" style="color:var(--red)">'+s.goals+'</div></div>'+
+      '<div class="stbox"><div class="stlbl">A</div><div class="stval" style="color:var(--acc)">'+s.assists+'</div></div>'+
+      '<div class="stbox"><div class="stlbl">PTS</div><div class="stval" style="color:var(--gold)">'+(s.goals+s.assists)+'</div></div>'+
+      '<div class="stbox"><div class="stlbl">+/-</div><div class="stval" style="color:'+(s.plusminus>=0?'var(--green)':'var(--red)')+'">'+(s.plusminus>=0?'+':'')+s.plusminus+'</div></div>'+
+      '<div class="stbox"><div class="stlbl">PIM</div><div class="stval" style="color:'+pimClr+'">'+s.pim+'</div></div>';
+  }
+  if(splits) html+='<div style="grid-column:1/-1">'+splits+'</div>';
+  return html;
+}
+
+function pushCallUpSeasonLogEntries(){
+  if(!G||!G.seasonCallUps||!G.seasonCallUps.length) return;
+  var i, row, lg, entry;
+  for(i=0;i<G.seasonCallUps.length;i++){
+    row=G.seasonCallUps[i];
+    if(row.season!==G.season||row._logged) continue;
+    lg=row.league||row.leagueKey||'';
+    entry={
+      year:G.year,season:G.season,league:lg,leagueKey:row.leagueKey||'',
+      team:String(row.team||'').split(' ').slice(-1)[0]||row.team||'',
+      gp:row.gp,w:row.w,l:row.l,otl:row.otl,ovrVal:ovr(G.attrs,G.pos),
+      wonCup:false,isGoalie:!!row.isGoalie,callUp:true
+    };
+    if(row.isGoalie||G.pos==='G'){
+      entry.sv=row.sv||0; entry.ga=row.ga||0;
+      entry.svpct=entry.sv+entry.ga>0?entry.sv/(entry.sv+entry.ga):null;
+      entry.gaa=row.gp>0?Math.round((entry.ga/row.gp)*100)/100:'--';
+    } else {
+      entry.g=row.g||0; entry.a=row.a||0;
+    }
+    G.seasonLog.push(entry);
+    row._logged=true;
+  }
+}
+
+function mergeCallUpSeasonsIntoCareerLeagueStats(){
+  if(!G||!G.seasonCallUps||!G.seasonCallUps.length) return;
+  if(!G.careerLeagueStats) G.careerLeagueStats={};
+  var i, row, ck, c;
+  for(i=0;i<G.seasonCallUps.length;i++){
+    row=G.seasonCallUps[i];
+    if(row.season!==G.season||row._careerMerged) continue;
+    ck=row.leagueKey;
+    if(!ck) continue;
+    if(!G.careerLeagueStats[ck]) G.careerLeagueStats[ck]=emptyPlayerStats();
+    c=G.careerLeagueStats[ck];
+    c.gp+=row.gp||0; c.g+=row.g||0; c.a+=row.a||0; c.pts+=(row.g||0)+(row.a||0);
+    c.pm+=row.pm||0; c.pim=(c.pim||0)+(row.pim||0);
+    c.sv=(c.sv||0)+(row.sv||0); c.ga=(c.ga||0)+(row.ga||0); c.w=(c.w||0)+(row.w||0);
+    row._careerMerged=true;
+  }
+}
+
 function isJuniorCallUpBlocked(){
-  return !!(G&&G.league&&G.league.tier==='junior');
+  if(!G||!G.league||G.league.tier!=='junior') return false;
+  if(typeof canAcademyJuniorReceiveProCallUp==='function'&&canAcademyJuniorReceiveProCallUp()) return false;
+  return true;
 }
 
 function canPlayerReceiveProCallUp(){
   if(!G||!G.league||G._callUpCtx&&G._callUpCtx.active) return false;
   if(isJuniorCallUpBlocked()) return false;
   if(G.league.tier==='pro') return false;
+  if(typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(G.leagueKey)){
+    return typeof hasAcademyOrgContract==='function'&&hasAcademyOrgContract()&&!!G._academyParentOrg;
+  }
   return true;
 }
 
 function getCallUpParentClub(){
+  if(typeof hasAcademyOrgContract==='function'&&hasAcademyOrgContract()&&G._academyParentOrg){
+    return {leagueKey:G._academyParentOrg.leagueKey, teamName:G._academyParentOrg.teamName};
+  }
   var proKey=typeof getProLeagueKeyByGender==='function'?getProLeagueKeyByGender(G.gender):'PHL';
   if(G.draftRights&&G.draftRights.leagueKey===proKey&&G.draftRights.team){
     return {leagueKey:proKey, teamName:G.draftRights.team};
@@ -343,14 +544,14 @@ function startProCallUp(parent, games, role){
     homeLeagueKey:G.leagueKey,
     homeTeam:G.team&&G.team.n,
     homeTeamObj:G.team?{n:G.team.n,e:G.team.e||'[-]'}:null,
+    homeSeasonStats:snapshotHomeSeasonStats(),
     proLeagueKey:parent.leagueKey,
     proTeamName:parent.teamName,
     gamesLeft:games,
     gamesTotal:games,
-    stintStartGp:G.gp||0,
     startWeek:G.week||1,
     role:role||'depth',
-    stintStats:{gp:0,g:0,a:0,sv:0,ga:0,w:0,l:0,otl:0,pm:0,perfSum:0,badGames:0,lastPerf:0}
+    stintStats:{gp:0,g:0,a:0,sv:0,ga:0,w:0,l:0,otl:0,pm:0,sog:0,pim:0,perfSum:0,badGames:0,lastPerf:0}
   };
   var proTeam=typeof getValidTeamForLeague==='function'
     ?getValidTeamForLeague(parent.leagueKey, parent.teamName)
@@ -370,6 +571,9 @@ function endProCallUpStint(reason){
   if(!ctx||!ctx.active) return;
   var homeLg=LEAGUES[ctx.homeLeagueKey];
   var proShort=LEAGUES[ctx.proLeagueKey]?LEAGUES[ctx.proLeagueKey].short:ctx.proLeagueKey;
+  archiveCallUpStint(ctx);
+  ensureCallUpHomeSnapshot();
+  if(ctx.homeSeasonStats) restoreHomeSeasonStats(ctx.homeSeasonStats);
   G.leagueKey=ctx.homeLeagueKey;
   G.league=homeLg;
   G.team=ctx.homeTeamObj||{n:ctx.homeTeam,e:'[-]'};
@@ -379,6 +583,7 @@ function endProCallUpStint(reason){
   G._callUpCtx=null;
   G.teamRoster=null;
   G._teamRosterKey=null;
+  if(typeof syncUserStandingsRow==='function') syncUserStandingsRow();
   if(typeof refreshStandings==='function') refreshStandings(G.leagueKey);
   if(reason==='performance'){
     addNews(proShort+' '+ctx.proTeamName+' sends '+G.first+' '+G.last+' back down — the call-up wasn\'t working out.','bad');
@@ -393,7 +598,7 @@ function endProCallUpStint(reason){
 function recordProCallUpGameResult(opts){
   var ctx=G._callUpCtx;
   if(!ctx||!ctx.active||!opts) return;
-  if(!ctx.stintStats) ctx.stintStats={gp:0,g:0,a:0,sv:0,ga:0,w:0,l:0,otl:0,pm:0,perfSum:0,badGames:0,lastPerf:0};
+  if(!ctx.stintStats) ctx.stintStats={gp:0,g:0,a:0,sv:0,ga:0,w:0,l:0,otl:0,pm:0,sog:0,pim:0,perfSum:0,badGames:0,lastPerf:0};
   var st=ctx.stintStats;
   st.gp++;
   st.g+=opts.g||0;
@@ -401,6 +606,8 @@ function recordProCallUpGameResult(opts){
   st.sv+=opts.sv||0;
   st.ga+=opts.ga||0;
   st.pm+=opts.pm||0;
+  st.sog=(st.sog||0)+(opts.sog||0);
+  st.pim=(st.pim||0)+(opts.pim||0);
   if(opts.won) st.w++;
   else if(opts.tied) st.otl++;
   else st.l++;
@@ -442,25 +649,10 @@ function shouldSendDownCallUpForPerformance(){
   return false;
 }
 
-function migrateProCallUpStintStartGp(ctx){
-  if(typeof ctx.stintStartGp==='number') return;
-  var playedOnStint=Math.max(0,(ctx.gamesTotal||0)-(ctx.gamesLeft||0));
-  if(playedOnStint>0){
-    ctx.stintStartGp=(G.gp||0)-playedOnStint;
-    return;
-  }
-  if(typeof ctx.startWeek==='number' && (G.week||0)>=ctx.startWeek+2 && ctx.gamesLeft===ctx.gamesTotal){
-    ctx.stintStartGp=(G.gp||0)-(ctx.gamesTotal||0);
-    return;
-  }
-  ctx.stintStartGp=G.gp||0;
-}
-
 function getProCallUpGamesPlayed(){
   var ctx=G._callUpCtx;
-  if(!ctx||!ctx.active) return 0;
-  migrateProCallUpStintStartGp(ctx);
-  return Math.max(0,(G.gp||0)-ctx.stintStartGp);
+  if(!ctx||!ctx.active||!ctx.stintStats) return 0;
+  return ctx.stintStats.gp||0;
 }
 
 function ensureProCallUpStintComplete(){
@@ -497,16 +689,27 @@ function rollWeeklyCallUpOffer(){
   if(!parent) return;
   var uOvr=ovr(G.attrs,G.pos);
   var floor=typeof getProHardDevelopmentFloorOvr==='function'?getProHardDevelopmentFloorOvr():75;
+  var academyJunior=typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(G.leagueKey);
+  if(academyJunior){
+    floor-=10;
+    if(typeof syncPlayerAcademyBand==='function') syncPlayerAcademyBand();
+    if(G._academyBand==='PRO_CALLUP') floor-=6;
+  }
   if(uOvr<floor-10) return;
-  var chance=0.018;
+  var chance=academyJunior?0.04:0.018;
   if(isUserHealthyScratch()) chance+=0.075;
   if(G.league.tier==='minor') chance+=0.035;
   if(G.draftRights) chance+=0.028;
   if(uOvr>=floor) chance+=0.04;
   if(getCoachRelation()>=65) chance+=0.015;
+  if(academyJunior){
+    if(G._academyBand==='PRO_CALLUP') chance+=0.14;
+    else if(G._academyBand==='U20') chance+=0.05;
+    if(uOvr>=getAcademyEarlySignOvrThreshold(G.leagueKey)) chance+=0.06;
+  }
   if(Math.random()>=chance) return;
-  var games=ri(1,4);
-  var role=uOvr>=floor+2?'lineup':'depth';
+  var games=academyJunior&&G._academyBand==='PRO_CALLUP'?ri(2,5):ri(1,4);
+  var role=(academyJunior&&(G._academyBand==='PRO_CALLUP'||uOvr>=getAcademyEarlySignOvrThreshold(G.leagueKey)))?'lineup':'depth';
   startProCallUp(parent, games, role);
 }
 
@@ -839,7 +1042,9 @@ function assignHealthyScratches(roster, slots){
   if(!roster||!slots) return;
   purgeScratchesFromActiveChart(slots);
   function pickWorst(pos, count){
-    return roster.players.filter(function(pl){return pl.pos===pos&&!pl.injured;})
+    return roster.players.filter(function(pl){
+      return pl.pos===pos&&!pl.injured&&(pl.ovr||0)<87;
+    })
       .sort(function(a,b){
         var d=getHealthyScratchScore(a)-getHealthyScratchScore(b);
         if(d!==0) return d;
@@ -896,12 +1101,15 @@ function assignHealthyScratches(roster, slots){
   fillEmpties(slots.defense, 'D', null);
   if(typeof fillSpecialSlots==='function'){
     var skaters=roster.players.filter(function(p){return (p.pos==='F'||p.pos==='D')&&!scratchIds[p.id];});
-    var stUsed={};
-    skaters.forEach(function(p){ if(p.ppSlot||p.pkSlot) stUsed[p.id]=true; });
-    fillSpecialSlots(skaters, stUsed, slots.pp1, getPowerPlayScore, 'ppSlot');
-    fillSpecialSlots(skaters, stUsed, slots.pp2, getPowerPlayScore, 'ppSlot');
-    fillSpecialSlots(skaters, stUsed, slots.pk1, getPenaltyKillScore, 'pkSlot');
-    fillSpecialSlots(skaters, stUsed, slots.pk2, getPenaltyKillScore, 'pkSlot');
+    var ppUsed={}, pkUsed={};
+    skaters.forEach(function(p){
+      if(p.ppSlot) ppUsed[p.id]=true;
+      if(p.pkSlot) pkUsed[p.id]=true;
+    });
+    fillSpecialSlots(skaters, ppUsed, slots.pp1, getPowerPlayScore, 'ppSlot');
+    fillSpecialSlots(skaters, ppUsed, slots.pp2, getPowerPlayScore, 'ppSlot');
+    fillSpecialSlots(skaters, pkUsed, slots.pk1, getPenaltyKillScore, 'pkSlot');
+    fillSpecialSlots(skaters, pkUsed, slots.pk2, getPenaltyKillScore, 'pkSlot');
   }
   slots.scratchF=[];
   slots.scratchD=[];
@@ -1020,6 +1228,8 @@ function renderTeamRelationsTab(){
   }
   if(isJuniorCallUpBlocked()){
     html+='<div class="vt" style="font-size:12px;color:var(--mut);margin-bottom:10px">Junior leagues: full-season commitment — no in-season pro call-ups.</div>';
+  } else if(typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(G.leagueKey)&&typeof hasAcademyOrgContract==='function'&&hasAcademyOrgContract()){
+    html+='<div class="vt" style="font-size:12px;color:var(--acc);margin-bottom:10px">Academy org contract: play up a band when dominant, or earn short <b>'+(G._academyParentOrg&&G._academyParentOrg.leagueKey||'pro')+'</b> call-ups with '+escHtml(G._academyParentOrg&&G._academyParentOrg.teamName||'your parent club')+'.</div>';
   } else if(canPlayerReceiveProCallUp()){
     html+='<div class="vt" style="font-size:12px;color:var(--acc);margin-bottom:10px">Healthy scratches and strong minor/college play can earn short pro call-ups when a parent club needs depth.</div>';
   }

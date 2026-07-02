@@ -120,12 +120,19 @@ function preGame(idx){
     runLocalScheduleEvent(idx);
     return;
   }
+  if(typeof isUsndtExhibitionEvent==='function'&&isUsndtExhibitionEvent(slot)){
+    runUsndtExhibition(idx);
+    return;
+  }
   curOpponent=slot||{n:'Opponent',e:'[-]'};
   G._curGameIdx=idx;
   safeEl('pg-hdr').textContent='WEEK '+G.week+' -- GAME '+(idx+1);
-  safeEl('pg-home').textContent=G.team.n;
+  if(typeof syncPlayerAcademyBand==='function') syncPlayerAcademyBand();
+  var homeLbl=typeof getTeamDisplayName==='function'?getTeamDisplayName(G.team.n,G.leagueKey,{academyBand:G._academyBand}):G.team.n;
+  var awayLbl=typeof getTeamDisplayName==='function'?getTeamDisplayName(curOpponent.n,G.leagueKey,{}):curOpponent.n;
+  safeEl('pg-home').textContent=homeLbl;
   markPuckSlot('pg-home-mark',stripBracketIcons(G.team.e));
-  safeEl('pg-away').textContent=curOpponent.n;
+  safeEl('pg-away').textContent=awayLbl;
   markPuckSlot('pg-away-mark',curOpponent.e);
   var reports=[
     'Strong defensive team -- they play a tight neutral zone.',

@@ -121,7 +121,7 @@ function sendOffer(){
 function acceptCurrentOffer(){finalizeContract(cnTeamOffer.sal,cnTeamOffer.yrs,false,false);}
 
 function returnAfterContractTalks(){
-  if(G&&G._inOffseason){show('s-offseason');return;}
+  if(G&&G._inOffseason){if(typeof showOffseasonScreen==='function') showOffseasonScreen(); else show('s-offseason'); return;}
   renderHub();show('s-hub');
 }
 
