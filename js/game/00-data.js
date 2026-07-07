@@ -54,6 +54,10 @@ var LEAGUES = {
   NEJC: {name:'Northern European Junior Circuit',short:'NEJC',tier:'junior',gender:'M',games:44,dev:1.35,salBase:0,desc:'Nordic academies — technical hockey, org contract with parent NEHL/FHL club. U16 under 17, U18 under 19, U20 under 21.'},
   CEJC: {name:'Central European Junior Circuit',short:'CEJC',tier:'junior',gender:'M',games:46,dev:1.32,salBase:0,desc:'Central European academies — technical, structured development; org deal with parent CEHL club. U16/U18/U20 bands.'},
   ARJC: {name:'Eurasian Junior Circuit',short:'ARJC',tier:'junior',gender:'M',games:48,dev:1.28,salBase:0,desc:'Eurasian academies — technical hockey, org contract with parent ARHL club. U16 under 17, U18 under 19, U20 under 21.'},
+  CJAL: {name:'Canadian Junior A League',short:'CJA',tier:'junior',gender:'M',games:54,dev:1.32,salBase:0,desc:'Tier-II Canadian junior — late bloomers start here; 58+ OVR can go straight to CHL (OJL/QMJL/WJL).'},
+  CJBL: {name:'Canadian Junior B League',short:'CJB',tier:'junior',gender:'M',games:44,dev:1.28,salBase:0,desc:'Regional Junior B — development rinks. Strong teens (58+ OVR) belong in major junior instead.'},
+  CJCL: {name:'Canadian Junior C League',short:'CJ-C',tier:'junior',gender:'M',games:36,dev:1.24,salBase:0,desc:'Grassroots Junior C — bottom of the ladder. 58+ OVR? Pick CHL at career start.'},
+  USJD: {name:'US Junior Development League',short:'USJD',tier:'junior',gender:'M',games:48,dev:1.22,salBase:0,desc:'US tier-II/III junior below USJL. 58+ OVR Americans can start in USJL directly.'},
   NEHL: {name:'Northern European Hockey League',short:'NEHL',tier:'euro',gender:'M',games:52,dev:1.1,salBase:55000,desc:'Nordic top tier — 14 teams, 52 games.'},
   FHL:  {name:'Finnish Hockey League',short:'FHL',tier:'euro',gender:'M',games:60,dev:1.1,salBase:32000,desc:"Finland's top men's pro circuit — 15 clubs, 60-game Liiga-style season. Feeder from NEJC; a clear step above CEHL."},
   CEHL: {name:'Central European Hockey League',short:'CEHL',tier:'euro',gender:'M',games:60,dev:1.02,salBase:16000,desc:'Weakest paid euro men\'s loop — Germany, Poland, Czechia & neighbors. Talent barely above LHL community hockey; feeder from CEJC.'},
@@ -65,6 +69,7 @@ var LEAGUES = {
   USWDL:{name:"US Women's Development League",short:'USWDL',tier:'junior',gender:'F',games:52,dev:1.2,salBase:0,desc:"U.S. women's junior dev — 16 teams, 52 games."},
   EWJC:{name:"European Women's Junior Circuit",short:'EWJC',tier:'junior',gender:'F',games:36,dev:1.22,salBase:0,desc:"European women's academies — technical hockey, org contract with SDHL/FWHL parent club. U16 under 17, U18 under 19, U20 under 21."},
   AWJC:{name:"Asian Women's Junior Circuit",short:'AWJC',tier:'junior',gender:'F',games:34,dev:1.2,salBase:0,desc:"Asian women's academies — technical development, org deal with AWHL parent club. U16 under 17, U18 under 19, U20 under 21."},
+  WJDL:{name:"Women's Junior Development League",short:'WJD',tier:'junior',gender:'F',games:40,dev:1.22,salBase:0,desc:"Grassroots women's junior — the feeder below the CWHL/USWDL. Late bloomers develop here and earn a major-junior call-up."},
   SDHL: {name:"Swedish Women's Hockey League",short:'SDHL',tier:'euro',gender:'F',games:36,dev:1.1,salBase:18000,desc:"Sweden women's top tier — 10 teams, 36 games."},
   FWHL: {name:"Finnish Women's Hockey League",short:'FWHL',tier:'euro',gender:'F',games:36,dev:1.1,salBase:16000,desc:"Finland women's top tier — 10 teams, 36 games."},
   AWHL: {name:"Asian Women's Hockey League",short:'AWHL',tier:'asia',gender:'F',games:36,dev:1.0,salBase:20000,desc:"Asia women's pro — 8 teams, 36 games."}
@@ -172,6 +177,30 @@ var TEAMS = {
     {n:'Vladivostok Tide Program',e:'[J]'},{n:'Astana Nomad Track',e:'[J]'},{n:'Harbin Ice Program',e:'[J]'},
     {n:'Almaty Snowleopard Program',e:'[J]'},{n:'Tashkent Steppe Track',e:'[J]'},{n:'Bishkek Pamir Circuit',e:'[J]'}
   ],
+  CJAL: [
+    {n:'Cornwall Ironmen',e:'[A]'},{n:'Pembroke Loggers',e:'[A]'},{n:'Brockville Rivermen',e:'[A]'},
+    {n:'Hawkesbury Rapids',e:'[A]'},{n:'Renfrew Timberwolves',e:'[A]'},{n:'Cobourg Harbourmen',e:'[A]'},
+    {n:'Aurora Highlanders',e:'[A]'},{n:'Newmarket Nighthawks',e:'[A]'},{n:'Trenton Falcons',e:'[A]'},
+    {n:'Collingwood Blizzard',e:'[A]'},{n:'Espanola Miners',e:'[A]'},{n:'Wellington Whalers',e:'[A]'}
+  ],
+  CJBL: [
+    {n:'Stratford Colts',e:'[B]'},{n:'Listowel Cyclones',e:'[B]'},{n:'Elmira Millers',e:'[B]'},
+    {n:'Ayr Rockets',e:'[B]'},{n:'Caledon Rangers',e:'[B]'},{n:'Fergus Falcons',e:'[B]'},
+    {n:'Waterloo Wildhawks',e:'[B]'},{n:'Tavistock Titans',e:'[B]'},{n:'Paris Panthers',e:'[B]'},
+    {n:'Hespeler Hawks',e:'[B]'},{n:'Delhi Frost',e:'[B]'},{n:'Wellesley Woodsmen',e:'[B]'}
+  ],
+  CJCL: [
+    {n:'Lucan Foxes',e:'[C]'},{n:'Mount Forest Rams',e:'[C]'},{n:'Wingham Ironmen',e:'[C]'},
+    {n:'Tillsonburg Tornados',e:'[C]'},{n:'Norwich Merchants',e:'[C]'},{n:'Dorchester Dragons',e:'[C]'},
+    {n:'Lambeth Lancers',e:'[C]'},{n:'Thamesford Trappers',e:'[C]'},{n:'Belmont Bandits',e:'[C]'},
+    {n:'Exeter Embers',e:'[C]'}
+  ],
+  USJD: [
+    {n:'Bismarck Frost',e:'[D]'},{n:'Fargo Blizzard',e:'[D]'},{n:'Aberdeen Wingmen',e:'[D]'},
+    {n:'Minot Miners',e:'[D]'},{n:'Topeka Scouts',e:'[D]'},{n:'Wichita Wranglers',e:'[D]'},
+    {n:'Amarillo Dust',e:'[D]'},{n:'El Paso Sandstorm',e:'[D]'},{n:'Odessa Outlaws',e:'[D]'},
+    {n:'Corpus Christi Tide',e:'[D]'},{n:'Springfield Spartans',e:'[D]'},{n:'Rochester Ironmen',e:'[D]'}
+  ],
   NEHL: [
     {n:'Stockholm Crowns',e:'[N]'},{n:'Göteborg Ironmen',e:'[N]'},{n:'Helsinki Lynx',e:'[N]'},
     {n:'Tampere Ironmen',e:'[N]'},{n:'Oslo Cannons',e:'[N]'},{n:'København Cannons',e:'[N]'},
@@ -245,6 +274,12 @@ var TEAMS = {
     {n:'Sapporo Polar Program',e:'[J]'},{n:'Tōkyō Ice Track',e:'[J]'},{n:'Seoul Comet Program',e:'[J]'},
     {n:'Beijing Dragon Program',e:'[J]'},{n:'Shanghai Pearl Circuit',e:'[J]'},{n:'Taipei Frost Academy',e:'[J]'},
     {n:'Busan Thunder Program',e:'[J]'},{n:'Hong Kong Harbor Program',e:'[J]'}
+  ],
+  WJDL: [
+    {n:'Cambridge Comets',e:'[W]'},{n:'Waterloo Ravens',e:'[W]'},{n:'Markham Storm',e:'[W]'},
+    {n:'Oakville Hornets',e:'[W]'},{n:'Whitby Wolves',e:'[W]'},{n:'Nepean Wildcats',e:'[W]'},
+    {n:'Mississauga Chiefs',e:'[W]'},{n:'Brampton Blades',e:'[W]'},{n:'Kitchener Frost',e:'[W]'},
+    {n:'London Lancers',e:'[W]'}
   ],
   SDHL: [
     {n:'Stockholm Crowns',e:'[S]'},{n:'Göteborg Ironwomen',e:'[S]'},{n:'Malmö Northwomen',e:'[S]'},
@@ -650,8 +685,8 @@ function buildPlayoffBracketFromStandings(sorted, leagueKey){
   return bracket;
 }
 
-var START_LEAGUES_M = ['OJL','QMJL','WJL','NCHA','USJL','NEJC','CEJC','ARJC'];
-var START_LEAGUES_F = ['CWHL','NWCHA','USWDL','EWJC','AWJC'];
+var START_LEAGUES_M = ['OJL','QMJL','WJL','NCHA','USJL','CJAL','CJBL','CJCL','USJD','NEJC','CEJC','ARJC'];
+var START_LEAGUES_F = ['CWHL','NWCHA','USWDL','WJDL','EWJC','AWJC'];
 /** At career start (age 16), college and paid overseas semi-pro need 17+ or preview OVR at/above this bar. */
 var START_LEAGUE_BYPASS_OVR_M=72;
 var START_LEAGUE_BYPASS_OVR_F=72;

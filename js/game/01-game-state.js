@@ -781,8 +781,8 @@ function applyGameSnapshot(snap){
     G._relationsPersonalityVersion=2;
     G.teamRelations=null;
   }
-  if(G._npcScoringModelVersion!==14){
-    G._npcScoringModelVersion=14;
+  if(G._npcScoringModelVersion!==15){
+    G._npcScoringModelVersion=15;
     G.leagueRostersCache=null;
     G.teamRoster=null;
     G._teamRosterKey=null;

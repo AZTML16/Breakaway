@@ -133,7 +133,10 @@ function startCareer(){
     isDraftFreeAgent:false,
     hadELC:false,
     elcYears:0,
-    _draftStatusText:'DRAFT STATUS: NOT ELIGIBLE YET',
+    _draftStatusText:(function(){
+      if(typeof isLowerJuniorLeague==='function'&&isLowerJuniorLeague(lk)&&typeof getLowerJuniorDraftStatusText==='function') return getLowerJuniorDraftStatusText();
+      return 'DRAFT STATUS: NOT ELIGIBLE YET';
+    })(),
     leadershipRole:'',
     teamTenure:0,
     prospectTrack:prospectTrack,
@@ -157,7 +160,7 @@ function startCareer(){
     _leadersPosFilter:'all',
     leagueStatsArchive:[],
     careerLeagueStats:{},
-    _rosterGenVersion:15,
+    _rosterGenVersion:26,
     _attrSubVersion:2
   };
   try{   if(typeof ensureUnifiedSkaterAttrs==='function') ensureUnifiedSkaterAttrs(G); }catch(eEns){}
@@ -180,6 +183,10 @@ function startCareer(){
   }
   G.socialMessages=generateSocialMessages();
   addNews('Career begins with the '+team.n+' as a '+formatPlayerPositionLabel(selPos, selSubPos)+'!','big');
+  if(window._createMajorJuniorBypassFrom&&LEAGUES[window._createMajorJuniorBypassFrom]){
+    addNews('Strong profile — fast-tracked from '+LEAGUES[window._createMajorJuniorBypassFrom].short+' straight into '+l.short+' major junior.','good');
+    window._createMajorJuniorBypassFrom=null;
+  }
   if(G.contract.sal>0) addNews('Signs '+G.contract.type+' contract -- '+fmt(G.contract.sal)+'/yr for '+G.contract.yrs+' years.','good');
   else if(G.contract.type==='ORG PRO DEAL'&&G._academyParentOrg){
     addNews('Signs ORG PRO DEAL with '+G._academyParentOrg.teamName+' ('+G._academyParentOrg.leagueKey+') — '+fmt(G.contract.sal)+'/yr while developing in '+l.short+'.','big');

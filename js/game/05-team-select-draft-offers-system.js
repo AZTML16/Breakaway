@@ -16,8 +16,43 @@ function goToTeamSelect(){
     var hometown=(safeEl('c-hometown')&&safeEl('c-hometown').value.trim())||nat;
     var previewOvr=typeof getTeamSelectPreviewOvr==='function'?getTeamSelectPreviewOvr():60;
     var acGender=safeEl('c-gender')?safeEl('c-gender').value:'M';
+    var bypassFromLk=null;
+    var useLowerJunior=typeof isLowerJuniorLeague==='function'&&isLowerJuniorLeague(lk);
+    if(useLowerJunior&&typeof qualifiesForMajorJuniorDirectStart==='function'&&qualifiesForMajorJuniorDirectStart(previewOvr,nat,acGender)){
+      var mjLk=typeof pickMajorJuniorDirectStartLeague==='function'?pickMajorJuniorDirectStartLeague(nat,hometown,acGender):null;
+      if(mjLk&&LEAGUES[mjLk]){
+        bypassFromLk=lk;
+        lk=mjLk;
+        teams=TEAMS[lk]||teams;
+        l=LEAGUES[lk];
+        useLowerJunior=false;
+        window._createMajorJuniorBypassFrom=bypassFromLk;
+      }
+    } else {
+      window._createMajorJuniorBypassFrom=null;
+    }
 
-    if(typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(lk)){
+    if(useLowerJunior){
+      var ljPicks=shuf(teams.slice()).slice(0,3);
+      G._availableTeams=ljPicks;
+      G._selTeamIdx=0;
+      var ljUp=typeof JUNIOR_PROMOTION_LADDER!=='undefined'&&JUNIOR_PROMOTION_LADDER[lk]?JUNIOR_PROMOTION_LADDER[lk]:[];
+      var ljUpName=ljUp.length&&LEAGUES[ljUp[ljUp.length-1]]?LEAGUES[ljUp[ljUp.length-1]].short:'the CHL/USJL';
+      safeEl('team-select-hdr').textContent=l.short+' TRYOUT';
+      safeEl('team-select-title').textContent='EARN A ROSTER SPOT';
+      safeEl('team-select-sub').textContent='NO DRAFT AT THIS LEVEL — MAKE A CLUB AND PROVE IT:';
+      html+='<div class="vt" style="font-size:14px;color:var(--acc);margin-bottom:10px;border-left:3px solid var(--acc);padding-left:8px">';
+      html+='Development junior — a path for late skill/size bloomers. No PHL draft here: dominate and you\'ll earn a call-up up the ladder toward <b>'+stripBracketIcons(ljUpName)+'</b>, then the PHL draft from there.';
+      html+=' <b>'+(typeof getMajorJuniorDirectStartMinOvr==='function'?getMajorJuniorDirectStartMinOvr():58)+'+ OVR?</b> Pick CHL/USJL instead — you can start major junior right away.';
+      html+='</div>';
+      for(var lji=0;lji<ljPicks.length;lji++){
+        html+='<div class="lcard'+(lji===0?' sel':'')+'" id="tc-'+lji+'" onclick="pickTeam('+lji+')">';
+        html+='<span class="badge '+(lji===0?'green':'mut')+'">'+(lji===0?'MADE THE TEAM':'ALSO INTERESTED')+'</span><br>';
+        html+='<span class="vt" style="font-size:'+(lji===0?'18':'16')+'px">'+ljPicks[lji].n+'</span>';
+        html+='<div class="vt" style="font-size:13px;color:var(--mut);margin-top:4px">Junior deal — no salary, all development reps</div>';
+        html+='</div>';
+      }
+    } else if(typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(lk)){
       var homeTeam=typeof pickAcademyHomeTeam==='function'?pickAcademyHomeTeam(lk,nat,hometown):teams[0];
       var alternates=typeof pickAcademyAlternateTeams==='function'?pickAcademyAlternateTeams(lk,homeTeam,2):shuf(teams.slice()).slice(0,2);
       G._availableTeams=[homeTeam].concat(alternates);
@@ -33,7 +68,7 @@ function goToTeamSelect(){
       html+='<span class="vt" style="font-size:18px">'+homeTeam.n+'</span>';
       var homeParent=typeof getAcademyParentProTeam==='function'?getAcademyParentProTeam(homeTeam.n, lk):null;
       if(homeParent) html+='<div class="vt" style="font-size:13px;color:var(--mut);margin-top:4px">Parent club: <b>'+homeParent.name+'</b> ('+homeParent.leagueKey+')</div>';
-      if(typeof getAcademyOrgContractBlurb==='function') html+=getAcademyOrgContractBlurb(homeTeam.n, lk, acGender, previewOvr);
+      if(typeof getAcademyOrgContractBlurb==='function') html+=getAcademyOrgContractBlurb(homeTeam.n, lk, acGender, previewOvr, 16);
       html+='<div class="vt" style="font-size:13px;color:var(--mut);margin-top:4px">Accept org contract — report to home academy camp</div>';
       html+='</div>';
       html+='<div class="vt" style="font-size:14px;color:var(--mut);margin:10px 0 6px">-- OR SIGN WITH ANOTHER ACADEMY PROGRAM --</div>';
@@ -43,6 +78,7 @@ function goToTeamSelect(){
         html+='<span class="vt" style="font-size:16px">'+alternates[ai].n+'</span>';
         var altParent=typeof getAcademyParentProTeam==='function'?getAcademyParentProTeam(alternates[ai].n, lk):null;
         if(altParent) html+='<div class="vt" style="font-size:13px;color:var(--mut);margin-top:3px">Parent: '+altParent.name+' ('+altParent.leagueKey+')</div>';
+        if(typeof getAcademyOrgContractBlurb==='function') html+=getAcademyOrgContractBlurb(alternates[ai].n, lk, acGender, previewOvr, 16);
         html+='<div class="vt" style="font-size:13px;color:var(--mut);margin-top:3px">Sign elsewhere — org deal with a different club</div>';
         html+='</div>';
       }
@@ -77,6 +113,11 @@ function goToTeamSelect(){
     safeEl('team-select-hdr').textContent=l.short+' DRAFT';
     safeEl('team-select-title').textContent=l.short.toUpperCase()+' DRAFT DAY';
     safeEl('team-select-sub').textContent='YOUR RIGHTS HAVE BEEN CLAIMED -- OR GO UNDRAFTED:';
+    if(bypassFromLk&&LEAGUES[bypassFromLk]){
+      html+='<div class="vt" style="font-size:14px;color:var(--gold);margin-bottom:10px;border-left:3px solid var(--gold);padding-left:8px">';
+      html+='<b>MAJOR JUNIOR FAST TRACK:</b> '+Math.round(previewOvr)+' OVR earned a '+stripBracketIcons(l.short)+' draft — skipped '+stripBracketIcons(LEAGUES[bypassFromLk].short)+'.';
+      html+='</div>';
+    }
     html+='<div class="draft-reveal">';
     html+='<div class="vt" style="font-size:12px;color:var(--mut);letter-spacing:2px;margin-bottom:4px">'+l.name.toUpperCase()+'</div>';
     html+='<div class="retro-puck-graphic lg" style="margin:8px 0"><div class="puck-disc"></div></div>';

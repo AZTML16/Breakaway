@@ -150,6 +150,7 @@ function getLeagueRosterSkillOffset(leagueKey){
   var map={
     OJL:2, CWHL:2, WJL:1, USJL:1, USWDL:1, NEJC:-1,
     ARJC:-2, QMJL:-4, CEJC:-5,
+    CJAL:-6, USJD:-7, CJBL:-8, WJDL:-8, CJCL:-10,
     EWJC:-2, AWJC:-4,
     NCHA:1, NWCHA:0,
     NEHL:1, FHL:-1, CEHL:-7, SDHL:0, FWHL:-1, AWHL:0, ARHL:1,
@@ -194,6 +195,10 @@ var MEN_LEAGUE_OVR_BANDS={
   AWJC:{cap:66,floor:46,baseline:50,spread:8},
   NCHA:{cap:84,floor:55,baseline:64,spread:12},
   NWCHA:{cap:84,floor:55,baseline:63,spread:12},
+  CJAL:{cap:68,floor:48,baseline:53,spread:9},
+  USJD:{cap:66,floor:47,baseline:52,spread:9},
+  CJBL:{cap:63,floor:45,baseline:49,spread:8},
+  CJCL:{cap:59,floor:43,baseline:46,spread:8},
   LHCM:{cap:72,floor:46,baseline:52,spread:9},
   LHLF:{cap:72,floor:45,baseline:51,spread:9}
 };
@@ -201,7 +206,7 @@ var MEN_LEAGUE_OVR_BANDS={
 var WOMEN_LEAGUE_MEN_ANALOG={
   PWL:'PHL', PWDL:'NAML', CWHL:'OJL', NWCHA:'NCHA', USWDL:'USJL',
   EWJC:'NEJC', AWJC:'ARJC', SDHL:'NEHL', FWHL:'FHL', AWHL:'ARHL',
-  LHLF:'LHCM'
+  WJDL:'CJAL', LHLF:'LHCM'
 };
 
 function getMenAnalogLeagueKey(leagueKey){
@@ -217,7 +222,6 @@ function getTierFallbackOvrBand(tier){
   if(tier==='euro'||tier==='asia') return {cap:87,floor:58,baseline:73,spread:11};
   if(tier==='minor') return {cap:83,floor:54,baseline:68,spread:10};
   if(tier==='pro') return {cap:99,floor:76,baseline:83,spread:5};
-  if(tier==='minor') return {cap:84,floor:72,baseline:77,spread:5};
   return {cap:80,floor:52,baseline:62,spread:11};
 }
 
@@ -545,6 +549,8 @@ function getLeagueScoringPaceClass(leagueKey){
   if(lk==='QMJL') return 'high';
   if(lk==='USJL'||lk==='USWDL') return 'structured';
   if(lk==='NEJC'||lk==='CEJC'||lk==='ARJC'||lk==='EWJC'||lk==='AWJC') return 'high';
+  if(lk==='CJCL'||lk==='CJBL') return 'lowskill';
+  if(lk==='CJAL'||lk==='USJD'||lk==='WJDL') return 'structured';
   if(typeof isLocalLeague==='function'&&isLocalLeague(lk)) return 'rungun';
   if(lk==='PHL') return 'tight';
   if(lk==='CWHL') return 'high';
@@ -589,6 +595,9 @@ function getLeaguePaceKnobsForLeague(leagueKey){
       nightCapF:4, nightCapD:3
     };
   }
+  if(lk==='CJAL') return {npcScale:0.98, tierBoost:0.96, ppgCap:1.40, userSim:0.96, nightCapF:3, nightCapD:2};
+  if(lk==='CJBL') return {npcScale:0.88, tierBoost:0.90, ppgCap:1.18, userSim:0.88, nightCapF:3, nightCapD:2};
+  if(lk==='CJCL'||lk==='USJD'||lk==='WJDL') return {npcScale:0.82, tierBoost:0.86, ppgCap:1.05, userSim:0.84, nightCapF:2, nightCapD:2};
   if(lk==='PHL'){
     return {npcScale:0.84, tierBoost:0.88, ppgCap:1.02, userSim:0.86, nightCapF:2, nightCapD:2};
   }
@@ -631,6 +640,11 @@ function getLeagueScoringProfile(leagueKey){
   else if(leagueKey==='ARJC'){ pts=76; gl=28; al=48; }
   else if(leagueKey==='EWJC'){ pts=54; gl=18; al=36; }
   else if(leagueKey==='AWJC'){ pts=50; gl=16; al=34; }
+  else if(leagueKey==='CJAL'){ pts=58; gl=22; al=36; }
+  else if(leagueKey==='CJBL'){ pts=48; gl=18; al=30; }
+  else if(leagueKey==='CJCL'){ pts=38; gl=14; al=24; }
+  else if(leagueKey==='USJD'){ pts=52; gl=18; al=34; }
+  else if(leagueKey==='WJDL'){ pts=44; gl=16; al=28; }
   else if(typeof isLocalLeague==='function'&&isLocalLeague(leagueKey)){ pts=22; gl=14; al=8; }
   else {
     var pace=getLeagueScoringPaceClass(leagueKey);

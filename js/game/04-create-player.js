@@ -394,6 +394,14 @@ function goToLeague(){
       }
     }
     var territoryNote='';
+    var majorDirectMin=typeof getMajorJuniorDirectStartMinOvr==='function'?getMajorJuniorDirectStartMinOvr():58;
+    var majorDirectNote='';
+    if(typeof isMajorJuniorLeagueKey==='function'&&isMajorJuniorLeagueKey(k)&&previewOvr>=majorDirectMin){
+      majorDirectNote=' <span style="color:var(--green)"><b>YOUR TIER</b> — '+Math.round(previewOvr)+' OVR fits major junior ('+majorDirectMin+'+).</span>';
+    }
+    if(typeof isLowerJuniorLeague==='function'&&isLowerJuniorLeague(k)&&previewOvr>=majorDirectMin){
+      majorDirectNote=' <span style="color:var(--gold)">'+majorDirectMin+'+ OVR — CHL/USJL is open; this ladder is for late bloomers.</span>';
+    }
     if(typeof getPlayerTerritoryJuniorLeague==='function'&&typeof isChlTerritoryLeague==='function'&&isChlTerritoryLeague(k)){
       var homeLg=getPlayerTerritoryJuniorLeague(safeEl('c-hometown')&&safeEl('c-hometown').value.trim(), homeNat, gender);
       if(homeLg===k) territoryNote=' <span style="color:var(--green)"><b>YOUR TERRITORY</b> — home league path.</span>';
@@ -402,7 +410,7 @@ function goToLeague(){
     html+='<div class="lcard '+isSel+(blocked?' locked':'')+'" id="lc-'+k+'" onclick="'+(typeof isChlTerritoryMismatch==='function'&&isChlTerritoryMismatch(k, safeEl('c-hometown')&&safeEl('c-hometown').value.trim(), homeNat, gender)?('pickLeagueImport(\''+k+'\')'):('pickLeague(\''+k+'\')'))+'">';
     html+='<div class="ltier" style="color:'+tierColor+'">'+l.tier.toUpperCase()+'</div>';
     html+='<div class="lname">'+stripBracketIcons(lShort)+' -- '+lName+'</div>';
-    html+='<div class="ldesc">'+l.desc+(l.tier==='junior'?' <span style="color:var(--acc)">'+(typeof getJuniorLeagueAgeTag==='function'?getJuniorLeagueAgeTag(k):'[Ages 16–19 only]')+'</span>':'')+(l.tier==='local'?' <span style="color:var(--green)">[12 games + 6 events]</span>':'')+localNote+territoryNote+'  ['+(l.tier==='local'?'12 G + 6 EVENTS':l.games+' GAMES/SEASON')+']'+(blocked&&l.tier!=='local'&&l.tier!=='junior'&&!isNonHockeyStartLeagueBlocked(k, homeNat)?' <span style="color:var(--gold)"> // At 16: '+needBypass+'+ preview OVR to jump here.</span>':'')+(blocked&&isNonHockeyStartLeagueBlocked(k, homeNat)?' <span style="color:var(--red)"> // '+escHtml(getNonHockeyStartBlockReason(homeNat))+'</span>':'')+(blocked&&l.tier==='local'?' <span style="color:var(--red)"> // '+escHtml(getLocalLeagueBlockReason(homeNat))+'</span>':'')+'</div>';
+    html+='<div class="ldesc">'+l.desc+(l.tier==='junior'?' <span style="color:var(--acc)">'+(typeof getJuniorLeagueAgeTag==='function'?getJuniorLeagueAgeTag(k):'[Ages 16–19 only]')+'</span>':'')+(l.tier==='local'?' <span style="color:var(--green)">[12 games + 6 events]</span>':'')+localNote+territoryNote+majorDirectNote+'  ['+(l.tier==='local'?'12 G + 6 EVENTS':l.games+' GAMES/SEASON')+']'+(blocked&&l.tier!=='local'&&l.tier!=='junior'&&!isNonHockeyStartLeagueBlocked(k, homeNat)?' <span style="color:var(--gold)"> // At 16: '+needBypass+'+ preview OVR to jump here.</span>':'')+(blocked&&isNonHockeyStartLeagueBlocked(k, homeNat)?' <span style="color:var(--red)"> // '+escHtml(getNonHockeyStartBlockReason(homeNat))+'</span>':'')+(blocked&&l.tier==='local'?' <span style="color:var(--red)"> // '+escHtml(getLocalLeagueBlockReason(homeNat))+'</span>':'')+'</div>';
     html+='</div>';
   }
   safeEl('league-list').innerHTML=html;

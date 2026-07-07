@@ -126,6 +126,9 @@ function getJuniorLeagueAgeTag(leagueKey){
   if(leagueKey==='USJL'){
     return '[Ages '+min+'–'+max+' · U17 age 16 · U18 ages 17–18]';
   }
+  if(typeof isLowerJuniorLeague==='function'&&isLowerJuniorLeague(leagueKey)){
+    return '[Ages '+min+'–'+max+' · development ladder — '+getMajorJuniorDirectStartMinOvr()+'+ OVR can start CHL/USJL directly]';
+  }
   return '[Ages '+min+'–'+max+' only]';
 }
 
@@ -286,10 +289,11 @@ function canAcademyJuniorReceiveProCallUp(){
   return pOvr>=(getAcademyEarlySignOvrThreshold(G.leagueKey)-5);
 }
 
-function getAcademyOrgContractBlurb(juniorTeamName, leagueKey, gender, pOvr){
+function getAcademyOrgContractBlurb(juniorTeamName, leagueKey, gender, pOvr, previewAge){
   var pack=buildAcademyOrgContract(leagueKey, gender, pOvr||60, juniorTeamName);
   var parent=pack.parentOrg;
   var g=gender||'M';
+  var ageForBand=previewAge!=null?previewAge:(G&&G.age||16);
   var html='<div class="vt" style="font-size:13px;color:var(--gold);margin-top:8px;border-left:3px solid var(--gold);padding-left:8px">';
   if(parent){
     html+='<b>ORGANIZATION CONTRACT:</b> Sign with parent club <b>'+parent.name+'</b> ('+parent.leagueKey+') — academy ice in '+String(LEAGUES[leagueKey]&&LEAGUES[leagueKey].short||leagueKey)+'. ';
@@ -301,9 +305,9 @@ function getAcademyOrgContractBlurb(juniorTeamName, leagueKey, gender, pOvr){
   } else {
     var bandLbl=typeof getYouthBandLabel==='function'?getYouthBandLabel(leagueKey,'U20'):'U20';
     html+='Organizational contract required — <b>no salary</b> on academy ice. ';
-    if(typeof getAcademyAgeBand==='function'&&getAcademyAgeBand(G&&G.age||16)==='U16'){
+    if(typeof getAcademyAgeBand==='function'&&getAcademyAgeBand(ageForBand)==='U16'){
       html+='<b>U16</b> is fully amateur (no pay). ';
-    } else if(typeof getAcademyAgeBand==='function'&&getAcademyAgeBand(G&&G.age||16)==='U18'){
+    } else if(typeof getAcademyAgeBand==='function'&&getAcademyAgeBand(ageForBand)==='U18'){
       html+='<b>U18</b> is fully amateur (no pay). ';
     } else {
       html+='At <b>'+bandLbl+'</b> you may receive a modest org stipend (~<b>'+fmt(pack.weeklyStipend*52)+'</b>/yr). ';
@@ -393,6 +397,32 @@ function applyAcademyEarlySignOfferBias(offers, otherLeagues){
   return offers;
 }
 
+/** Push a real offseason offer when the parent org has flagged an early signing. */
+function appendAcademyEarlySignOffer(){
+  if(typeof curFAOffers==='undefined'||!G||!G._academyEarlySignOffer||G._academyEarlySignOffer.season!==G.season) return;
+  if(!isProAcademyJuniorLeague(G.leagueKey)||!G.team) return;
+  var lk=G.leagueKey;
+  var l=LEAGUES[lk];
+  if(!l) return;
+  var dup=false, j;
+  for(j=0;j<curFAOffers.length;j++){ if(curFAOffers[j].academyEarlySign){ dup=true; break; } }
+  if(dup) return;
+  var parentName=G._academyEarlySignOffer.parentTeam;
+  var pk=G._academyEarlySignOffer.parentLeague;
+  var po=typeof ovr==='function'?ovr(G.attrs,G.pos):60;
+  var pack=typeof buildAcademyOrgContract==='function'?buildAcademyOrgContract(lk, G.gender, po, G.team.n):null;
+  if(!pack||!pack.contract) return;
+  curFAOffers.unshift({
+    lk:lk, l:l, team:G.team,
+    sal:pack.contract.sal||0,
+    yrs:pack.contract.yrs||2,
+    juniorDeal:true,
+    movementOffer:true,
+    academyEarlySign:true,
+    rightsNote:'Early ORG deal with '+parentName+' ('+pk+') — stay in '+l.short+', parent salary on pro track'
+  });
+}
+
 function getAcademyHubBlurb(){
   if(!G||!isProAcademyJuniorLeague(G.leagueKey)||!G.team) return '';
   syncPlayerAcademyBand();
@@ -407,7 +437,7 @@ function getAcademyHubBlurb(){
   else if(G.contract&&G.contract.type==='ORG PRO DEAL') html+=' (<b>ORG PRO DEAL</b> — '+fmt(G.contract.sal||0)+'/yr from parent org).';
   else if(G.contract&&G.contract.type==='ACADEMY CONTRACT') html+=' (<b>ACADEMY CONTRACT</b> with parent org).';
   if(band==='PRO_CALLUP'){
-    html+=' <b>Pro-ready band</b> — parent club may dress you for '+parent.leagueKey+' games this season.';
+    html+=' <b>Pro-ready band</b> — parent club may dress you for '+(parent?parent.leagueKey:'pro')+' games this season.';
   } else if(band!==getAcademyAgeBand(G.age)){
     html+=' <b>Playing up</b> — '+((G.gp||0)>=8&&(G.goals+G.assists)/(G.gp||1)>=0.45?'strong production or ':'')+'60+ OVR / age qualifies you for the next band.';
   }

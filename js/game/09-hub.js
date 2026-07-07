@@ -837,6 +837,10 @@ function renderStandingsTab(){
     var acBlurb=getAcademyHubBlurb();
     if(acBlurb) html+=acBlurb;
   }
+  if(typeof getLowerJuniorHubBlurb==='function'){
+    var ljBlurb=getLowerJuniorHubBlurb();
+    if(ljBlurb) html+=ljBlurb;
+  }
   if(!layout){
     html+=standingsMiniTable(st);
     html+='</div>';

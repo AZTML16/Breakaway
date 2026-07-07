@@ -302,8 +302,22 @@ function qualifiesForLocalAdvancePath(){
 
 function getLocalAdvanceLeagueOptions(){
   if(!G) return [];
-  if(G.gender==='F') return ['CWHL','USWDL','EWJC','AWJC','NWCHA'];
-  return ['OJL','QMJL','WJL','USJL','NEJC','CEJC','ARJC','NCHA'];
+  var nat=typeof normalizePlayerNat==='function'?normalizePlayerNat(G.nat):String(G.nat||'');
+  var po=typeof ovr==='function'?ovr(G.attrs,G.pos):0;
+  var directMin=typeof getMajorJuniorDirectStartMinOvr==='function'?getMajorJuniorDirectStartMinOvr():58;
+  if(po>=directMin&&typeof getMajorJuniorLeagueOptionsForPlayer==='function'){
+    var majors=getMajorJuniorLeagueOptionsForPlayer(nat, G.gender, G.hometown);
+    if(majors.length){
+      if(G.gender==='F') return majors.concat(['WJDL','NWCHA','EWJC','AWJC']);
+      if(nat==='United States') return majors.concat(['NCHA','CJAL','USJD']);
+      if(nat==='Canada') return majors.concat(['NCHA','CJAL','CJBL','CJCL']);
+      return majors.concat(['NCHA','CJCL','CJBL','CJAL','USJD','NEJC','CEJC','ARJC']);
+    }
+  }
+  if(G.gender==='F') return ['WJDL','CWHL','USWDL','EWJC','AWJC','NWCHA'];
+  if(nat==='United States') return ['USJD','USJL','CJAL','OJL','QMJL','WJL','NCHA'];
+  if(nat==='Canada') return ['CJCL','CJBL','CJAL','OJL','QMJL','WJL','USJL','NCHA'];
+  return ['CJCL','CJBL','CJAL','USJD','OJL','QMJL','WJL','USJL','NEJC','CEJC','ARJC','NCHA'];
 }
 
 function buildLocalNatRegionMap(){
