@@ -512,13 +512,42 @@ function teamLogoSVGCollege(teamName,size,cols,leagueKey){
 // TEAM LOGOS — pro / minor / junior composer
 // ============================================================
 
+function teamLogoImgFallback(img){
+  if(!img||img.getAttribute('data-fallback')==='1') return;
+  img.setAttribute('data-fallback','1');
+  var name=img.getAttribute('data-team')||'';
+  var lk=img.getAttribute('data-lk')||'';
+  var s=parseInt(img.getAttribute('width'),10)||72;
+  try{
+    var html=teamLogoSVGProcedural(name,s,lk);
+    var wrap=document.createElement('div');
+    wrap.innerHTML=html;
+    var node=wrap.firstChild;
+    if(node&&img.parentNode) img.parentNode.replaceChild(node,img);
+  }catch(e){
+    img.style.display='none';
+  }
+}
+
 function teamLogoSVG(teamName,size,leagueKey){
   var lk=String(leagueKey!=null?leagueKey:'');
   var s=size||26;
+  // Asset images only for hub/large crests — small chips stay procedural to avoid
+  // dozens of HTTP fetches every standings/schedule redraw (lag on weaker devices).
   var asset=typeof teamLogoAssetPath==='function'?teamLogoAssetPath(teamName,lk):null;
-  if(asset){
-    return '<img class="team-crest-svg team-crest-img" src="'+asset+'" width="'+s+'" height="'+s+'" alt="" decoding="async" style="width:'+s+'px;height:'+s+'px;object-fit:contain;display:block"/>';
+  if(asset&&s>=48){
+    var safeSrc=String(asset).replace(/"/g,'&quot;');
+    var safeName=String(teamName||'TEAM').replace(/"/g,'&quot;');
+    var safeTeam=String(teamName||'').replace(/"/g,'&quot;');
+    var safeLk=String(lk).replace(/"/g,'&quot;');
+    return '<img class="team-crest-svg team-crest-img" src="'+safeSrc+'" width="'+s+'" height="'+s+'" alt="'+safeName+'" data-team="'+safeTeam+'" data-lk="'+safeLk+'" decoding="async" loading="eager" onerror="teamLogoImgFallback(this)" style="width:'+s+'px;height:'+s+'px;object-fit:contain;display:block"/>';
   }
+  return teamLogoSVGProcedural(teamName,s,lk);
+}
+
+/** Procedural crest (always available — used for chips + asset fallback). */
+function teamLogoSVGProcedural(teamName,size,leagueKey){
+  var lk=String(leagueKey!=null?leagueKey:'');
   var cols=teamColorPack(teamName,lk);
   if(isCollegeLeagueKey(lk)) return teamLogoSVGCollege(teamName,size,cols,lk);
   var B=teamLogoIdentityBlob(teamName,lk);
