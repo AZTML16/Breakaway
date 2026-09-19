@@ -620,6 +620,7 @@ function renderWeekGames(){
       if(G.isInjured) html+='<span class="vt" style="font-size:12px;color:var(--acc);display:block;margin-top:4px">Light participation — no game contact</span>';
       html+='</div>';
     } else {
+    var myTeamLbl=typeof getTeamDisplayName==='function'?getTeamDisplayName(G.team.n,G.leagueKey,{academyBand:G._academyBand}):(G.team&&G.team.n)||'TEAM';
     var oppLbl=typeof getTeamDisplayName==='function'?getTeamDisplayName(opp.n,G.leagueKey,{}):opp.n;
     html+='<div class="vt" style="font-size:15px;flex:1">'+teamLogoChip(G.team.n,20,G.leagueKey)+' '+myTeamLbl+' <span style="color:var(--mut)">VS</span> '+teamLogoChip(opp.n,20,G.leagueKey)+' '+oppLbl;
     if(G.pos==='G'&&!injBlock) html+='<span class="vt" style="font-size:12px;color:var(--mut);display:block;margin-top:4px">'+(youStart?'YOU START':'BENCH -- '+bname+' starts')+'</span>';
