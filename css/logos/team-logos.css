@@ -85,6 +85,15 @@
   filter: contrast(1.12) saturate(0.78) brightness(0.96);
 }
 
+.hub-team-crest img.team-crest-img,
+.team-chip img.team-crest-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  filter: contrast(1.08) saturate(0.85) brightness(0.98);
+}
+
 .hub-team-crest::after {
   content: "";
   position: absolute;

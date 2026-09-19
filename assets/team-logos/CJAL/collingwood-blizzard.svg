@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Collingwood Blizzard">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2d2d2d"/>
+      <stop offset="1" stop-color="#78909c" stop-opacity=".35"/>
+    </linearGradient>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity=".45"/>
+    </filter>
+  </defs>
+  <rect width="256" height="256" fill="#2d2d2d"/>
+  <path d="M48 55 H208 V175 Q208 210 128 225 Q48 210 48 175 Z" fill="url(#g)" stroke="#ff5722" stroke-width="8" filter="url(#sh)"/>
+  <path d="M48 55 H208 V175 Q208 210 128 225 Q48 210 48 175 Z" fill="none" stroke="#fff5f0" stroke-width="2" opacity=".25"/>
+  <g transform="translate(0,-6)"><path d="M128 50 L148 95 L200 100 L160 132 L172 185 L128 158 L84 185 L96 132 L56 100 L108 95 Z" fill="#ff5722"/><circle cx="128" cy="118" r="14" fill="#78909c" opacity=".35"/></g>
+  <text x="128" y="38" text-anchor="middle" font-family="Oswald, Arial Narrow, sans-serif" font-size="14" font-weight="700" fill="#ff5722" letter-spacing="2">COLLINGWOO</text>
+  <text x="128" y="228" text-anchor="middle" font-family="Bebas Neue, Impact, sans-serif" font-size="26" font-weight="700" fill="#fff5f0" letter-spacing="1">BLIZZARD</text>
+  <text x="128" y="246" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#78909c" opacity=".7">CJAL</text>
+</svg>

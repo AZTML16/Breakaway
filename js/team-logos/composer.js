@@ -57,42 +57,37 @@ function teamLogoTextFitAttrs(str,optMinLen,textLengthMax){
 /** Map mascot keywords → hand-tuned crest mark (gfx-0 ids) so logos resemble the team. */
 var TEAM_NICK_LOGO_THEMES=[
   [/monarch|royal|king|queen|crown|regal|emperor/i,4],
-  [/voyageur|voyag|mariner|sailor|harbour|harbor|seafarer|tidal|surf/i,5],
-  [/storm|thunder|tempest|lightning|outlaw/i,8],
-  [/blaze|fire|forge|scorch|furnace|neon|founder/i,16],
-  [/blizzard|snow|frost|tundra|ice|glacier/i,5],
-  [/wolf|husky|hound|coyote|copperhead/i,1],
-  [/bear|grizzly|bruin/i,0],
-  [/eagle|hawk|falcon|raptor|snowhawk/i,13],
-  [/shark|fish|tidal/i,32],
-  [/star|stellar/i,9],
-  [/iron|steel|rail|rivet|smelter|archer/i,30],
-  [/mountain|mountaineer|altitude|summit|peak/i,3],
-  [/colonial|diplomat|sentinel|rampart|fort/i,14],
-  [/copper|miner|driller|roughneck|roughnecks/i,21],
+  [/voyageur|voyag|mariner|sailor|harbour|harbor|seafarer|tidal|surf|whaler|whale|dock|skiff|rapide|rapids/i,5],
+  [/storm|thunder|tempest|lightning|outlaw|bolt|volt|voltage|surge|cyclone|tornado/i,8],
+  [/blaze|fire|forge|scorch|furnace|neon|founder|ember|torch|smelter/i,16],
+  [/blizzard|snow|frost|tundra|ice|glacier|chill|freeze|winter|aurora/i,5],
+  [/wolf|husky|hound|coyote|copperhead|timberwolf|wolfpack/i,1],
+  [/bear|grizzly|bruin|polar/i,0],
+  [/eagle|hawk|falcon|raptor|snowhawk|seahawk|icehawk|redhawk|wildhawk|steelhawk|nighthawk/i,13],
+  [/shark|fish|gator/i,32],
+  [/star|stellar|comet|northstar/i,9],
+  [/iron|steel|rail|rivet|smelter|archer|ironclad|ironmen|ironwomen|ironspire|ironhorse/i,30],
+  [/mountain|mountaineer|altitude|summit|peak|alpine|rock/i,3],
+  [/colonial|diplomat|sentinel|rampart|fort|cannon|canon|grenadier|centurion|spartan|cadet|command|lancer/i,14],
+  [/copper|miner|driller|roughneck|roughnecks|prospect/i,21],
   [/sun|solar|sunblazer/i,17],
   [/tide|wave|rainmaker|surf/i,5],
-  [/archer|target/i,17],
   [/troubadour|music/i,29],
-  [/diplomat|diplomats/i,14],
-  [/grind|grinder|thresh|wheat/i,12],
-  [/river|rivermen/i,22],
-  [/ghost|phantom/i,15],
-  [/surge|pulse|volt/i,8],
-  [/mustang|stallion|horse/i,27],
+  [/grind|grinder|thresh|wheat|lumber|logger|timber|woods|pine|forest/i,12],
+  [/river|rivermen|danube|vistula/i,22],
+  [/ghost|phantom|spectre/i,15],
+  [/mustang|stallion|horse|colt|stampede/i,27],
   [/crusher|crush/i,11],
-  [/outlaw/i,8],
-  [/colonial/i,14],
-  [/iron|ironclad/i,30],
-  [/founder/i,16],
-  [/smelter/i,16],
-  [/neon/i,17],
-  [/rainmaker/i,5],
-  [/scorch/i,16],
-  [/tidal|tide/i,5],
-  [/surf/i,5],
-  [/rail/i,30],
-  [/altitude/i,3]
+  [/dragon|drakon|dragoons/i,20],
+  [/lion|tiger|tigres|lynx|panther|thundercat|wildcat/i,0],
+  [/fox|bison|buck|stag|ram|pronghorn|caribou/i,2],
+  [/raven|owl|cardinal|phoenix|phœnix/i,13],
+  [/viking|northmen|northwomen|norwester|valkyrie|siren/i,14],
+  [/rocket|jet|pilot|torpedo|express|force|circuit|dynamo|motor/i,17],
+  [/scout|ranger|trapper|renegade|bandit|raider|maverick|wildcard|hornet|scorpion|viper/i,8],
+  [/castle|capital|metro|union|liberty|heritage|academy|program|scholar|nittany/i,14],
+  [/avalanche|dust|sandstorm|fog|blade|skate/i,3],
+  [/pride|shamrock|saint|beacon|breeze|chinook|fogcutter/i,9]
 ];
 
 function teamLogoThemeGraphicId(teamName){
@@ -519,6 +514,11 @@ function teamLogoSVGCollege(teamName,size,cols,leagueKey){
 
 function teamLogoSVG(teamName,size,leagueKey){
   var lk=String(leagueKey!=null?leagueKey:'');
+  var s=size||26;
+  var asset=typeof teamLogoAssetPath==='function'?teamLogoAssetPath(teamName,lk):null;
+  if(asset){
+    return '<img class="team-crest-svg team-crest-img" src="'+asset+'" width="'+s+'" height="'+s+'" alt="" decoding="async" style="width:'+s+'px;height:'+s+'px;object-fit:contain;display:block"/>';
+  }
   var cols=teamColorPack(teamName,lk);
   if(isCollegeLeagueKey(lk)) return teamLogoSVGCollege(teamName,size,cols,lk);
   var B=teamLogoIdentityBlob(teamName,lk);
