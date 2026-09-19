@@ -111,6 +111,11 @@ function getWeeklyStipend(){
     return Math.round((g==='M'?175:130)+rd(0,g==='M'?125:95));
   }
   if(lk==='USJL') return Math.round(105+rd(0,75));
+  if(typeof isLowerJuniorLeague==='function'&&isLowerJuniorLeague(lk)){
+    var ljBase=Math.round(3200/52);
+    var ljOvr=typeof ovr==='function'?ovr(G.attrs,G.pos):50;
+    return Math.round(Math.max(ljBase, Math.min(Math.round(5500/52), ljBase+(ljOvr-50)*0.35)));
+  }
   if(tier==='junior'){
     if(lk==='CWHL'||lk==='USWDL') return Math.round(90+rd(0,60));
     return Math.round((g==='M'?70:55)+rd(0,50));
@@ -127,7 +132,11 @@ function getWeeklyLivingCost(){
   var sal=(G.contract&&G.contract.sal)|0;
   var base;
   if(isChlMajorJuniorLeague(lk)&&G.gender==='M'){
-    base=85+rd(0,45);
+    base=85+rd(0,45); // billet / host-family living
+  } else if(typeof isLowerJuniorLeague==='function'&&isLowerJuniorLeague(lk)){
+    base=70+rd(0,40); // mostly home / local rink life
+  } else if(typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(lk)){
+    base=95+rd(0,50); // org housing / academy digs
   } else if(tier==='local'){
     base=95+rd(0,55);
   } else if(tier==='junior'){
@@ -231,12 +240,17 @@ function renderPlayerFinanceSection(){
   var living=getWeeklyLivingCost();
   var net=weeklyPay+stipend-living;
   var stipLabel='';
+  var livingLabel='Living';
   if(stipend>0){
     if(isChlMajorJuniorLeague(G.leagueKey)&&G.gender==='M') stipLabel='CHL stipend';
     else if(typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(G.leagueKey)) stipLabel='academy org stipend';
+    else if(typeof isLowerJuniorLeague==='function'&&isLowerJuniorLeague(G.leagueKey)) stipLabel='lower-junior stipend';
     else if(G.leagueKey==='NCHA'||G.leagueKey==='NWCHA') stipLabel='scholarship + spending';
     else stipLabel='amateur stipend';
   }
+  if(isChlMajorJuniorLeague(G.leagueKey)&&G.gender==='M') livingLabel='Billet / host family';
+  else if(typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(G.leagueKey)) livingLabel='Org housing';
+  else if(typeof isLowerJuniorLeague==='function'&&isLowerJuniorLeague(G.leagueKey)) livingLabel='Home / local rink';
   var html='<div style="background:var(--rink);border:1px solid var(--rl);padding:12px;margin:12px 0">'+
     '<div class="vt" style="font-size:14px;color:var(--mut)">FINANCES</div>'+
     '<div class="vt" style="font-size:12px;color:var(--mut);margin-top:4px">CAREER EARNINGS (LIFETIME)</div>'+
@@ -246,7 +260,7 @@ function renderPlayerFinanceSection(){
     '<div class="vt" style="font-size:13px;color:var(--mut);margin-top:6px;line-height:1.5">'+
     (weeklyPay>0?('Salary: <span style="color:var(--green)">'+fmt(weeklyPay)+'</span>'):
       (stipend>0?('<span style="color:var(--green)">'+fmt(stipend)+'</span> /wk '+stipLabel):'No weekly pay'))+
-    ' &nbsp;·&nbsp; Living: <span style="color:var(--red)">−'+fmt(living)+'</span> &nbsp;·&nbsp; '+
+    ' &nbsp;·&nbsp; '+livingLabel+': <span style="color:var(--red)">−'+fmt(living)+'</span> &nbsp;·&nbsp; '+
     'Net: <span style="color:'+(net>=0?'var(--green)':'var(--red)')+'">'+(net>=0?'+':'')+fmt(net)+'</span>'+
     '</div></div>';
 

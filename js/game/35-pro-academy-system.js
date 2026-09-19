@@ -352,7 +352,17 @@ function getAcademyOrgDisplayBand(leagueKey, teamName){
 function syncPlayerAcademyBand(){
   if(!G||!isProAcademyJuniorLeague(G.leagueKey)) return;
   var pOvr=typeof ovr==='function'?ovr(G.attrs,G.pos):60;
-  G._academyBand=getAcademyPlayingBand(G.age,pOvr,G.leagueKey,{allowUserBoost:true});
+  var prev=G._academyBand||'';
+  var next=getAcademyPlayingBand(G.age,pOvr,G.leagueKey,{allowUserBoost:true});
+  G._academyBand=next;
+  if(prev&&next&&prev!==next){
+    var newsKey=prev+'>'+next+'@'+(G.season||0);
+    if(G._academyBandNewsKey!==newsKey){
+      G._academyBandNewsKey=newsKey;
+      var lbl=typeof getYouthBandLabel==='function'?getYouthBandLabel(G.leagueKey,next):next;
+      addNews('ACADEMY MOVE: '+G.first+' '+G.last+' elevated to '+lbl+(next==='PRO_CALLUP'?' — parent club may dress you for pro games.':'.'),'big');
+    }
+  }
 }
 
 function getAcademyEarlySignOvrThreshold(leagueKey){

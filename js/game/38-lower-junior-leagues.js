@@ -146,6 +146,35 @@ function getLowerJuniorDraftStatusText(){
 }
 
 /**
+ * Prefer call-up clubs near hometown / territory (CHL reality) — still random among a shortlist.
+ */
+function pickTerritoryWeightedJuniorTeam(leagueKey){
+  var teams=(TEAMS[leagueKey]||[]).slice();
+  if(!teams.length) return null;
+  if(teams.length===1) return teams[0];
+  var hometown=String((G&&G.hometown)||'').toLowerCase();
+  var homeTok=hometown.replace(/[^a-zà-öø-ÿ\s]/gi,'').split(/\s+/).filter(function(w){return w.length>2;});
+  var scored=[], i, t, name, score, hi;
+  for(i=0;i<teams.length;i++){
+    t=teams[i];
+    name=String(t.n||'').toLowerCase();
+    score=1;
+    for(hi=0;hi<homeTok.length;hi++){
+      if(name.indexOf(homeTok[hi])>=0){ score+=12; break; }
+    }
+    if(typeof isChlTerritoryLeague==='function'&&isChlTerritoryLeague(leagueKey)&&
+       typeof isChlTerritoryMismatch==='function'&&G&&!isChlTerritoryMismatch(leagueKey,G.hometown,G.nat,G.gender)){
+      score+=4;
+    }
+    scored.push({t:t,s:score});
+  }
+  scored.sort(function(a,b){return b.s-a.s;});
+  var topN=Math.min(5, Math.max(2, Math.ceil(scored.length*0.35)));
+  var pool=scored.slice(0,topN);
+  return pool[Math.floor(Math.random()*pool.length)].t;
+}
+
+/**
  * Push promotion (call-up) offers into the offseason FA panel for a qualifying
  * lower-junior player. Called from generateOffseasonContractOffers.
  */
@@ -162,7 +191,7 @@ function appendJuniorPromotionOffers(){
     if(!l||!teams.length) continue;
     if(typeof offerAlreadyHasLeague==='function'&&offerAlreadyHasLeague(lk)) continue;
     if(typeof canJoinLeagueByAge==='function'&&!canJoinLeagueByAge(lk)) continue;
-    var team=teams[Math.floor(Math.random()*teams.length)];
+    var team=pickTerritoryWeightedJuniorTeam(lk)||teams[Math.floor(Math.random()*teams.length)];
     // CHL clubs honour home territory unless the player signs as an import.
     var isImport=typeof isChlTerritoryMismatch==='function'&&typeof isChlTerritoryLeague==='function'&&
       isChlTerritoryLeague(lk)&&isChlTerritoryMismatch(lk,G.hometown,G.nat,G.gender);

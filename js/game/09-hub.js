@@ -159,7 +159,21 @@ function renderHub(){
   if(G.streakType && G.streakType!=='none' && G.streakCount>=2) msgs.push('TREND: '+G.streakType+G.streakCount+' STREAK');
   if(G.streakType && G.streakType!=='none' && G.streakCount>=4) msgs.push('ARENA ENERGY: '+G.streakType+G.streakCount+' -- EVERY SHIFT MATTERS');
   if(typeof draftClubWillingToSignElc==='function' && hasActiveDraftRights() && !draftClubWillingToSignElc())
-    msgs.push('DRAFT: '+G.draftRights.team+' HOLDS RIGHTS (NO CONTRACT) — OVERSEAS SEMI-PRO OK · ELC AT '+getDraftClubElcMinOvr()+'+ OVR');
+    msgs.push('DRAFT: '+G.draftRights.team+' HOLDS RIGHTS (NO CONTRACT) - OVERSEAS SEMI-PRO OK · ELC AT '+getDraftClubElcMinOvr()+'+ OVR');
+  else if(!G.everDrafted&&G.league){
+    var draftAgeNext=(G.age||16)+1;
+    var maxDrAge=typeof getPhlDraftWindowMaxAge==='function'?getPhlDraftWindowMaxAge(G.nat):20;
+    var onDraftCircuit=typeof isPhlDraftEligibleCircuit==='function'?isPhlDraftEligibleCircuit(G.leagueKey):false;
+    var inLowerJ=typeof isLowerJuniorLeague==='function'&&isLowerJuniorLeague(G.leagueKey);
+    if(inLowerJ&&(G.age||16)>=17)
+      msgs.push('DRAFT: PHL WINDOW OPENS AFTER A MAJOR-JUNIOR CALL-UP');
+    else if(onDraftCircuit&&draftAgeNext===18)
+      msgs.push('DRAFT: PRIMARY PHL DRAFT YEAR AFTER THIS SEASON');
+    else if(onDraftCircuit&&draftAgeNext>18&&draftAgeNext<=maxDrAge)
+      msgs.push('DRAFT: RE-ENTRY WINDOW OPEN THROUGH AGE '+maxDrAge);
+  }
+  if(G.league&&G.league.tier==='junior'&&(G.age||16)>=(typeof getJuniorMaxAge==='function'?getJuniorMaxAge():19))
+    msgs.push('JUNIOR: FINAL SEASON - AGE-OUT AFTER THIS YEAR');
   if(typeof isPlayerUnderBindingContract==='function' && isPlayerUnderBindingContract())
     msgs.push('CONTRACT: '+getContractCircuitHint(G._contractCircuit||'')+' ('+(G.contractYrsLeft||0)+' YR LEFT)');
   if(G.morale>=88) msgs.push(G.first.toUpperCase()+' -- LOCKER ROOM VIBES: MORALE THROUGH THE ROOF');
@@ -200,7 +214,20 @@ function maybeMidSeasonPulse(){
     lines.push({t:'Try-hockey volunteers thanked you on social — good vibes.',m:5,x:10,f:ri(15,60)});
   }
   if(tier==='junior'||tier==='college'){
-    lines.push({t:'Scouts were in the building this week — pressure, but motivation.',m:1,x:9});
+    if(typeof isLowerJuniorLeague==='function'&&isLowerJuniorLeague(G.leagueKey)){
+      lines.push({t:'Tier-II scouts and a CHL/USJL coach were on the glass — call-up tape week.',m:2,x:11});
+      lines.push({t:'Junior A/B chatter: dominate here and the next rung notices.',m:1,x:9});
+    } else if(typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(G.leagueKey)){
+      lines.push({t:'Parent org GM in the stands — academy pipeline is watching every shift.',m:2,x:12});
+      if(G._academyEarlySignOffer&&G._academyEarlySignOffer.season===G.season)
+        lines.push({t:'Early-signing buzz around the room — org deal talks are live.',m:3,x:10});
+    } else if((G.age||16)===17){
+      lines.push({t:'Central scouting / PHL list watch — draft-year pressure, but fuel.',m:1,x:12});
+    } else if(!G.everDrafted&&(G.age||16)>=18&&typeof getPhlDraftWindowMaxAge==='function'&&(G.age||16)<getPhlDraftWindowMaxAge(G.nat)){
+      lines.push({t:'Late-bloomer buzz — a rare re-entry look if you keep climbing.',m:2,x:10});
+    } else {
+      lines.push({t:'Scouts were in the building this week — pressure, but motivation.',m:1,x:9});
+    }
   }
   var pick=lines[ri(0,lines.length-1)];
   G.morale=cl((G.morale||50)+pick.m,0,100);

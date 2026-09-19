@@ -134,14 +134,7 @@ function preGame(idx){
   markPuckSlot('pg-home-mark',stripBracketIcons(G.team.e));
   safeEl('pg-away').textContent=awayLbl;
   markPuckSlot('pg-away-mark',curOpponent.e);
-  var reports=[
-    'Strong defensive team -- they play a tight neutral zone.',
-    'High-scoring lineup -- expect a back-and-forth game.',
-    'Goalie on a hot streak -- shots need to be prime.',
-    'Big physical team -- protect the puck and battle hard.',
-    'Lost 3 in a row -- expect desperation hockey.',
-    'Playing their best hockey right now -- bring your A game.'
-  ];
+  var reports=getPregameScoutReports(G.leagueKey);
   safeEl('scout-report').textContent=reports[ri(0,reports.length-1)];
   var shtml='';
   for(var i=0;i<STRATEGIES.length;i++){
@@ -151,6 +144,50 @@ function preGame(idx){
   safeEl('strategy-btns').innerHTML=shtml;
   setPregamePlayButton(!!G._pregameBackupNight,idx);
   show('s-pregame');
+}
+
+/** League-flavored pregame lines — pace/feel of the rink, not generic filler. */
+function getPregameScoutReports(leagueKey){
+  var lk=leagueKey||(G&&G.leagueKey)||'';
+  var pace=typeof getLeagueScoringPaceClass==='function'?getLeagueScoringPaceClass(lk):'structured';
+  var byPace={
+    rungun:[
+      'Transition barn — expect odd-man rushes and open ice.',
+      'High event pace — mistakes become goals fast.',
+      'They stretch the ice; keep sticks active on the backcheck.'
+    ],
+    high:[
+      'Skill-first lineup — one-timers and seam passes will be there.',
+      'Flashy attack — protect the slot and win puck battles early.',
+      'Neutral-zone chess at speed — clean exits matter.'
+    ],
+    structured:[
+      'Structured breakout — they choke mid-ice and wait for turnovers.',
+      'Systems game — patience off the rush, then attack the cycle.',
+      'Tight five-man unit — force them to the outside.'
+    ],
+    tight:[
+      'Low-event, tight-checking rink — shots need to be premium.',
+      'Goalie-friendly building — traffic and tips are your friend.',
+      'Grinders night — board battles decide the scoreboard.'
+    ],
+    lowskill:[
+      'Community rink pace — dump-ins and chase, messy ice.',
+      'Raw skill gaps — win races and own the dirty areas.',
+      'Small-barn chaos — keep your head up through the middle.'
+    ]
+  };
+  var base=(byPace[pace]||byPace.structured).slice();
+  if(typeof isLowerJuniorLeague==='function'&&isLowerJuniorLeague(lk)){
+    base.push('Development circuit — scouts want habits as much as points.');
+  }
+  if(typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(lk)){
+    base.push('Academy tape — parent org watches structure and work rate.');
+  }
+  if(lk==='WJL') base.push('Western physical brand — finish checks, protect the puck.');
+  if(lk==='QMJL') base.push('East Coast skill flash — look for east-west plays.');
+  if(lk==='OJL') base.push('Ontario pace — transition and compete every shift.');
+  return base;
 }
 
 function setStrategy(id,btn){

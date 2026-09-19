@@ -1118,7 +1118,28 @@ function buildSeasonRecapHTML(){
     }
     html+='</div>';
   } else if(tier==='junior'){
-    html+='<div style="color:var(--mut);font-size:13px">Junior circuit — draft stock and ice time matter as much as the scoreboard.</div>';
+    html+='<div style="color:var(--mut);font-size:13px">';
+    if(typeof isLowerJuniorLeague==='function'&&isLowerJuniorLeague(G.leagueKey)){
+      var ljBar=typeof getJuniorPromotionMinOvr==='function'?getJuniorPromotionMinOvr(G.leagueKey):56;
+      var ljUp=typeof getJuniorPromotionOptions==='function'?getJuniorPromotionOptions():[];
+      var ljNext=ljUp.length&&LEAGUES[ljUp[0]]?LEAGUES[ljUp[0]].short:'CHL/USJL';
+      html+='Lower junior path — OVR <b>'+Math.round(o)+'</b> vs call-up bar ~'+ljBar+'. Next rung: <b>'+escHtml(typeof stripBracketIcons==='function'?stripBracketIcons(ljNext):ljNext)+'</b>. Not PHL-draft eligible until a major-junior promotion.';
+      if(typeof qualifiesForJuniorPromotion==='function'&&qualifiesForJuniorPromotion()) html+=' <span style="color:var(--gold)">Call-up eligible this offseason.</span>';
+    } else if(typeof isProAcademyJuniorLeague==='function'&&isProAcademyJuniorLeague(G.leagueKey)){
+      var acBand=G._academyBand||(typeof getAcademyAgeBand==='function'?getAcademyAgeBand(G.age):'');
+      html+='Academy org pipeline'+(acBand?' — playing <b>'+escHtml(acBand)+'</b>':'')+'.';
+      if(G._academyParentOrg) html+=' Parent club: <b>'+escHtml(G._academyParentOrg.teamName)+'</b> ('+escHtml(G._academyParentOrg.leagueKey)+').';
+      html+=' PHL scouts can still draft you at 18 while you develop overseas.';
+    } else {
+      var draftAgeNext=(G.age||16)+1;
+      var maxDr=typeof getPhlDraftWindowMaxAge==='function'?getPhlDraftWindowMaxAge(G.nat):20;
+      html+='Major junior — draft stock and ice time matter as much as the scoreboard.';
+      if(!G.everDrafted&&draftAgeNext===18) html+=' <span style="color:var(--gold)">Entering primary PHL draft year.</span>';
+      else if(!G.everDrafted&&draftAgeNext>18&&draftAgeNext<=maxDr) html+=' Re-entry window open through age '+maxDr+'.';
+      else if(G.draftRights) html+=' Rights held by <b>'+escHtml(G.draftRights.team)+'</b>.';
+      else if((G.age||16)>=(typeof getJuniorMaxAge==='function'?getJuniorMaxAge():19)) html+=' Final junior season — age-out after this year.';
+    }
+    html+='</div>';
   }
   if(G._wonLeagueChampionship||G.wonCup) html+='<div style="color:var(--green);margin-top:8px"><b>League champion</b> this season.</div>';
   if(G._memorialCupWon) html+='<div style="color:var(--gold);margin-top:6px"><b>CJL Memorial Cup champion</b> — national junior title.</div>';
@@ -1525,6 +1546,7 @@ function renderFAOffersPanel(rightsActive,rightsDevHold,wantMovement,mustLeaveAm
 
 function signFAOffer(i){
   var o=curFAOffers[i];if(!o)return;
+  var preSignLeagueShort=(G.league&&G.league.short)||G.leagueKey||'';
   if(o.academyEarlySign&&G&&G.league&&G.team){
     o.lk=G.leagueKey;
     o.l=G.league;
@@ -1604,7 +1626,15 @@ function signFAOffer(i){
   }
   G.standings=buildStandings(o.lk);
   G.allOpponents=genSeason(o.lk,o.team);
-  addNews(G.first+' '+G.last+' ('+formatPlayerPositionLabel(G.pos, G.subPos)+') signs '+o.yrs+'-year deal with '+o.team.n+' in the '+o.l.short+'!','big');
+  if(o.juniorPromotion){
+    addNews('CALL-UP: '+G.first+' '+G.last+' promoted from '+preSignLeagueShort+' to '+o.l.short+' ('+o.team.n+') — now on a PHL-draft eligible circuit.','big');
+  } else if(o.lowerJuniorTransfer){
+    addNews(G.first+' '+G.last+' transfers within '+o.l.short+' — new club '+o.team.n+' (same development rung).','neutral');
+  } else if(o.academyTransfer){
+    addNews(G.first+' '+G.last+' switches academy programs to '+o.team.n+' ('+o.l.short+') — new parent org pipeline.','big');
+  } else if(!o.academyEarlySign){
+    addNews(G.first+' '+G.last+' ('+formatPlayerPositionLabel(G.pos, G.subPos)+') signs '+o.yrs+'-year deal with '+o.team.n+' in the '+o.l.short+'!','big');
+  }
   if(o.academyEarlySign&&G._academyParentOrg){
     addNews('Early organizational signing with '+G._academyParentOrg.teamName+' ('+G._academyParentOrg.leagueKey+') — upgraded org deal while developing in '+G.league.short+'.','big');
   }
